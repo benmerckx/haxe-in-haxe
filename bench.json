@@ -1,11 +1,11 @@
 {
  "meta": {
-  "date": "2026-10-09 18:32 UTC",
-  "commit": "93f1df5",
+  "date": "2026-10-09 23:32 UTC",
+  "commit": "e221106",
   "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
   "cores": 4,
   "memory_gb": 15.7,
-  "os": "Linux-6.18.44-fc-v80-x86_64-with-glibc2.39",
+  "os": "Linux-6.18.44-fc-v114-x86_64-with-glibc2.39",
   "python": "3.13.16",
   "versions": {
    "reference": "5.0.0-preview.1",
@@ -36,7 +36,8 @@
   "wasm": "/root/emsdk/node/24.19.0_64bit/bin/node --stack-size=65500 bin/bench/wasm/hih.js",
   "hlc": "bin/bench/hih-hlc",
   "eval-source": "haxe/haxe -D eval-call-stack-depth=1000000 -cp src --run haxe.Main",
-  "eval-hxb": "haxe/haxe -D eval-call-stack-depth=1000000 --hxb-lib bin/bench/haxe-in-haxe.eval.hxb --run haxe.Main"
+  "eval-hxb": "haxe/haxe -D eval-call-stack-depth=1000000 --hxb-lib bin/bench/haxe-in-haxe.eval.hxb --run haxe.Main",
+  "hxc-clang": "bin/backend/hih/hih_clang"
  },
  "results": [
   {
@@ -110,12 +111,25 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 0.284,
-   "wall_median": 0.297,
-   "cpu_min": 0.283,
-   "cpu_median": 0.297,
-   "maxrss_mb": 56.5,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 0.276,
+   "wall_median": 0.289,
+   "cpu_min": 0.274,
+   "cpu_median": 0.286,
+   "maxrss_mb": 40.4,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "hello",
+   "runner": "hxc-clang",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 0.114,
+   "wall_median": 0.116,
+   "cpu_min": 0.113,
+   "cpu_median": 0.115,
+   "maxrss_mb": 33.7,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "hello",
@@ -123,12 +137,12 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 0.104,
-   "wall_median": 0.113,
-   "cpu_min": 0.103,
-   "cpu_median": 0.113,
+   "wall_min": 0.132,
+   "wall_median": 0.132,
+   "cpu_min": 0.129,
+   "cpu_median": 0.131,
    "maxrss_mb": 25.5,
-   "date": "2026-10-09 16:12 UTC"
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "hello",
@@ -136,12 +150,12 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 0.12,
-   "wall_median": 0.125,
-   "cpu_min": 0.12,
-   "cpu_median": 0.125,
-   "maxrss_mb": 49.1,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 0.111,
+   "wall_median": 0.113,
+   "cpu_min": 0.111,
+   "cpu_median": 0.112,
+   "maxrss_mb": 32.8,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "hello",
@@ -175,12 +189,12 @@
    "status": "ok",
    "runs": 3,
    "verified": false,
-   "wall_min": 0.122,
-   "wall_median": 0.138,
-   "cpu_min": 0.122,
-   "cpu_median": 0.138,
-   "maxrss_mb": 38.2,
-   "date": "2026-10-09 17:14 UTC"
+   "wall_min": 0.129,
+   "wall_median": 0.181,
+   "cpu_min": 0.128,
+   "cpu_median": 0.143,
+   "maxrss_mb": 38.4,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "hello",
@@ -194,6 +208,71 @@
    "cpu_median": 2.062,
    "maxrss_mb": 228.9,
    "date": "2026-10-09 16:12 UTC"
+  },
+  {
+   "workload": "trycatch",
+   "runner": "hxc",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 0.281,
+   "wall_median": 0.286,
+   "cpu_min": 0.28,
+   "cpu_median": 0.285,
+   "maxrss_mb": 40.5,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "trycatch",
+   "runner": "hxc-clang",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 0.113,
+   "wall_median": 0.115,
+   "cpu_min": 0.112,
+   "cpu_median": 0.114,
+   "maxrss_mb": 33.8,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "trycatch",
+   "runner": "hxc-cosmo",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 0.132,
+   "wall_median": 0.132,
+   "cpu_min": 0.13,
+   "cpu_median": 0.131,
+   "maxrss_mb": 25.5,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "trycatch",
+   "runner": "hxc-o2",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 0.113,
+   "wall_median": 0.115,
+   "cpu_min": 0.112,
+   "cpu_median": 0.114,
+   "maxrss_mb": 32.8,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "trycatch",
+   "runner": "reference",
+   "status": "ok",
+   "runs": 3,
+   "verified": false,
+   "wall_min": 0.124,
+   "wall_median": 0.129,
+   "cpu_min": 0.124,
+   "cpu_median": 0.127,
+   "maxrss_mb": 38.4,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "stdlib",
@@ -266,12 +345,25 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 0.583,
-   "wall_median": 0.587,
-   "cpu_min": 0.578,
-   "cpu_median": 0.582,
-   "maxrss_mb": 56.8,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 0.606,
+   "wall_median": 0.629,
+   "cpu_min": 0.605,
+   "cpu_median": 0.627,
+   "maxrss_mb": 52.7,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "stdlib",
+   "runner": "hxc-clang",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 0.227,
+   "wall_median": 0.227,
+   "cpu_min": 0.226,
+   "cpu_median": 0.226,
+   "maxrss_mb": 46.0,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "stdlib",
@@ -279,12 +371,12 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 0.222,
-   "wall_median": 0.222,
-   "cpu_min": 0.222,
-   "cpu_median": 0.222,
-   "maxrss_mb": 38.9,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 0.262,
+   "wall_median": 0.263,
+   "cpu_min": 0.261,
+   "cpu_median": 0.261,
+   "maxrss_mb": 36.3,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "stdlib",
@@ -292,12 +384,12 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 0.23,
-   "wall_median": 0.236,
-   "cpu_min": 0.223,
+   "wall_min": 0.223,
+   "wall_median": 0.231,
+   "cpu_min": 0.222,
    "cpu_median": 0.23,
-   "maxrss_mb": 49.3,
-   "date": "2026-10-09 16:12 UTC"
+   "maxrss_mb": 45.0,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "stdlib",
@@ -331,12 +423,12 @@
    "status": "ok",
    "runs": 3,
    "verified": false,
-   "wall_min": 0.233,
-   "wall_median": 0.233,
-   "cpu_min": 0.231,
-   "cpu_median": 0.232,
-   "maxrss_mb": 52.2,
-   "date": "2026-10-09 17:14 UTC"
+   "wall_min": 0.255,
+   "wall_median": 0.255,
+   "cpu_min": 0.247,
+   "cpu_median": 0.25,
+   "maxrss_mb": 52.9,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "stdlib",
@@ -422,12 +514,25 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 11.603,
-   "wall_median": 11.606,
-   "cpu_min": 11.596,
-   "cpu_median": 11.604,
-   "maxrss_mb": 805.3,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 13.27,
+   "wall_median": 13.543,
+   "cpu_min": 13.163,
+   "cpu_median": 13.375,
+   "maxrss_mb": 464.4,
+   "date": "2026-10-09 23:32 UTC"
+  },
+  {
+   "workload": "self",
+   "runner": "hxc-clang",
+   "status": "ok",
+   "runs": 3,
+   "verified": true,
+   "wall_min": 5.218,
+   "wall_median": 5.227,
+   "cpu_min": 5.191,
+   "cpu_median": 5.199,
+   "maxrss_mb": 455.8,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "self",
@@ -435,12 +540,12 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 5.047,
-   "wall_median": 5.204,
-   "cpu_min": 5.046,
-   "cpu_median": 5.202,
-   "maxrss_mb": 759.9,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 8.291,
+   "wall_median": 8.564,
+   "cpu_min": 8.247,
+   "cpu_median": 8.531,
+   "maxrss_mb": 446.5,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "self",
@@ -448,12 +553,12 @@
    "status": "ok",
    "runs": 3,
    "verified": true,
-   "wall_min": 4.418,
-   "wall_median": 4.433,
-   "cpu_min": 4.417,
-   "cpu_median": 4.432,
-   "maxrss_mb": 797.7,
-   "date": "2026-10-09 16:12 UTC"
+   "wall_min": 5.245,
+   "wall_median": 5.356,
+   "cpu_min": 5.222,
+   "cpu_median": 5.273,
+   "maxrss_mb": 453.8,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "self",
@@ -487,12 +592,12 @@
    "status": "ok",
    "runs": 3,
    "verified": false,
-   "wall_min": 5.171,
-   "wall_median": 5.418,
-   "cpu_min": 5.055,
-   "cpu_median": 5.184,
-   "maxrss_mb": 480.1,
-   "date": "2026-10-09 18:32 UTC"
+   "wall_min": 5.973,
+   "wall_median": 6.26,
+   "cpu_min": 5.946,
+   "cpu_median": 6.17,
+   "maxrss_mb": 539.2,
+   "date": "2026-10-09 23:32 UTC"
   },
   {
    "workload": "self",

@@ -25,14 +25,14 @@
 <main class="wrap">
 <article class="story">
 
-<p class="byline">Written 9 October 2026. Every number below comes from the repository: its Git history, <code>test/TESTING.md</code>, <code>bench/README.md</code> and the other notes it cites.</p>
+<p class="byline">Written 9 October 2026, updated the same night after the memory, threads and formatter work. Every number below comes from the repository: its Git history, <code>test/TESTING.md</code>, <code>bench/README.md</code> and the other notes it cites.</p>
 
-<p>The Haxe compiler is written in OCaml. The compiler running on the <a href="index.html">front page</a> is a port of it written in Haxe. That port parses, types and filters Haxe programs and writes HXB archives that match the OCaml compiler's byte for byte. It runs macros in its own port of the Eval interpreter, and it is compiled to C by a backend that is also written in Haxe. The resulting native binary compiles the port's own source a little faster than the OCaml compiler does.</p>
+<p>The Haxe compiler is written in OCaml. The compiler running on the <a href="index.html">front page</a> is a port of it written in Haxe. That port parses, types and filters Haxe programs and writes HXB archives that match the OCaml compiler's byte for byte. It runs macros in its own port of the Eval interpreter, and it is compiled to C by a backend that is also written in Haxe. The resulting native binary compiles the port's own source faster than the OCaml compiler does, in less memory, and can run upstream's parallel passes on real threads.</p>
 
 <p>This is the long version: the order things happened in, the dead ends, and what we would do the same way again.</p>
 
 <aside class="callout">
-	<p><b>Who “we” is.</b> The port was written by Claude, Anthropic's AI model, working in this repository with its owner, Ben Merckx. The repository's ground rules (<code>AGENTS.md</code>) set the scope and the bar. Much of the work ran as many sub-agents in parallel, each in its own Git worktree on its own branch, merged back after validation. The August and September commits are the owner's groundwork. From 7 October on, the history is Claude's: 198 commits in roughly 48 hours, out of 248 in total.</p>
+	<p><b>Who “we” is.</b> The port was written by Claude, Anthropic's AI model, working in this repository with its owner, Ben Merckx. The repository's ground rules (<code>AGENTS.md</code>) set the scope and the bar. Much of the work ran as many sub-agents in parallel, each in its own Git worktree on its own branch, merged back after validation. The August and September commits are the owner's groundwork. From 7 October on, the history is Claude's: 241 commits in roughly 52 hours, out of 291 in total.</p>
 </aside>
 
 <nav class="toc" aria-label="Contents">
@@ -49,6 +49,9 @@
 		<li><a href="#target">hxc as a real target</a></li>
 		<li><a href="#rest">Filling in the rest of the compiler</a></li>
 		<li><a href="#upstream">Upstream's own test suite</a></li>
+		<li><a href="#memory">Memory: below OCaml</a></li>
+		<li><a href="#threads">Real threads</a></li>
+		<li><a href="#formatter">A real program: the formatter</a></li>
 		<li><a href="#today">Where it stands</a></li>
 		<li><a href="#lessons">Lessons</a></li>
 	</ol>
@@ -88,11 +91,12 @@
 	<tbody>
 		<tr><td>Upstream OCaml in <code>haxe/src</code>, all of it</td><td class="n">297</td><td class="n">135k</td><td class="n">4.6&nbsp;MB</td></tr>
 		<tr><td>… without the target generators</td><td class="n">247</td><td class="n">89k</td><td class="n">2.9&nbsp;MB</td></tr>
-		<tr><td>The port in <code>src/</code> today</td><td class="n">277</td><td class="n">71k</td><td class="n">3.5&nbsp;MB</td></tr>
-		<tr><td>The C backend (<code>backend/src</code>) and its runtime (<code>backend/rt</code>)</td><td class="n">5 + 10</td><td class="n">3.5k + 6.8k</td><td class="n"></td></tr>
+		<tr><td>The port in <code>src/</code> today, formatted</td><td class="n">278</td><td class="n">105k</td><td class="n">3.8&nbsp;MB</td></tr>
+		<tr><td>… before formatting</td><td class="n">278</td><td class="n">71k</td><td class="n">3.6&nbsp;MB</td></tr>
+		<tr><td>The C backend (<code>backend/src</code>) and its runtime (<code>backend/rt</code>)</td><td class="n">5 + 12</td><td class="n">3.6k + 8.8k</td><td class="n"></td></tr>
 	</tbody>
 </table></div>
-<figcaption>Counted with <code>wc</code> at the time of writing. The port also has support modules with no upstream counterpart, such as OCaml-style tables, streams and ZIP reading.</figcaption>
+<figcaption>Counted with <code>wc</code> at the time of writing. The port also has support modules with no upstream counterpart, such as OCaml-style tables, streams and ZIP reading. Machine translation left very long lines; the last commit of the day formatted <code>src/</code> with haxe-formatter (section 14), which accounts for the jump in line count.</figcaption>
 </figure>
 
 <h2 id="ocaml">3. OCaml semantics that leak into bytes</h2>
@@ -287,7 +291,7 @@ HAXE_REFERENCE=haxe/haxe python3 test/conformance.py -j 8</code></pre>
 		<tr><td>hello / 17 std modules</td><td class="n">0.11 / 0.20&nbsp;s</td><td class="n">0.11 / 0.18&nbsp;s</td></tr>
 	</tbody>
 </table></div>
-<figcaption>From <code>bench/README.md</code>, 9 October. Outputs byte-identical. Peak memory on the self-compile was 694 MB against 462 MB.</figcaption>
+<figcaption>From <code>bench/README.md</code>, 9 October. Outputs byte-identical. Peak memory on the self-compile was 694 MB against 462 MB at this point; section 12 is how that changed.</figcaption>
 </figure>
 
 <p>We stopped there on purpose. The nursery and heap sizes (<code>RT_MINOR_KB</code>, <code>RT_OLD_MB</code>) stay at generic defaults instead of being tuned to this benchmark. A compiler that compiles itself is a tempting benchmark to overfit, and a backend is supposed to be good for other programs too.</p>
@@ -348,10 +352,10 @@ haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 <ul>
 	<li><b>HXB library input</b> (<code>hxbReader.ml</code>). A new round-trip check reads every module of the reference's archive back through <code>--hxb-lib</code> and writes it again; all 275 cases round-trip identically.</li>
 	<li><b>The compilation server</b>, its caches, and <b>haxelib</b>. <code>test/server.py</code> drives a reference server and a port server through the same scenarios (every case twice, an edit sequence whose 628 lines of verbose log must match, stdin forwarding, <code>--next</code>, <code>--server-connect</code>): 587 of 587 pass.</li>
-	<li><b>Threads in the C runtime.</b> The server needs threads, and so do Eval programs. The first design is M:1 green threads on <code>ucontext</code>. Only one thread runs at a time, so the GC and runtime tables need no locks and the single-threaded hot paths stay unchanged. Threads switch when they block, sleep, wait for a descriptor, or at a minor collection. That last point caused the subtle bugs: a switch can happen inside any allocation. A lazily allocated waiter list in <code>Mutex</code> could lose a waiter, a <code>Tls</code> map could be switched out half rebuilt, and array growth reused a stale length. Each one hung the compiler's parallel filters only now and then.</li>
+	<li><b>Threads in the C runtime.</b> The server needs threads, and so do Eval programs. The first design was M:1 green threads on <code>ucontext</code>. Only one thread runs at a time, so the GC and runtime tables need no locks and the single-threaded hot paths stay unchanged. Threads switch when they block, sleep, wait for a descriptor, or at a minor collection. That last point caused the subtle bugs: a switch can happen inside any allocation. A lazily allocated waiter list in <code>Mutex</code> could lose a waiter, a <code>Tls</code> map could be switched out half rebuilt, and array growth reused a stale length. Each one hung the compiler's parallel filters only now and then.</li>
 	<li><b>Gc.finalise</b> in the C GC, with OCaml's semantics: a major collection that finds the value unreachable copies it back and queues the call. HashLink has no finalisers on Haxe objects, so this is the one place the C build passes upstream's unit tests where the HashLink build can't.</li>
 </ul>
-<p>Green threads give concurrency without parallelism. Upstream runs some filter passes in parallel, so OS threads in the C runtime are the obvious next step.</p>
+<p>Green threads give concurrency without parallelism. Upstream runs some filter passes in parallel, so OS threads in the C runtime were the obvious next step (section 13).</p>
 
 <h2 id="upstream">11. Upstream's own test suite</h2>
 
@@ -380,9 +384,89 @@ haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 <figcaption>From <code>test/TESTING.md</code>. * The 4 errors are <code>unit.TestGcFinalizer</code>: HashLink has no finalisers. † <code>ThreadPool</code> needs a libuv loop, which only the C build has. The threads figure for the C build is with libuv.</figcaption>
 </figure>
 
-<p>Exclusions apply to both compilers alike and each has a reason in the script. The projects excluded inside steps all need a target generator the port doesn't have: two misc projects compile with <code>-js</code> and check the JavaScript, three resolution projects run <code>node</code>, and one block of the sys tests builds a Neko binary. Four whole steps are skipped: source maps and an ES6 null-safety run (both JS), display (its own CI job), and the third-party projects, which are cloned from GitHub and run separately.</p>
+<p>Exclusions apply to both compilers alike and each has a reason in the script. The projects excluded inside steps all need a target generator the port doesn't have: two misc projects compile with <code>-js</code> and check the JavaScript, three resolution projects run <code>node</code>, and one block of the sys tests builds a Neko binary. Three whole steps are skipped: source maps and an ES6 null-safety run (both JS), and display, which has its own CI job and its own harness here.</p>
 
-<h2 id="today">12. Where it stands</h2>
+<p>The third-party projects of that CI job came next. <code>test/upstream.py party</code> clones tink_core and hxcoro at pinned commits and runs their test suites with the port: tink_core's 257 assertions and hxcoro's 321 tests (1,256 assertions) match the reference (hxcoro's also through <code>--hxb</code> and <code>--hxb-lib</code>). tink_core first failed with “You cannot use @:build inside a macro”: the macro context shared the global metadata array, where upstream's immutable list gives it a snapshot. More upstream suites became HXB conformance cases too: 195 configurations from the unit, null-safety, threads, sys, optimization, benchmark, display and server suites, and the 406 snippets of the display tests compiled normally.</p>
+
+<p>hxcoro also exposed a crash. About one run in four died with SIGSEGV in a spawned Eval thread, always at <code>AtomicInt.load</code>, or hung. The port ran Eval threads truly in parallel on host threads, but upstream's Eval threads are OCaml threads, which share one runtime lock, and the interpreter's state relies on that. <code>EvalLock.hx</code> now reproduces the lock: inactive until a second thread runs Eval code, released around blocking host calls, handed over in FIFO order when a waiter has waited 2 ms. hxcoro then passed 20 runs in a row.</p>
+
+<h2 id="memory">12. Memory: below OCaml</h2>
+
+<p>Section 7 left one number unflattering: the C build's peak memory on the self-compile was well above the reference's. The first step was a heap census (<code>RT_CENSUS=1</code>): live objects per type after a final major collection, next to an estimate of the same data in OCaml's representation. It showed 214 MB live against an estimated 154 MB for OCaml, and a peak far above both, so most of the excess was the collector, not the data.</p>
+
+<ul>
+	<li><b>GC policy</b> (837 → 565 MB, and 0.8 s faster): the copying collector kept its from-space resident and faulted the to-space in up to the from-space's size. Both are now returned to the kernel or faulted in on demand. And the port's translation of <code>x :: l</code>, <code>Array.insert</code> at the front, re-recorded every young element of a large array in the remembered set on every call: 700 million slot checks. A long range now remembers the object once.</li>
+	<li><b>Representation</b> (565 → 467 MB): enum values without a tag slot (the constructor is the header's type index), arrays without a capacity slot and with exact-length literals, Int and Bool fields packed two per slot, so <code>core.Pos</code> went from 32 to 24 bytes, and identifiers interned per file by the lexer (strings 13.6 → 5.5 MB).</li>
+	<li><b>Not kept:</b> a collector that deduplicates strings saved a few MB more and broke 10 macro cases, because string identity is observable in the port (the physical-equality check from section 3). Tuning the nursery and old-space limits to this one workload was also left out.</li>
+</ul>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Workload (CPU, peak RSS)</th><th class="n">reference</th><th class="n">hxc gcc -O2, before</th><th class="n">after</th></tr></thead>
+	<tbody>
+		<tr><td>hello</td><td class="n">0.12&nbsp;s, 39&nbsp;MB</td><td class="n">0.11&nbsp;s, 51&nbsp;MB</td><td class="n">0.10&nbsp;s, 32&nbsp;MB</td></tr>
+		<tr><td>stdlib</td><td class="n">0.24&nbsp;s, 53&nbsp;MB</td><td class="n">0.23&nbsp;s, 51&nbsp;MB</td><td class="n">0.22&nbsp;s, 42&nbsp;MB</td></tr>
+		<tr><td>self</td><td class="n">5.78&nbsp;s, 531&nbsp;MB</td><td class="n">5.72&nbsp;s, 837&nbsp;MB</td><td class="n">4.98&nbsp;s, 467&nbsp;MB</td></tr>
+	</tbody>
+</table></div>
+<figcaption>From <code>bench/README.md</code> (“hxc memory”), minimum of 3–5 interleaved runs, every archive byte-identical. The machine was slower than in section 7.</figcaption>
+</figure>
+
+<p>Around the same time clang replaced gcc as the preferred compiler: on the same generated C, <code>clang -O2</code> ran the self-compile 4–10% faster and built faster, and <code>-O3</code> added nothing.</p>
+
+<h2 id="threads">13. Real threads</h2>
+
+<p>Green threads had kept the runtime simple: one thread at a time, so no locks. Real threads meant revisiting every piece of shared state. The design follows OCaml 5's shape. The per-thread runtime state (shadow stack, allocation pointer, handler chain, pending exception) moved into <code>__thread</code> variables with the local-exec TLS model, one <code>%fs</code>-relative access, as cheap as the globals they replace, so the generated C didn't change. Each thread allocates from its own chunk of the shared nursery. A collection stops the world: the thread that runs out of space waits until every other thread is at a safepoint (an allocation slow path) or inside a blocking call, then collects every thread's roots and remembered sets. tcc has no thread-local storage, so tcc builds keep the green threads.</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Self-compile, clang -O2</th><th class="n">wall</th><th class="n">CPU</th><th class="n">peak RSS</th></tr></thead>
+	<tbody>
+		<tr><td>green threads only, sequential</td><td class="n">5.21&nbsp;s</td><td class="n">5.16&nbsp;s</td><td class="n">454&nbsp;MB</td></tr>
+		<tr><td>OS threads, sequential</td><td class="n">5.20&nbsp;s</td><td class="n">5.16&nbsp;s</td><td class="n">469&nbsp;MB</td></tr>
+		<tr><td>OS threads, parallel, 4 threads</td><td class="n">4.18&nbsp;s</td><td class="n">5.91&nbsp;s</td><td class="n">536&nbsp;MB</td></tr>
+		<tr><td>OCaml reference, sequential</td><td class="n">6.11&nbsp;s</td><td class="n">6.03&nbsp;s</td><td class="n">531&nbsp;MB</td></tr>
+		<tr><td>OCaml reference, 4 domains</td><td class="n">4.03&nbsp;s</td><td class="n">6.72&nbsp;s</td><td class="n">592&nbsp;MB</td></tr>
+	</tbody>
+</table></div>
+<figcaption>From <code>bench/README.md</code>, minimum of 3 runs on a 4-core machine with another job running. Every parallel archive matched the sequential reference after normalizing variable ids.</figcaption>
+</figure>
+
+<p>The sequential build costs the same as before. In parallel mode the port saves 20% of wall time with 4 threads, the reference 34%: only filters, analyzer, DCE marking and HXB writing are parallel, typing is not. That puts the port within 4% of the reference in parallel mode.</p>
+
+<p>Parallel output can't be compared byte for byte, because even the reference allocates variable ids from a shared counter in whatever order its workers run. <code>conformance.py --parallel</code> therefore lets the reference load each archive through <code>--hxb-lib</code> and write it again sequentially, which renumbers the ids in reading order, and compares that. All 837 parallel runs of the conformance cases matched, as did the parallel macro cases the reference can reload and four parallel self-compiles. The races found on the way are the immutable-list lesson of section 3 again:</p>
+<ul>
+	<li><b><code>Inline.hx</code>:</b> parallel filter workers inlining into classes of the same module unshifted into that module's list of inline calls at the same time. Upstream conses onto an immutable list; the port's array push now takes a mutex. ThreadSanitizer found this one.</li>
+	<li><b>Shared regular expressions:</b> an <code>EReg</code> keeps its last match, and <code>RenameVars</code>, the analyzer and the hxc std's <code>EReg.escape</code> each shared one. In parallel mode that corrupted generated variable names. The hxc regex engine also published its case-insensitive sets before filling them.</li>
+	<li><b>The runtime itself:</b> the thread count was read plainly while updated atomically.</li>
+</ul>
+<p>ThreadSanitizer would not run on the whole program (its shadow call stack overflows in the port's parser), so only the runtime was instrumented: it sees every allocation, barrier, array, string and map access the generated code makes through the runtime, and every lock. After the fixes it reported nothing on parallel self-compiles. One caveat stays recorded: like upstream, the port publishes new objects to other workers without fences, which x86-64's store order makes safe and the ARM64 half of the portable binary has not been checked for.</p>
+
+<p>The <code>eval.luv</code> threads and thread pool run on the same threads; upstream's threads suite passes 144 of 144 on the C build, with green threads and OS threads alike.</p>
+
+<h2 id="formatter">14. A real program: the formatter</h2>
+
+<p>A backend tested mostly on the program it was written for is a weak claim. The first outside program was <a href="https://github.com/HaxeCheckstyle/haxe-formatter">haxe-formatter</a>, built through the <code>hxc</code> haxelib package and, for comparison, by the reference compiler for its other targets. Each build formatted upstream's <code>haxe/std</code> (2,583 files, 14 MB) in place:</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Build of haxe-formatter</th><th class="n">CPU</th><th class="n">peak RSS</th><th>output</th></tr></thead>
+	<tbody>
+		<tr><td>hxc, gcc -O2</td><td class="n">3.65&nbsp;s</td><td class="n"></td><td>identical</td></tr>
+		<tr><td>hxc, clang -O2</td><td class="n">3.81&nbsp;s</td><td class="n">183&nbsp;MB</td><td>the baseline</td></tr>
+		<tr><td>C++ (hxcpp)</td><td class="n">6.34&nbsp;s</td><td class="n">212&nbsp;MB</td><td>identical</td></tr>
+		<tr><td>JS (Node 22)</td><td class="n">9.12&nbsp;s</td><td class="n">124&nbsp;MB</td><td>identical</td></tr>
+		<tr><td>hxc, tcc</td><td class="n">8.16&nbsp;s</td><td class="n">184&nbsp;MB</td><td>identical</td></tr>
+		<tr><td>HL/C</td><td class="n">8.58&nbsp;s</td><td class="n"></td><td>identical</td></tr>
+		<tr><td>HashLink JIT</td><td class="n">–</td><td class="n"></td><td>crashes in stock <code>hl</code></td></tr>
+	</tbody>
+</table></div>
+<figcaption>From <code>bench/README.md</code>, minimum of 3 runs.</figcaption>
+</figure>
+
+<p>The optimized hxc builds are 1.6× faster than C++ and Node and 2.3× faster than HL/C. Building it found three hxc bugs: <code>Exception.caught</code>/<code>thrown</code> removed by <code>-dce full</code>, <code>StringTools.isEof</code>, which never reported the end of a string on the custom target (so a JSON parser never stopped), and <code>String.split</code> holding the delimiter across an allocation, which a moving collector punishes. The formatter then went to work on this repository: <code>tools/format-src.sh</code> builds it with hxc and formats <code>src/</code> with <code>hxformat.json</code>. The machine-translated modules had very long lines; the commit that formatted them changed 255 files (+51,773/−18,540 lines), stable after two passes. One file, the Unicode case tables, never reaches a fixed point and is excluded.</p>
+
+<h2 id="today">15. Where it stands</h2>
 
 <p>The <a href="index.html#benchmarks">benchmarks on the front page</a> come from <code>bench/results.json</code>. The same compiler, built twelve ways, compiles three workloads, and a run counts only if its archive is byte-identical to the reference's:</p>
 
@@ -403,25 +487,25 @@ haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 		<tr><td>Eval, from HXB</td><td class="n">11.3&nbsp;s</td><td class="n">20.6&nbsp;s</td><td class="n">1885&nbsp;s</td><td class="n">3329&nbsp;MB</td></tr>
 	</tbody>
 </table></div>
-<figcaption>Commit <code>93f1df5</code>, a shared 4-core Xeon at 2.10 GHz, <code>-D disable-parallelism</code>. The self-compile number differs from section 7's because the machine and the port both changed in between. The comparison that matters is within one run.</figcaption>
+<figcaption>Commit <code>93f1df5</code>, a shared 4-core Xeon at 2.10 GHz, <code>-D disable-parallelism</code>, before the memory and threads work of sections 12 and 13 (the front page has the newer hxc rows). The self-compile number differs from section 7's because the machine and the port both changed in between. The comparison that matters is within one run.</figcaption>
 </figure>
 
 <p>An honest list of limits:</p>
 <ul>
-	<li><b>Memory.</b> The C build uses about 1.7× the reference's peak memory on the self-compile (798 MB against 480 MB). Two likely contributors: copying collections need free space to copy into, and strings are UTF-16 (two bytes per ASCII character, where OCaml strings are bytes). The design note recommended OCaml's non-moving major heap, and the runtime doesn't have one yet.</li>
+	<li><b>Memory.</b> The C build now peaks below the reference on the self-compile (467 MB against 531 MB), but a copying old generation still needs room to copy into: a mark-sweep or mark-compact major heap, as the design note recommended, would take the peak to an estimated 305–390 MB.</li>
 	<li><b>No code generators.</b> JS, C++, HashLink, JVM and the other generators aren't ported. The port type-checks, runs programs with <code>--interp</code>, writes HXB, and (through hxc) produces C.</li>
-	<li><b>Parallelism.</b> Conformance runs single-threaded because the reference itself isn't deterministic under parallel filters. The C runtime's green threads don't run in parallel.</li>
-	<li><b>Portability claims are partly untested.</b> Only Linux x86-64 has run the portable binary. The hxc target covers what the compiler needs to compile itself, not the whole language and std.</li>
+	<li><b>Parallelism.</b> Byte-for-byte conformance runs single-threaded because the reference itself isn't deterministic under parallel filters; parallel runs are compared after renumbering variable ids. Typing is sequential, as upstream's. tcc builds keep green threads.</li>
+	<li><b>Portability claims are partly untested.</b> Only Linux x86-64 has run the portable binary. The hxc target covers what the compiler and the formatter need, not the whole language and std.</li>
 	<li><b>Small gaps</b> are recorded in <code>TRANSLATION.md</code> and <code>test/TESTING.md</code>: the Eval debugger, memory statistics that need OCaml object sizes, IPv4-only sockets, and one-second file-time resolution on HashLink.</li>
 </ul>
 
-<h2 id="lessons">13. Lessons</h2>
+<h2 id="lessons">16. Lessons</h2>
 
 <h3>What worked</h3>
 <ul>
 	<li><b>A byte-identical oracle.</b> It turned “is this right?” into a diff, and it found bugs no reasonable test would have looked for: hash iteration order, argument evaluation order, string identity. It also made every performance change safe to try, since a benchmark only counted if its output matched.</li>
 	<li><b>Translating instead of reimplementing.</b> The hand-written start couldn't get variable ids right. The translation got all 22 members of the first fixture right on the day it could first be measured. Keeping the port traceable to upstream also made it reviewable: a disagreement with the reference meant reading two functions side by side.</li>
-	<li><b>Parallel agents with strict validation.</b> The macro runtime, the HXB reader, the server, display, threads and the upstream suite were each worked on in separate worktrees. After each merge the suites were run again, and the results are recorded in <code>test/TESTING.md</code>. The merge commits record how conflicts were resolved: against upstream, not by picking a side.</li>
+	<li><b>Parallel agents with strict validation.</b> The macro runtime, the HXB reader, the server, display, threads, memory and the upstream suite were each worked on in separate worktrees. After each merge the suites were run again, and the results are recorded in <code>test/TESTING.md</code>. The merge commits record how conflicts were resolved: against upstream, not by picking a side.</li>
 	<li><b>Measuring before optimizing.</b> Nearly every speedup in <code>bench/README.md</code> starts with a profile that pointed somewhere unexpected: stack capture on throws (80% of the HL/C run), closures allocated at their definition, short free runs after a sweep, an enum tag load waiting on memory.</li>
 	<li><b>Writing negative results down.</b> The generational GC for HL/C, hx2go, chibicc, transparent huge pages: each has its numbers in the repository.</li>
 </ul>
@@ -438,6 +522,7 @@ haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 	<li>That the ~20 s WebAssembly stall happened <em>after</em> the program had finished, and was caused by <code>setjmp</code>.</li>
 	<li>That the biggest single speedup of the C runtime was the order in which the collector copies objects.</li>
 	<li>That running a compiler this hard also finds bugs in the runtimes underneath it: a HashLink JIT trap bug, hxcpp's parallel marking, races in libhl's lazy initialisation.</li>
+	<li>That the races real threads exposed were in the port, not the runtime, and all of the same kind: an OCaml immutable list translated as a shared mutable array.</li>
 </ul>
 
 <p>The code, the notes behind every number, and the harnesses are all in the repository. The fastest way to see the result is still the <a href="index.html#playground">playground</a>.</p>

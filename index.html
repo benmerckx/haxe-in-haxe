@@ -12,11 +12,12 @@
 	<div class="wrap">
 		<p class="kicker">Experimental</p>
 		<h1>Haxe in Haxe</h1>
-		<p class="lead">The Haxe compiler, ported line by line from OCaml to Haxe, compiled to C, and running here in your browser as WebAssembly.</p>
+		<p class="lead">The Haxe compiler, ported line by line from OCaml to Haxe and compiled to C by its own backend. Natively it compiles itself faster than the OCaml original, in less memory; here it runs in your browser as WebAssembly.</p>
 		<p class="storylink"><a href="story.html">How we got here: the long story, with what worked and what didn't →</a></p>
 		<nav class="links">
 			<a href="#playground">Playground</a>
 			<a href="#download">Download</a>
+			<a href="#hxc">Use hxc</a>
 			<a href="#status">Status</a>
 			<a href="#how">How it works</a>
 			<a href="#numbers">Numbers</a>
@@ -28,10 +29,12 @@
 
 <main class="wrap">
 	<section class="cards" aria-label="Summary">
-		<div class="card"><b>275 / 275</b><span>HXB conformance cases byte-identical to the reference compiler (plus 7 the reference also rejects)</span></div>
-		<div class="card"><b>66 / 66</b><span>macro cases: the Eval macro interpreter and the Macro API are ported too</span></div>
-		<div class="card"><b>247 → 231</b><span>OCaml modules in scope, mapped to Haxe modules (2.9 MB of OCaml, 2.8 MB of Haxe)</span></div>
-		<div class="card"><b>4.0 s vs 4.9 s</b><span>the port compiling itself, natively (gcc -O2) versus the OCaml compiler; 7–13% faster on the conformance cases too</span></div>
+		<div class="card"><b>279 / 279</b><span>HXB conformance cases byte-identical to the reference compiler (plus 7 the reference also rejects), and 66 / 66 macro cases</span></div>
+		<div class="card"><b>All steps pass</b><span>upstream CI's target-independent test job on the C build: unit 11372 / 11372, misc 684 / 684, threads 144 / 144, tink_core, hxcoro</span></div>
+		<div class="card"><b>5.19 s vs 5.95 s</b><span>CPU time of the port compiling itself, natively (hxc built with clang) versus the OCaml compiler, single-threaded</span></div>
+		<div class="card"><b>456 MB vs 539 MB</b><span>peak memory of that self-compile: below the OCaml compiler's</span></div>
+		<div class="card"><b>4.18 s on 4 threads</b><span>with upstream's parallel passes on real OS threads (OCaml with 4 domains: 4.03 s)</span></div>
+		<div class="card"><b>1.6× faster</b><span>haxe-formatter built with hxc versus its C++ and Node builds, formatting <code>haxe/std</code> with byte-identical output</span></div>
 	</section>
 
 	<section id="playground">
@@ -68,24 +71,36 @@ chmod +x haxe-in-haxe.com
 		<p class="note">Only the x86-64 Linux half has been tested. Code generation for JavaScript, C++, HashLink and the other targets isn't ported: the binary type-checks, runs programs with <code>--interp</code> and writes HXB.</p>
 	</section>
 
+	<section id="hxc">
+		<h2>Use hxc</h2>
+		<p>The C backend is also a Haxe target for your own programs: the <code>hxc</code> haxelib package. Your Haxe types the program (macros, <code>-lib</code> and IDE support included) and writes HXB; the bundled <code>hxc.com</code>, this port with the backend, reads the archive and writes C; clang, gcc or tcc builds a native binary, or cosmocc a portable one. Threads, sockets, TLS and libuv are supported.</p>
+<pre class="cmd"># in a checkout of the repository (needs cosmocc, or NATIVE_CC=clang)
+sh backend/haxelib/build.sh                     # bin/haxelib/hxc.zip
+haxelib install bin/haxelib/hxc.zip
+haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
+./bin/main</pre>
+		<p class="note">HXB is tied to the compiler that writes it, so your Haxe must be the build <code>hxc.com</code> was made from (named in the package's <code>hxc.json</code>). Options (<code>-D hxc.cc</code>, <code>hxc.static</code>, <code>hxc.ssl</code>, <code>hxc.uv</code>, …) are in <code>backend/haxelib/README.md</code>. The first real program built this way besides the compiler is <a href="https://github.com/HaxeCheckstyle/haxe-formatter">haxe-formatter</a>, which formatted this project's sources.</p>
+	</section>
+
 	<section id="status">
 		<h2>Status</h2>
 		<p>The goal is a close-to-line-by-line port of the Haxe compiler (<code>haxe/src</code>, pinned upstream commit <code>b10fa6e</code>) that keeps upstream's structure, branch order and data layout. Conformance is strict: for the same invocation, the port must write the same set of HXB modules, each byte-identical to what the OCaml compiler writes.</p>
-		<table>
+		<div class="scroll"><table>
 			<thead><tr><th>Area</th><th>Upstream (OCaml)</th><th>Port (Haxe)</th><th>State</th></tr></thead>
 			<tbody>
-				<tr><td>Syntax: lexer, parser, preprocessor</td><td>139 KB</td><td>254 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Typing</td><td>699 KB</td><td>746 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Core types, unification, printing</td><td>353 KB</td><td>511 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Context, compiler driver, HXB writer and reader</td><td>627 KB</td><td>314 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Filters, optimization, analyzer, DCE</td><td>363 KB</td><td>341 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Coroutines, codegen helpers</td><td>191 KB</td><td>121 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Macros: Eval interpreter, Macro API</td><td>553 KB</td><td>544 KB</td><td class="ok">ported, incl. TLS, libuv, threads (no debugger)</td></tr>
+				<tr><td>Syntax: lexer, parser, preprocessor</td><td>139 KB</td><td>268 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Typing</td><td>631 KB</td><td>790 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Core types, unification, printing</td><td>305 KB</td><td>569 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Context, compiler driver, HXB writer and reader</td><td>379 KB</td><td>423 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Filters, optimization, analyzer, DCE</td><td>363 KB</td><td>370 KB</td><td class="ok">ported, incl. parallel passes</td></tr>
+				<tr><td>Coroutines, codegen helpers</td><td>191 KB</td><td>137 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Macros: Eval interpreter, Macro API, macro context</td><td>592 KB</td><td>807 KB</td><td class="ok">ported, incl. TLS, libuv, threads</td></tr>
+				<tr><td>Display (completion, hover, …), compilation server, haxelib</td><td>324 KB</td><td>393 KB</td><td class="ok">ported</td></tr>
 				<tr><td>Target generators (JS, C++, HL, JVM, …)</td><td>1.6 MB</td><td>–</td><td class="todo">out of scope for now</td></tr>
-				<tr><td>Display (completion, hover, …), compilation server, haxelib</td><td>–</td><td>–</td><td class="ok">ported</td></tr>
+				<tr><td>C backend (hxc) and its runtime</td><td>–</td><td>12k lines</td><td class="todo">experimental</td></tr>
 			</tbody>
-		</table>
-		<p class="note">Sizes are source bytes per upstream directory; the Haxe side is often denser or more verbose depending on the module. File-level mapping: <code>TRANSLATION.md</code>; test results: <code>test/TESTING.md</code>.</p>
+		</table></div>
+		<p class="note">Sizes are source bytes per area; the Haxe side is formatted with haxe-formatter (<code>tools/format-src.sh</code>) and is denser or more verbose depending on the module. The backend is 3.6k lines of Haxe and an 8.8k-line C runtime. Not ported: the Eval debugger, <code>server/module</code> and object sizes for <code>server/memory</code>. File-level mapping: <code>TRANSLATION.md</code>; test results: <code>test/TESTING.md</code>.</p>
 	</section>
 
 	<section id="how">
@@ -94,39 +109,54 @@ chmod +x haxe-in-haxe.com
 			<li><b>Port.</b> Each OCaml module in <code>haxe/src</code> has a Haxe counterpart in <code>src/</code>: records become classes, variants become enums, lists become arrays, with upstream's evaluation order preserved.</li>
 			<li><b>Type itself.</b> The port parses, types and filters its own source, the same pipeline that produces HXB.</li>
 			<li><b>Lower to C.</b> A small backend (<code>backend/</code>, also Haxe) lowers the typed program to C. Ints and floats are unboxed, generics are erased with boxing at the boundaries, virtual calls go through dispatch tables, and structural field access uses inline caches.</li>
-			<li><b>Runtime.</b> About 3,000 lines of C: a precise generational copying GC with a shadow stack, UTF-16 strings, arrays with unboxed element kinds, and exceptions on <code>setjmp</code>. The standard library is mostly written in Haxe over a few native primitives, including the regular-expression engine.</li>
-			<li><b>Compile the C.</b> <code>tcc</code> compiles the 16 MB file in under a second for development, <code>gcc -O2</code> builds the fast native binary, <code>cosmocc</code> the portable one, and Emscripten the WebAssembly on this page.</li>
+			<li><b>Runtime.</b> About 8,800 lines of C: a precise generational copying GC with a shadow stack, compact object layouts, real OS threads with stop-the-world collections (green threads under tcc), UTF-16 strings, arrays with unboxed element kinds, exceptions on <code>setjmp</code>, and bindings for sockets, mbedtls and libuv. The standard library is mostly written in Haxe over a few native primitives, including the regular-expression engine.</li>
+			<li><b>Compile the C.</b> <code>tcc</code> compiles the 16 MB file in about a second for development, <code>clang -O2</code> builds the fastest native binary (<code>gcc -O2</code> is 4–10% behind), <code>cosmocc</code> the portable one, and Emscripten the WebAssembly on this page.</li>
 		</ol>
 	</section>
 
 	<section id="numbers">
 		<h2>Numbers</h2>
-		<h3>Compile time of the compiler</h3>
-		<p>Median of 3 runs, <code>-D disable-parallelism</code>, every output checked byte-for-byte against the reference. * measured before the GC improvements that made the gcc build faster than OCaml.</p>
-		<table>
-			<thead><tr><th>Workload</th><th>OCaml reference</th><th>gcc -O2</th><th>cosmocc (APE)</th><th>tcc</th></tr></thead>
+		<h3>Compile time and memory</h3>
+		<p>CPU time and peak RSS, minimum of 3–5 runs, <code>-D disable-parallelism</code>, every output checked byte-for-byte against the reference (after the memory work, commit <code>4dc6b64</code>).</p>
+		<div class="scroll"><table>
+			<thead><tr><th>Workload</th><th>OCaml reference</th><th>hxc, gcc -O2</th><th>hxc, tcc</th></tr></thead>
 			<tbody>
-				<tr><td>hello world</td><td>0.15 s</td><td>0.11 s</td><td>0.12 s</td><td>0.27 s</td></tr>
-				<tr><td>30 std modules</td><td>0.24 s</td><td>0.23 s</td><td>0.24 s</td><td>0.63 s</td></tr>
-				<tr><td>282 conformance cases, summed (CPU)</td><td>18.05 s</td><td>16.79 s</td><td>–</td><td>–</td></tr>
-				<tr><td>the port itself (52k lines, runs macros)</td><td>4.94 s</td><td>3.9–4.1 s</td><td>5.67 s*</td><td>12.08 s*</td></tr>
+				<tr><td>hello world</td><td>0.12 s, 39 MB</td><td>0.10 s, 32 MB</td><td>0.26 s, 39 MB</td></tr>
+				<tr><td>32 std modules</td><td>0.24 s, 53 MB</td><td>0.22 s, 42 MB</td><td>0.55 s, 49 MB</td></tr>
+				<tr><td>the port itself (runs macros)</td><td>5.78 s, 531 MB</td><td>4.98 s, 467 MB</td><td>12.4 s, 477 MB</td></tr>
 			</tbody>
-		</table>
+		</table></div>
+		<p class="note">The memory came down from 837 MB on the self-compile: the collector now returns its from-space to the kernel, enum values lost their tag slot and arrays their capacity slot, Int and Bool fields are packed two per slot, and the lexer interns identifiers. clang -O2 builds are another 4–10% faster than gcc -O2.</p>
+		<h3>Parallel mode</h3>
+		<p>The self-compile without <code>-D disable-parallelism</code>: filters, analyzer, DCE marking and HXB writing run on OS threads, as upstream runs them on OCaml domains (typing stays sequential). hxc built with clang -O2, minimum of 3 runs; every archive matches the sequential reference after normalizing variable ids.</p>
+		<div class="scroll"><table>
+			<thead><tr><th>Run</th><th>wall</th><th>CPU</th><th>peak RSS</th></tr></thead>
+			<tbody>
+				<tr><td>hxc, sequential</td><td>5.20 s</td><td>5.16 s</td><td>469 MB</td></tr>
+				<tr><td>hxc, 2 threads</td><td>4.52 s</td><td>5.53 s</td><td>501 MB</td></tr>
+				<tr><td>hxc, 4 threads</td><td>4.18 s</td><td>5.91 s</td><td>536 MB</td></tr>
+				<tr><td>OCaml reference, sequential</td><td>6.11 s</td><td>6.03 s</td><td>531 MB</td></tr>
+				<tr><td>OCaml reference, 4 domains</td><td>4.03 s</td><td>6.72 s</td><td>592 MB</td></tr>
+			</tbody>
+		</table></div>
 		<h3>Building the compiler from its C</h3>
-		<table>
+		<div class="scroll"><table>
 			<thead><tr><th>C compiler</th><th>build time</th><th>binary</th><th>gzip</th></tr></thead>
 			<tbody>
 				<tr><td>tcc</td><td>0.6 s</td><td>14.6 MB</td><td>3.2 MB</td></tr>
 				<tr><td>gcc -O2</td><td>132 s</td><td>8.8 MB</td><td>3.0 MB</td></tr>
+				<tr><td>clang -O2 *</td><td>151 s</td><td>12.1 MB</td><td>–</td></tr>
 				<tr><td>cosmocc -O2, x86-64 + ARM64</td><td>203 s</td><td>17.0 MB</td><td>6.3 MB</td></tr>
 				<tr><td>emcc -O2 (this page)</td><td>84 s</td><td data-info="wasmSize">–</td><td data-info="wasmGz">–</td></tr>
 			</tbody>
-		</table>
+		</table></div>
+		<p class="note">* Measured later, on the larger C of a newer port; gcc -O2 took 179 s for an 11.5 MB binary in that run.</p>
 	</section>
 	<section id="benchmarks">
 		<h2>Benchmarks</h2>
 		<p>The same compiler, run in different ways, compiling the same programs to HXB. The port's timing only counts if its archive has the same members as the reference compiler's and every <code>.hxb</code> payload is byte-identical.</p>
 		<div id="bench-results"><p class="note">Loading results…</p></div>
+		<p class="note">These runs are all sequential. The reference and the hxc tcc and gcc -O2 rows were rerun after the memory work; the other runners are from earlier the same day. Parallel mode and clang builds are under <a href="#numbers">Numbers</a>.</p>
 		<h3>Runners</h3>
 		<dl class="runners">
 			<dt>OCaml reference</dt><dd>The upstream compiler, native OCaml, built from the pinned <code>haxe/</code> submodule. Every ratio is relative to it.</dd>

@@ -14,6 +14,7 @@
 		["cpp", "C++ (hxcpp)"],
 		["hxc", "hxc, tcc"],
 		["hxc-o2", "hxc, gcc -O2"],
+		["hxc-clang", "hxc, clang -O2"],
 		["hxc-cosmo", "hxc, cosmocc"],
 		["wasm", "hxc, wasm (Node)"],
 	];
