@@ -345,7 +345,15 @@ function registerProviders() {
 let checkTimer = 0;
 function scheduleCheck() {
 	clearTimeout(checkTimer);
-	checkTimer = setTimeout(check, 700);
+	// right after a `.` (completion territory) the line is usually incomplete:
+	// wait longer before reporting it as an error
+	let delay = 700;
+	const pos = editor && editor.getPosition();
+	if (pos) {
+		const before = editor.getModel().getLineContent(pos.lineNumber).slice(0, pos.column - 1);
+		if (/\.\w*$/.test(before)) delay = 2500;
+	}
+	checkTimer = setTimeout(check, delay);
 }
 async function check() {
 	if (!editor) return;
