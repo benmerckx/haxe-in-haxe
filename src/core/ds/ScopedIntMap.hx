@@ -45,7 +45,8 @@ class ScopedIntMap {
 		while (i > m) {
 			i--;
 			var k = logKeys[i];
-			if (logHad[i]) map.set(k, logPrev[i]) else map.remove(k);
+			if (logHad[i]) map.set(k, logPrev[i])
+			else map.remove(k);
 		}
 		logKeys.resize(m);
 		logHad.resize(m);

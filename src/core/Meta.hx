@@ -1,7 +1,6 @@
 package core;
 
 import Type as StdType;
-
 import core.Ast.Metadata;
 import core.Ast.MetadataEntry;
 import core.Globals.Platform;
@@ -14,10 +13,21 @@ import haxe.ds.StringMap;
 	public var doc:String;
 	public var flags:Array<MetaParameter>;
 	public var source:Null<String>;
-	public inline function new(doc:String, flags:Array<MetaParameter>, source:Null<String>) { this.doc = doc; this.flags = flags; this.source = source; }
+
+	public inline function new(doc:String, flags:Array<MetaParameter>, source:Null<String>) {
+		this.doc = doc;
+		this.flags = flags;
+		this.source = source;
+	}
+
 	public inline function clone():UserMeta return new UserMeta(doc, flags, source);
 }
-enum MetaOrigin { Compiler; UserDefined(source:Null<String>); }
+
+enum MetaOrigin {
+	Compiler;
+	UserDefined(source:Null<String>);
+}
+
 @:structInit class MetaInfos {
 	public var mInternal:Bool;
 	public var mDoc:String;
@@ -26,14 +36,30 @@ enum MetaOrigin { Compiler; UserDefined(source:Null<String>); }
 	public var mUsedOn:Array<MetaUsage>;
 	public var mOrigin:MetaOrigin;
 	public var mLinks:Array<String>;
-	public inline function new(mInternal:Bool, mDoc:String, mParams:Array<String>, mPlatforms:Array<Platform>, mUsedOn:Array<MetaUsage>, mOrigin:MetaOrigin, mLinks:Array<String>) { this.mInternal = mInternal; this.mDoc = mDoc; this.mParams = mParams; this.mPlatforms = mPlatforms; this.mUsedOn = mUsedOn; this.mOrigin = mOrigin; this.mLinks = mLinks; }
+
+	public inline function new(mInternal:Bool, mDoc:String, mParams:Array<String>, mPlatforms:Array<Platform>, mUsedOn:Array<MetaUsage>,
+			mOrigin:MetaOrigin, mLinks:Array<String>) {
+		this.mInternal = mInternal;
+		this.mDoc = mDoc;
+		this.mParams = mParams;
+		this.mPlatforms = mPlatforms;
+		this.mUsedOn = mUsedOn;
+		this.mOrigin = mOrigin;
+		this.mLinks = mLinks;
+	}
+
 	public inline function clone():MetaInfos return new MetaInfos(mInternal, mDoc, mParams, mPlatforms, mUsedOn, mOrigin, mLinks);
 }
+
 class MetaNotFound extends core.ds.NotFound {
 	public static final instance = new MetaNotFound();
-	public static inline function raise():MetaNotFound { #if hl hl.Api.rethrow(instance); #end return instance; }
+
+	public static inline function raise():MetaNotFound {#if hl hl.Api.rethrow(instance); #end return instance;
+	}
+
 	public function new() super();
 }
+
 class Meta {
 	// Structural equality (OCaml's =); comparing indices first avoids the deep
 	// comparison for the common mismatch.
@@ -42,113 +68,180 @@ class Meta {
 	// One type-pointer test instead of a checked Dynamic->enum cast per entry.
 	// hl.Type comparison calls hl_same_type; the type pointers are compared directly.
 	static final strictMetaType:hl.Bytes = untyped $unsafecast(hl.Type.getDynamic(StrictMeta.Used));
-	public static inline function metaEq(a:StrictMeta,b:Dynamic):Bool {
+
+	public static inline function metaEq(a:StrictMeta, b:Dynamic):Bool {
 		if (b == null || (untyped $unsafecast(hl.Type.getDynamic(b)) : hl.Bytes) != strictMetaType) return false;
 		var e:StrictMeta = untyped $unsafecast(b);
-		return StdType.enumIndex(a) == StdType.enumIndex(e) && StdType.enumEq(a,e);
+		return StdType.enumIndex(a) == StdType.enumIndex(e) && StdType.enumEq(a, e);
 	}
 	#else
-	public static inline function metaEq(a:StrictMeta,b:Dynamic):Bool return core.ds.Key.asString(b) == null && StdType.enumIndex(a) == StdType.enumIndex(b) && StdType.enumEq(a,b);
+	public static inline function metaEq(a:StrictMeta,
+			b:Dynamic):Bool return core.ds.Key.asString(b) == null && StdType.enumIndex(a) == StdType.enumIndex(b) && StdType.enumEq(a, b);
 	#end
-	public static function has(m:StrictMeta,ml:Metadata):Bool { for (entry in ml) if (metaEq(m,entry.meta)) return true; return false; }
-	public static function hasOneOf(ml1:Array<StrictMeta>,ml2:Metadata):Bool {
-		for (entry in ml2) for (meta in ml1) if (metaEq(meta,entry.meta)) return true;
+
+	public static function has(m:StrictMeta, ml:Metadata):Bool {
+		for (entry in ml) if (metaEq(m, entry.meta)) return true;
 		return false;
 	}
+
+	public static function hasOneOf(ml1:Array<StrictMeta>, ml2:Metadata):Bool {
+		for (entry in ml2) for (meta in ml1) if (metaEq(meta, entry.meta)) return true;
+		return false;
+	}
+
 	// Meta.get without the exception, for callers that catch MetaNotFound.
-	public static function getOpt(m:StrictMeta,ml:Metadata):Null<MetadataEntry> {
-		for (entry in ml) if (metaEq(m,entry.meta)) return entry;
+	public static function getOpt(m:StrictMeta, ml:Metadata):Null<MetadataEntry> {
+		for (entry in ml) if (metaEq(m, entry.meta)) return entry;
 		return null;
 	}
-	public static function get(m:StrictMeta,ml:Metadata):MetadataEntry {
-		for (entry in ml) if (metaEq(m,entry.meta)) return entry;
+
+	public static function get(m:StrictMeta, ml:Metadata):MetadataEntry {
+		for (entry in ml) if (metaEq(m, entry.meta)) return entry;
 		throw MetaNotFound.raise();
 	}
-	public static function remove(m:StrictMeta,ml:Metadata):Metadata {
+
+	public static function remove(m:StrictMeta, ml:Metadata):Metadata {
 		if (ml.length == 0) return [];
-		if (metaEq(m,ml[0].meta)) return ml.slice(1);
-		return [ml[0]].concat(remove(m,ml.slice(1)));
+		if (metaEq(m, ml[0].meta)) return ml.slice(1);
+		return [ml[0]].concat(remove(m, ml.slice(1)));
 	}
-	public static function registerUserMeta(userMetas:StringMap<UserMeta>,s:String,data:UserMeta):Void userMetas.set(s,data);
-	public static function getInfo(m:StrictMeta,?userMetas:StringMap<UserMeta>):{name:String,info:MetaInfos} {
+
+	public static function registerUserMeta(userMetas:StringMap<UserMeta>, s:String, data:UserMeta):Void userMetas.set(s, data);
+
+	public static function getInfo(m:StrictMeta, ?userMetas:StringMap<UserMeta>):{name:String, info:MetaInfos} {
 		var origin:MetaOrigin = Compiler;
 		var raw = switch m {
 			case StrictMeta.Custom(s) if (userMetas != null && userMetas.exists(s)):
 				var data = userMetas.get(s);
 				origin = UserDefined(data.source);
-				{name:s,doc:data.doc,flags:data.flags};
+				{name: s, doc: data.doc, flags: data.flags};
 			case _: MetaList.getInfo(m);
 		};
 		var params = [], used = [], platforms = [], links = [];
 		var internal = false;
 		for (flag in raw.flags) switch flag {
-			case HasParam(s): params.unshift(s);
-			case Platforms(values): platforms = values.concat(platforms);
-			case UsedOn(values): used = values.concat(used);
-			case UsedInternally: internal = true;
-			case Link(url): links.unshift(url);
+			case HasParam(s):
+				params.unshift(s);
+			case Platforms(values):
+				platforms = values.concat(platforms);
+			case UsedOn(values):
+				used = values.concat(used);
+			case UsedInternally:
+				internal = true;
+			case Link(url):
+				links.unshift(url);
 		}
-		return {name:raw.name,info:{mInternal:internal,mDoc:raw.doc,mParams:params,mPlatforms:platforms,mUsedOn:used,mOrigin:origin,mLinks:links}};
+		return {
+			name: raw.name,
+			info: {
+				mInternal: internal,
+				mDoc: raw.doc,
+				mParams: params,
+				mPlatforms: platforms,
+				mUsedOn: used,
+				mOrigin: origin,
+				mLinks: links
+			}
+		};
 	}
+
 	public static function toString(m:StrictMeta):String return getInfo(m).name;
+
 	static final hmeta:StringMap<StrictMeta> = makeMetaMap();
+
 	static function makeMetaMap():StringMap<StrictMeta> {
 		var h = new StringMap<StrictMeta>();
-		for (m in MetaList.all) h.set(toString(m),m);
+		for (m in MetaList.all) h.set(toString(m), m);
 		return h;
 	}
-	public static function parse(s:String):StrictMeta { var m = hmeta.get(":" + s); return m == null ? Custom(":" + s) : m; }
+
+	public static function parse(s:String):StrictMeta {
+		var m = hmeta.get(":" + s);
+		return m == null ? Custom(":" + s) : m;
+	}
+
 	public static function fromString(s:String):StrictMeta {
 		if (s == "") return Custom("");
 		return switch s.charAt(0) {
-			case ":": var m = hmeta.get(s); m == null ? Custom(s) : m;
+			case ":":
+				var m = hmeta.get(s);
+				m == null ? Custom(s) : m;
 			case "$": Dollar(s.substr(1));
 			case _: Custom(s);
 		};
 	}
-	public static function getDocumentation(userMetas:StringMap<UserMeta>,m:StrictMeta):Null<{name:String,description:String}> {
-		var pair = getInfo(m,userMetas);
+
+	public static function getDocumentation(userMetas:StringMap<UserMeta>, m:StrictMeta):Null<{name:String, description:String}> {
+		var pair = getInfo(m, userMetas);
 		var data = pair.info;
 		if (data.mInternal) return null;
-		var params = data.mParams.copy(); params.reverse();
+		var params = data.mParams.copy();
+		params.reverse();
 		var parameterText = params.length == 0 ? "" : "(<" + params.join(">, <") + ">) ";
-		var platforms = data.mPlatforms.copy(); platforms.reverse();
+		var platforms = data.mPlatforms.copy();
+		platforms.reverse();
 		var pfs = Globals.platformListHelp(platforms);
-		var origin = switch data.mOrigin { case UserDefined(s) if (s != null): " (from " + s + ")"; case _: ""; };
-		return {name:"@" + pair.name,description:parameterText + data.mDoc + pfs + origin};
+		var origin = switch data.mOrigin {
+			case UserDefined(s) if (s != null): " (from " + s + ")";
+			case _: "";
+		};
+		return {name: "@" + pair.name, description: parameterText + data.mDoc + pfs + origin};
 	}
-	public static function getDocumentationList(userMetas:StringMap<UserMeta>):{all:Array<{name:String,description:String}>,maxLength:Int} {
+
+	public static function getDocumentationList(userMetas:StringMap<UserMeta>):{all:Array<{name:String, description:String}>, maxLength:Int} {
 		var maxLength = 0;
 		var all = [];
-		for (m in MetaList.all) { var doc = getDocumentation(userMetas,m); if (doc != null) { if (doc.name.length > maxLength) maxLength = doc.name.length; all.push(doc); } }
-		all.sort(function(a,b) return Reflect.compare(a.name,b.name));
-		return {all:all,maxLength:maxLength};
+		for (m in MetaList.all) {
+			var doc = getDocumentation(userMetas, m);
+			if (doc != null) {
+				if (doc.name.length > maxLength) maxLength = doc.name.length;
+				all.push(doc);
+			}
+		}
+		all.sort(function(a, b) return Reflect.compare(a.name, b.name));
+		return {all: all, maxLength: maxLength};
 	}
-	public static function getMetaList(userMetas:StringMap<UserMeta>):Array<{name:String,info:MetaInfos}> {
-		var all = [for (m in MetaList.all) getInfo(m,userMetas)];
-		for (s in userMetas.keys()) all.push(getInfo(Custom(s),userMetas));
-		all.sort(function(a,b) return Reflect.compare(a.name,b.name));
+
+	public static function getMetaList(userMetas:StringMap<UserMeta>):Array<{name:String, info:MetaInfos}> {
+		var all = [for (m in MetaList.all) getInfo(m, userMetas)];
+		for (s in userMetas.keys()) all.push(getInfo(Custom(s), userMetas));
+		all.sort(function(a, b) return Reflect.compare(a.name, b.name));
 		return all;
 	}
+
 	public static function getAll(userMetas:StringMap<UserMeta>):Array<StrictMeta> {
 		var all = MetaList.all.copy();
 		for (s in userMetas.keys()) all.push(Custom(s));
-		all.sort(function(a,b) return Reflect.compare(toString(a),toString(b)));
+		all.sort(function(a, b) return Reflect.compare(toString(a), toString(b)));
 		return all;
 	}
-	public static function getUserDocumentationList(userMetas:StringMap<UserMeta>):{all:Array<{name:String,description:String}>,maxLength:Int} {
+
+	public static function getUserDocumentationList(userMetas:StringMap<UserMeta>):{all:Array<{name:String, description:String}>, maxLength:Int} {
 		var maxLength = 0;
 		var all = [];
-		for (s in userMetas.keys()) { var doc = getDocumentation(userMetas,Custom(s)); if (doc != null) { if (doc.name.length > maxLength) maxLength = doc.name.length; all.unshift(doc); } }
-		all.sort(function(a,b) return Reflect.compare(a.name,b.name));
-		return {all:all,maxLength:maxLength};
+		for (s in userMetas.keys()) {
+			var doc = getDocumentation(userMetas, Custom(s));
+			if (doc != null) {
+				if (doc.name.length > maxLength) maxLength = doc.name.length;
+				all.unshift(doc);
+			}
+		}
+		all.sort(function(a, b) return Reflect.compare(a.name, b.name));
+		return {all: all, maxLength: maxLength};
 	}
-	public static function maybeGetPos(m:StrictMeta,ml:Metadata):Null<Pos> {
-		try return get(m,ml).pos catch (_:MetaNotFound) return null;
+
+	public static function maybeGetPos(m:StrictMeta, ml:Metadata):Null<Pos> {
+		try return get(m, ml).pos
+		catch (_:MetaNotFound) return null;
 	}
+
 	public static function Custom(s:String):StrictMeta return StrictMeta.Custom(s);
+
 	public static function Dollar(s:String):StrictMeta return StrictMeta.Dollar(s);
-	public static function InlineConstructorArgument(variable:Int,index:Int):StrictMeta return StrictMeta.InlineConstructorArgument(variable,index);
+
+	public static function InlineConstructorArgument(variable:Int,
+			index:Int):StrictMeta return StrictMeta.InlineConstructorArgument(variable, index);
+
 	public static final Abi:StrictMeta = StrictMeta.Abi;
 	public static final Access:StrictMeta = StrictMeta.Access;
 	public static final Accessor:StrictMeta = StrictMeta.Accessor;

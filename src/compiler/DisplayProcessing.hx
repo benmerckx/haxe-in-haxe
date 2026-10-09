@@ -27,7 +27,6 @@ enum DisplayPathKind {
 
 class DisplayProcessing {
 	// 1. Argument processing from --display
-
 	public static function processDisplayArg(com:CommonContext, actx:ArgContext):ParseInputResult {
 		var resultHandler = com.requestScope.resultHandler;
 		return resultHandler.setCom(com);
@@ -116,7 +115,13 @@ class DisplayProcessing {
 							if (!sys.FileSystem.exists(real)) throw new core.ds.Failure("Display file does not exist");
 							var parts = real.split(core.Path.pathSep);
 							var file = parts[parts.length - 1];
-							if (file != null && file.length > 0 && StringTools.fastCodeAt(file, 0) >= "a".code && StringTools.fastCodeAt(file, 0) <= "z".code) throw new core.ds.Failure("Display file '" + file + "' should not start with a lowercase letter");
+							if (file != null
+								&& file.length > 0
+								&& StringTools.fastCodeAt(file, 0) >= "a".code
+								&& StringTools.fastCodeAt(file,
+									0) <= "z".code) throw new core.ds.Failure("Display file '"
+									+ file
+									+ "' should not start with a lowercase letter");
 							DPKDirect(real);
 						}
 					};
@@ -234,8 +239,10 @@ class DisplayProcessing {
 	public static function promoteTypeHints(tctx:Typer):Void {
 		function exploreTypeHint(md:ModuleDefDisplay, p:Pos, t:T):Void {
 			switch t {
-				case TMono(r): if (r.tmType != null) exploreTypeHint(md, p, r.tmType);
-				case TLazy(f): exploreTypeHint(md, p, lazyType(f));
+				case TMono(r):
+					if (r.tmType != null) exploreTypeHint(md, p, r.tmType);
+				case TLazy(f):
+					exploreTypeHint(md, p, lazyType(f));
 				case TInst({clNamePos: pn}, _) | TEnum({eNamePos: pn}, _) | TType({tNamePos: pn}, _) | TAbstract({aNamePos: pn}, _):
 					md.mTypeHints.unshift({hintPos: p, typePos: pn});
 				case TDynamic(_):
@@ -262,12 +269,19 @@ class DisplayProcessing {
 						var cfile = e.cfile;
 						var file = cfile.cFilePath.file;
 						if (filter != null || DisplayPosition.displayPosition.isInFile(com.partScope.fileKeys.get(file))) {
-							acc.unshift({file: file, symbols: context.display.DocumentSymbols.collectModuleSymbols({file: file, name: CompilationCache.getModuleNameOfCfile(file, cfile)}, filter == null, {pack: cfile.cPackage, declarations: cfile.cDecls})});
+							acc.unshift({
+								file: file,
+								symbols: context.display.DocumentSymbols.collectModuleSymbols({
+									file: file,
+									name: CompilationCache.getModuleNameOfCfile(file, cfile)
+								}, filter == null, {pack: cfile.cPackage, declarations: cfile.cDecls})
+							});
 						}
 					}
 					acc;
 				};
-				DisplayException.sendModuleSymbolsRaise(com, context.display.DocumentSymbols.DocumentSymbolsPrinter.jsonOfModuleSymbols(com, symbols, filter));
+				DisplayException.sendModuleSymbolsRaise(com,
+					context.display.DocumentSymbols.DocumentSymbolsPrinter.jsonOfModuleSymbols(com, symbols, filter));
 			case _:
 		}
 	}
@@ -275,8 +289,7 @@ class DisplayProcessing {
 	public static function handleDisplayAfterFinalization(com:CommonContext, tctx:Typer, displayFileDotPath:Null<GlobalTypePath>):Void {
 		// Special case for diagnostics: We don't want to load the display file in macro mode because there's a chance it might not be
 		// macro-compatible. This means that we might some macro-specific diagnostics, but I don't see what we could do about that.
-		var shouldLoadInMacro =
-			// Special case for the special case: If the display file has a block which becomes active if `macro` is defined, we can safely
+		var shouldLoadInMacro = // Special case for the special case: If the display file has a block which becomes active if `macro` is defined, we can safely
 			// type the module in macro context. (#8682).
 			!Common.isDiagnostics(com) || com.partScope.parserState.displayModuleHasMacroDefines;
 		if (com.display.dmsForceMacroTyping && shouldLoadInMacro) {

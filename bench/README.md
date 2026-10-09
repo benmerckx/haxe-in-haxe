@@ -19,6 +19,60 @@ HL_STATIC="libhl.a fmt.o dxt.o sha1.o" sh bench/build.sh hlc   # static link
 LD_LIBRARY_PATH=/path/to/patched/hashlink HAXE_REFERENCE=haxe/haxe python3 bench/run.py -n 7
 ```
 
+## hxc OS threads: sequential cost and parallel mode (2026-10-09, late)
+
+`self` (a snapshot of `src`), clang -O2 builds, minimum of 3 runs per
+round; 4-core Xeon @ 2.10 GHz, load 1.0–1.4 (one other job). "Before" is
+commit 54799e3 (green threads only), "after" 66d8f9d (1:1 OS threads,
+thread-local runtime state, safepoints). Parallel mode is the compiler
+without `-D disable-parallelism`; the port's pool has
+`NUMBER_OF_PROCESSORS` − 1 workers besides the calling thread, the
+reference uses its default domain count (4). Every archive matched the
+sequential reference after normalizing variable IDs (test/TESTING.md).
+
+| Run | wall | CPU | peak RSS |
+| --- | ---: | ---: | ---: |
+| before, sequential (2 rounds) | 5.21 / 5.19 s | 5.16 / 5.15 s | 454 MB |
+| after, sequential (2 rounds) | 5.20 / 5.21 s | 5.16 / 5.16 s | 469 MB |
+| after, parallel, 1 thread | 5.33 s | 5.27 s | 469 MB |
+| after, parallel, 2 threads | 4.52 s | 5.53 s | 501 MB |
+| after, parallel, 4 threads | 4.18 s | 5.91 s | 536 MB |
+| reference, sequential | 6.11 s | 6.03 s | 531 MB |
+| reference, parallel (4 domains) | 4.03 s | 6.72 s | 592 MB |
+
+- No sequential regression: the thread-local variables use the local-exec
+  TLS model (one `%fs`-relative access, like a global), and with one thread
+  a TLAB is the whole nursery. stdlib 0.20 → 0.21 s, hello 0.12 → 0.12 s.
+  (The "after" binary also links mbedtls and libuv; "before" does not.)
+- Parallel mode saves 20% wall time with 4 threads (the reference: 34%):
+  only the filters, analyzer, DCE marking and HXB writing are parallel,
+  typing is not. The port in parallel mode is within 4% of the reference in
+  parallel mode, and 32% faster than the reference sequentially.
+
+## A real program: haxe-formatter built with hxc (2026-10-09)
+
+[haxe-formatter](https://github.com/haxecheckstyle/haxe-formatter) (pinned in
+`tools/format-src.sh`) built with the hxc haxelib package and, for comparison,
+by the reference compiler for its other targets; formatting upstream's
+`haxe/std` (2583 files, 14 MB) in place with `hxformat.json`, CPU time min of 3
+(load 1-2):
+
+| Build | CPU | wall | peak RSS | output |
+| --- | ---: | ---: | ---: | --- |
+| hxc, gcc -O2 | 3.65 s | 3.67 s | | identical |
+| hxc, clang -O2 | 3.81 s | 3.85 s | 183 MB | reference for the others |
+| C++ (hxcpp) | 6.34 s | 6.00 s | 212 MB | identical |
+| JS (Node 22) | 9.12 s | 6.15 s | 124 MB | identical |
+| hxc, tcc | 8.16 s | 8.29 s | 184 MB | identical |
+| HL/C | 8.58 s | 7.04 s | | identical |
+| HashLink JIT | — | — | | crashes (SIGSEGV in stock `hl`) |
+
+hxc's optimized builds format 1.6× faster than C++ and Node and 2.3× faster
+than HL/C (CPU), with byte-identical output. Building it exposed and fixed
+three hxc bugs: `Exception.caught/thrown` removed by `-dce full`,
+`StringTools.isEof`, and `String.split` holding the delimiter across an
+allocation (a moving-GC bug).
+
 ## hxc memory: below the OCaml compiler's peak RSS (2026-10-09, night)
 
 Peak RSS and CPU time (user + system), minimum of 3–5 interleaved runs,

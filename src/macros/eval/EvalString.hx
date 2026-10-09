@@ -37,12 +37,14 @@ class EvalString {
 
 	public static function createUnknown(s:String):Value return VString(createUnknownVstring(s));
 
-	public static function concat(s1:Vstring, s2:Vstring):Vstring return new Vstring(s1.sstring + s2.sstring, s1.slength + s2.slength, s1.sbmp && s2.sbmp
-		&& !joinsSurrogates(s1.sstring, s2.sstring));
+	public static function concat(s1:Vstring,
+			s2:Vstring):Vstring return new Vstring(s1.sstring + s2.sstring, s1.slength +
+			s2.slength, s1.sbmp && s2.sbmp && !joinsSurrogates(s1.sstring, s2.sstring));
 
 	static function joinsSurrogates(a:String, b:String):Bool {
 		if (a.length == 0 || b.length == 0) return false;
-		var x = StringTools.fastCodeAt(a, a.length - 1), y = StringTools.fastCodeAt(b, 0);
+		var x = StringTools.fastCodeAt(a, a.length - 1),
+			y = StringTools.fastCodeAt(b, 0);
 		return x >= 0xD800 && x <= 0xDBFF && y >= 0xDC00 && y <= 0xDFFF;
 	}
 
@@ -111,7 +113,7 @@ class EvalString {
 		Upstream returns a function searching from (cIndex, bIndex); this returns
 		that search (character index, start and end native index) or throws NotFound.
 	**/
-	public static function findSubstring(self:Vstring, sub:Vstring, reverse:Bool):(cIndex:Int, bIndex:Int) -> {c:Int, b:Int, e:Int} {
+	public static function findSubstring(self:Vstring, sub:Vstring, reverse:Bool):(cIndex:Int, bIndex:Int) -> {c: Int, b: Int, e: Int} {
 		var clThis = self.slength;
 		var clSub = sub.slength;
 		var sThis = self.sstring;
@@ -184,10 +186,12 @@ class EvalString {
 	public static function compareCodePoints(a:String, b:String):Int {
 		var n = a.length < b.length ? a.length : b.length;
 		for (i in 0...n) {
-			var x = StringTools.fastCodeAt(a, i), y = StringTools.fastCodeAt(b, i);
+			var x = StringTools.fastCodeAt(a, i),
+				y = StringTools.fastCodeAt(b, i);
 			if (x != y) {
 				// surrogates encode code points above every other UTF-16 unit
-				var sx = x >= 0xD800 && x <= 0xDFFF, sy = y >= 0xD800 && y <= 0xDFFF;
+				var sx = x >= 0xD800 && x <= 0xDFFF,
+					sy = y >= 0xD800 && y <= 0xDFFF;
 				if (sx != sy) return sx ? 1 : -1;
 				return x < y ? -1 : 1;
 			}

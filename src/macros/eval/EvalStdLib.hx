@@ -112,7 +112,8 @@ class EvalStdLib {
 
 	public static function initFields(builtins:Builtins, path:GlobalTypePath, staticFields:Array<{name:String, value:Value}>,
 			instanceFields:Array<{name:String, value:Value}>):Void {
-		function map(f:{name:String, value:Value}):{name:Int, value:Value} return {name: EvalHash.hash(f.name), value: f.value};
+		function map(f:{name:String, value:Value}):{name:Int, value:Value}
+			return {name: EvalHash.hash(f.name), value: f.value};
 		var path = EvalHash.pathHash(path);
 		builtins.staticBuiltins = builtins.staticBuiltins.add(path, staticFields.map(map));
 		builtins.instanceBuiltins = builtins.instanceBuiltins.add(path, instanceFields.map(map));
@@ -197,7 +198,8 @@ class EvalStdLib {
 			}
 		});
 		add(EvalHash.key_EReg, vl -> switch vl {
-			case [r, opt]: EvalEncode.encodeInstance(EvalHash.key_EReg, StdEReg.create(EvalDecode.decodeString(r), EvalDecode.decodeString(opt)));
+			case [r, opt]: EvalEncode.encodeInstance(EvalHash.key_EReg,
+					StdEReg.create(EvalDecode.decodeString(r), EvalDecode.decodeString(opt)));
 			case _: die();
 		});
 		add(EvalHash.key_String, vl -> switch vl {
@@ -215,7 +217,8 @@ class EvalStdLib {
 		add(EvalHash.key_haxe_ds_IntMap, _ -> EvalEncode.encodeIntMapDirect(new RuntimeIntHashtbl()));
 		add(EvalHash.key_haxe_ds_Int64Map, _ -> EvalEncode.encodeInt64MapDirect(new RuntimeInt64Hashtbl()));
 		add(EvalHash.key_haxe_ds_ObjectMap, _ -> EvalEncode.encodeObjectMapDirect(EvalValueTools.createValueHashtbl()));
-		add(EvalHash.key_haxe_io_BytesBuffer, _ -> EvalEncode.encodeInstance(EvalHash.key_haxe_io_BytesBuffer, IOutput(new haxe.io.BytesBuffer())));
+		add(EvalHash.key_haxe_io_BytesBuffer,
+			_ -> EvalEncode.encodeInstance(EvalHash.key_haxe_io_BytesBuffer, IOutput(new haxe.io.BytesBuffer())));
 		add(EvalHash.key_haxe_io_Bytes, vl -> switch vl {
 			case [length, b]:
 				var length = EvalDecode.decodeInt(length);
@@ -307,12 +310,15 @@ class EvalStdLib {
 		h.set(EvalHash.key_EReg,
 			() -> EvalEncode.encodeInstance(EvalHash.key_EReg, IRegex(new Vregex(new EReg("", ""), EvalString.createAscii("~//"), false))));
 		h.set(EvalHash.key_String, () -> EvalString.vEmptyString);
-		h.set(EvalHash.key_haxe_ds_StringMap, () -> EvalEncode.encodeInstance(EvalHash.key_haxe_ds_StringMap, IStringMap(new RuntimeStringHashtbl())));
+		h.set(EvalHash.key_haxe_ds_StringMap,
+			() -> EvalEncode.encodeInstance(EvalHash.key_haxe_ds_StringMap, IStringMap(new RuntimeStringHashtbl())));
 		h.set(EvalHash.key_haxe_ds_IntMap, () -> EvalEncode.encodeInstance(EvalHash.key_haxe_ds_IntMap, IIntMap(new RuntimeIntHashtbl())));
-		h.set(EvalHash.key_haxe_ds_Int64Map, () -> EvalEncode.encodeInstance(EvalHash.key_haxe_ds_Int64Map, IInt64Map(new RuntimeInt64Hashtbl())));
+		h.set(EvalHash.key_haxe_ds_Int64Map,
+			() -> EvalEncode.encodeInstance(EvalHash.key_haxe_ds_Int64Map, IInt64Map(new RuntimeInt64Hashtbl())));
 		h.set(EvalHash.key_haxe_ds_ObjectMap,
 			() -> EvalEncode.encodeInstance(EvalHash.key_haxe_ds_ObjectMap, IObjectMap(EvalValueTools.createValueHashtbl())));
-		h.set(EvalHash.key_haxe_io_BytesBuffer, () -> EvalEncode.encodeInstance(EvalHash.key_haxe_io_BytesBuffer, IOutput(new haxe.io.BytesBuffer())));
+		h.set(EvalHash.key_haxe_io_BytesBuffer,
+			() -> EvalEncode.encodeInstance(EvalHash.key_haxe_io_BytesBuffer, IOutput(new haxe.io.BytesBuffer())));
 	}
 
 	public static function initStandardLibrary(builtins:Builtins):Void {
@@ -343,9 +349,7 @@ class EvalStdLib {
 			{name: "toString", value: StdArray.toString},
 			{name: "unshift", value: StdArray.unshift},
 		]);
-		initFields(builtins, tp(["eval"], "Vector"), [
-			{name: "fromArrayCopy", value: StdEvalVector.fromArrayCopy},
-		], [
+		initFields(builtins, tp(["eval"], "Vector"), [{name: "fromArrayCopy", value: StdEvalVector.fromArrayCopy},], [
 			{name: "blit", value: StdEvalVector.blit},
 			{name: "toArray", value: StdEvalVector.toArray},
 			{name: "copy", value: StdEvalVector.copy},
@@ -396,9 +400,7 @@ class EvalStdLib {
 			{name: "_callStack", value: EvalStackTrace.getCallStack},
 			{name: "exceptionStack", value: EvalStackTrace.getExceptionStack},
 		], []);
-		initFields(builtins, tp(["haxe", "zip"], "Compress"), [
-			{name: "run", value: StdCompress.run},
-		], [
+		initFields(builtins, tp(["haxe", "zip"], "Compress"), [{name: "run", value: StdCompress.run},], [
 			{name: "close", value: StdCompress.close},
 			{name: "execute", value: StdCompress.execute},
 			{name: "setFlushMode", value: StdCompress.setFlushMode},
@@ -409,9 +411,7 @@ class EvalStdLib {
 			{name: "callMacroApi", value: StdContext.callMacroApi},
 			{name: "loadPlugin", value: StdContext.loadPlugin},
 		], []);
-		initFields(builtins, tp(["haxe", "crypto"], "Crc32"), [
-			{name: "make", value: StdCrc32.make},
-		], []);
+		initFields(builtins, tp(["haxe", "crypto"], "Crc32"), [{name: "make", value: StdCrc32.make},], []);
 		initFields(builtins, tp([], "Date"), [
 			{name: "fromString", value: StdDate.fromString},
 			{name: "fromTime", value: StdDate.fromTime},
@@ -440,9 +440,7 @@ class EvalStdLib {
 			{name: "push", value: StdDeque.push},
 			{name: "pop", value: StdDeque.pop},
 		]);
-		initFields(builtins, tp([], "EReg"), [
-			{name: "escape", value: StdEReg.escape},
-		], [
+		initFields(builtins, tp([], "EReg"), [{name: "escape", value: StdEReg.escape},], [
 			{name: "map", value: StdEReg.map},
 			{name: "match", value: StdEReg.matchValue},
 			{name: "matched", value: StdEReg.matched},
@@ -519,13 +517,9 @@ class EvalStdLib {
 			{name: "hostToString", value: StdHost.hostToString},
 			{name: "resolve", value: StdHost.resolve},
 		], []);
-		initFields(builtins, tp(["sys", "thread"], "Lock"), [], [
-			{name: "release", value: StdLock.release},
-			{name: "wait", value: StdLock.wait},
-		]);
-		initFields(builtins, tp(["haxe"], "Log"), [
-			{name: "trace", value: StdLog.trace},
-		], []);
+		initFields(builtins, tp(["sys", "thread"], "Lock"), [],
+			[{name: "release", value: StdLock.release}, {name: "wait", value: StdLock.wait},]);
+		initFields(builtins, tp(["haxe"], "Log"), [{name: "trace", value: StdLog.trace},], []);
 		initFields(builtins, tp([], "Math"), [
 			{name: "NaN", value: StdMath.nan},
 			{name: "NEGATIVE_INFINITY", value: StdMath.negativeInfinity},
@@ -555,10 +549,8 @@ class EvalStdLib {
 			{name: "sqrt", value: StdMath.sqrt},
 			{name: "tan", value: StdMath.tan},
 		], []);
-		initFields(builtins, tp(["haxe", "crypto"], "Md5"), [
-			{name: "encode", value: StdMd5.encode},
-			{name: "make", value: StdMd5.make},
-		], []);
+		initFields(builtins, tp(["haxe", "crypto"], "Md5"), [{name: "encode", value: StdMd5.encode}, {name: "make", value: StdMd5.make},],
+			[]);
 		initFields(builtins, tp(["sys", "thread"], "Mutex"), [], [
 			{name: "acquire", value: StdMutex.acquire},
 			{name: "tryAcquire", value: StdMutex.tryAcquire},
@@ -609,13 +601,9 @@ class EvalStdLib {
 			{name: "getString", value: StdResource.getString},
 			{name: "getBytes", value: StdResource.getBytes},
 		], []);
-		initFields(builtins, tp(["haxe", "crypto"], "Sha1"), [
-			{name: "encode", value: StdSha1.encode},
-			{name: "make", value: StdSha1.make},
-		], []);
-		initFields(builtins, tp(["eval", "vm"], "NativeSocket"), [
-			{name: "select", value: StdSocket.select},
-		], [
+		initFields(builtins, tp(["haxe", "crypto"], "Sha1"),
+			[{name: "encode", value: StdSha1.encode}, {name: "make", value: StdSha1.make},], []);
+		initFields(builtins, tp(["eval", "vm"], "NativeSocket"), [{name: "select", value: StdSocket.select},], [
 			{name: "accept", value: StdSocket.accept},
 			{name: "bind", value: StdSocket.bind},
 			{name: "close", value: StdSocket.close},
@@ -643,9 +631,7 @@ class EvalStdLib {
 			{name: "string", value: StdStd.string},
 			{name: "random", value: StdStd.random},
 		], []);
-		initFields(builtins, tp([], "String"), [
-			{name: "fromCharCode", value: StdString.fromCharCode},
-		], [
+		initFields(builtins, tp([], "String"), [{name: "fromCharCode", value: StdString.fromCharCode},], [
 			{name: "charAt", value: StdString.charAt},
 			{name: "charCodeAt", value: StdString.charCodeAt},
 			{name: "indexOf", value: StdString.indexOf},
@@ -732,9 +718,7 @@ class EvalStdLib {
 			{name: "resolveEnum", value: StdType.resolveEnum},
 			{name: "typeof", value: StdType.typeof},
 		], []);
-		initFields(builtins, tp(["haxe", "zip"], "Uncompress"), [
-			{name: "run", value: StdUncompress.run},
-		], [
+		initFields(builtins, tp(["haxe", "zip"], "Uncompress"), [{name: "run", value: StdUncompress.run},], [
 			{name: "close", value: StdUncompress.close},
 			{name: "execute", value: StdUncompress.execute},
 			{name: "setFlushMode", value: StdUncompress.setFlushMode},

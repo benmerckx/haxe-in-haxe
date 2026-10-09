@@ -6,9 +6,15 @@ import haxe.DynamicAccess;
 @:structInit class JsonField {
 	public var name:String;
 	public var value:Dynamic;
-	public inline function new(name:String, value:Dynamic) { this.name = name; this.value = value; }
+
+	public inline function new(name:String, value:Dynamic) {
+		this.name = name;
+		this.value = value;
+	}
+
 	public inline function clone():JsonField return new JsonField(name, value);
 }
+
 class JsonReaderApi {
 	public static function readOptional(data:Dynamic, callback:Dynamic->Void):Void {
 		if (data != null) callback(data);
@@ -70,6 +76,8 @@ class JsonWriterApi {
 	}
 
 	public static function writeString(value:String):Dynamic return value;
+
 	public static function writeBool(value:Bool):Dynamic return value;
+
 	public static function writeInt(value:Int):Dynamic return value;
 }

@@ -111,14 +111,24 @@ int32_t hx_str_cmp(void *a, void *b) {
 }
 
 int32_t hx_str_hash(void *s) {
+	// cached in the string (a benign race between threads: the same value)
 	int32_t *h = &((int32_t *)s)[1];
+#if RT_MT
+	int32_t h0 = __atomic_load_n(h, __ATOMIC_RELAXED);
+	if (h0) return h0;
+#else
 	if (*h) return *h;
+#endif
 	uint32_t x = 2166136261u;
 	uint16_t *c = STR_CHARS(s);
 	for (int32_t i = 0, n = STR_LEN(s); i < n; i++)
 		x = (x ^ c[i]) * 16777619u;
 	if (x == 0) x = 1;
+#if RT_MT
+	__atomic_store_n(h, (int32_t)x, __ATOMIC_RELAXED);
+#else
 	*h = (int32_t)x;
+#endif
 	return (int32_t)x;
 }
 
@@ -353,6 +363,7 @@ void *String_split(void *s, void *delim) {
 	RT_ROOT(delim);
 	void *arr = hx_arr_new(AK_PTR, 0);
 	RT_ROOT(arr);
+	RT_RELOAD(delim); // hx_arr_new may have moved it (a stale delim's length is its forwarding address)
 	int32_t m = STR_LEN(delim);
 	int32_t start = 0;
 	for (;;) {

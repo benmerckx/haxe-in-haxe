@@ -1,7 +1,7 @@
 package typing;
+
 import core.MetaList.StrictMeta as MetaTag;
 import core.Globals.Pos;
-
 import core.TType;
 import core.Globals.*;
 import core.TFunctions.*;
@@ -16,8 +16,13 @@ import core.Meta;
 import haxe.ds.StringMap;
 
 // haxe/src/typing/unifyMin.ml — mechanical draft; not compile-validated.
-class NoValue extends haxe.Exception {public function new() super("NoValue");}
-private class UnifyMinExit extends haxe.Exception {public function new() super("Exit");}
+class NoValue extends haxe.Exception {
+	public function new() super("NoValue");
+}
+
+private class UnifyMinExit extends haxe.Exception {
+	public function new() super("Exit");
+}
 
 class UnifyMin {
 	public static function unifyMinRaise(basic:BasicTypes, el:Array<TExpr>):T {
@@ -33,7 +38,7 @@ class UnifyMin {
 			};
 		}
 		function loop(t:Null<T>, values:Array<TExpr>):{hasError:Bool, type:T} {
-			if (values.length == 0) return {hasError:false, type:t == null ? tDynamic : t};
+			if (values.length == 0) return {hasError: false, type: t == null ? tDynamic : t};
 			var e = values[0], rest = values.slice(1);
 			if (follow(e.etype) == tDynamic) return loop(t, rest);
 			if (t == null) return loop(chkNull(e) ? basic.tnull(e.etype) : e.etype, rest);
@@ -45,7 +50,9 @@ class UnifyMin {
 				try {
 					unify(t, e.etype);
 					return loop(isNull(t) ? basic.tnull(e.etype) : e.etype, rest);
-				} catch (_:Unify_error) {return {hasError:true, type:t};}
+				} catch (_:Unify_error) {
+					return {hasError: true, type: t};
+				}
 			}
 		}
 		var first = loop(null, el);
@@ -57,33 +64,44 @@ class UnifyMin {
 			var fields = new StringMap<Array<TExpr>>();
 			for (e in el) switch follow(e.etype) {
 				case TAnon(a) if (a.aStatus == Const):
-					var names = [for (name in a.aFields.keys()) name]; names.sort(Reflect.compare);
+					var names = [for (name in a.aFields.keys()) name];
+					names.sort(Reflect.compare);
 					if (fcount == -1) {
 						fcount = names.length;
 						for (name in names) fields.set(name, [expr(a.aFields.get(name))]);
 					} else {
 						if (fcount != names.length) throw core.ds.FastThrow.of("Not_found");
-						var previous = [for (name in fields.keys()) name]; previous.sort(Reflect.compare);
+						var previous = [for (name in fields.keys()) name];
+						previous.sort(Reflect.compare);
 						for (name in previous) {
 							var f = a.aFields.get(name);
 							if (f == null) throw core.ds.FastThrow.of("Not_found");
 							fields.set(name, [expr(f)].concat(fields.get(name)));
 						}
 					}
-				case _: throw core.ds.FastThrow.of("Not_found");
+				case _:
+					throw core.ds.FastThrow.of("Not_found");
 			}
 			var result = new StringMap<TClassField>();
-			var names = [for (name in fields.keys()) name]; names.sort(Reflect.compare);
+			var names = [for (name in fields.keys()) name];
+			names.sort(Reflect.compare);
 			for (name in names) {
 				var values = fields.get(name);
-				var t = try unifyMinRaise(basic, values) catch (_:Unify_error) {throw core.ds.FastThrow.of("Not_found");};
+				var t = try unifyMinRaise(basic, values) catch (_:Unify_error) {
+					throw core.ds.FastThrow.of("Not_found");
+				};
 				result.set(name, mkField(name, t, values[0].epos, nullPos));
 			}
 			return mkAnon(Closed, result);
-		} catch (error:Dynamic) {if (error != "Not_found") throw core.ds.FastThrow.of(error);}
+		} catch (error:Dynamic) {
+			if (error != "Not_found") throw core.ds.FastThrow.of(error);
+		}
 		try {
 			// Function argument types are contravariant; return types have a common base.
-			var signature = switch follow(el[0].etype) {case TFun(s): s; case _: throw core.ds.FastThrow.of(new UnifyMinExit());};
+			var signature = switch follow(el[0].etype) {
+				case TFun(s): s;
+				case _: throw core.ds.FastThrow.of(new UnifyMinExit());
+			};
 			var args = signature.args.copy(), arity = args.length;
 			var rets:Array<T> = [];
 			for (e in el.slice(1)) switch follow(e.etype) {
@@ -95,20 +113,23 @@ class UnifyMin {
 						else if (!doesUnify(tcur, tnew)) throw core.ds.FastThrow.of(new UnifyMinExit());
 					}
 					rets.push(s.ret);
-				case _: throw core.ds.FastThrow.of(new UnifyMinExit());
+				case _:
+					throw core.ds.FastThrow.of(new UnifyMinExit());
 			}
 			var commonTypes = UnifyMinT.collectBaseTypes(signature.ret);
 			var ret = switch UnifyMinT.unifyMinPrime(defaultUnificationContext(), commonTypes, rets) {
 				case UnifyMinOk(t): t;
 				case UnifyMinError(_, _): throw core.ds.FastThrow.of(new UnifyMinExit());
 			};
-			return TFun({args:args, ret:ret});
+			return TFun({args: args, ret: ret});
 		} catch (_:UnifyMinExit) {
 			var commonTypes = UnifyMinT.collectBaseTypes(first.type);
 			var dynTypes:Array<T> = [];
-			function hasDynamic(c:TClass):Bool return Meta.has(MetaTag.UnifyMinDynamic, c.clMeta) || (c.clSuper != null && hasDynamic(c.clSuper.cls));
+			function hasDynamic(c:TClass):Bool return Meta.has(MetaTag.UnifyMinDynamic, c.clMeta)
+				|| (c.clSuper != null && hasDynamic(c.clSuper.cls));
 			for (t in commonTypes) switch t {
-				case TInst(c, params) if (params.length > 0 && hasDynamic(c)): dynTypes.unshift(TInst(c, params.map(function(_) return tDynamic)));
+				case TInst(c, params) if (params.length > 0 && hasDynamic(c)):
+					dynTypes.unshift(TInst(c, params.map(function(_) return tDynamic)));
 				case _:
 			}
 			dynTypes.reverse();

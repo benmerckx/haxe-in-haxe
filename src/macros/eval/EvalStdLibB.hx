@@ -60,7 +60,8 @@ class StdLibBHelpers {
 			{
 				name: EvalHash.key_next,
 				value: EvalEncode.vifun0(_ -> {
-					if (l.length == 0) VNull else {
+					if (l.length == 0) VNull
+					else {
 						var v = l[0];
 						l = l.slice(1);
 						v;
@@ -143,17 +144,17 @@ class StdLog {
 	public static final trace = EvalEncode.vfun2((v, infos) -> {
 		var s = EvalPrinting.valueString(v);
 		var s = switch infos {
-			case VNull: s + EvalStdLibA.lineEnd;
-			case _:
-				var infos = EvalDecode.decodeObject(infos);
-				var fileName = EvalDecode.decodeString(EvalField.objectField(infos, key_fileName));
-				var lineNumber = EvalDecode.decodeInt(EvalField.objectField(infos, key_lineNumber));
-				var l = switch EvalField.objectField(infos, key_customParams) {
-					case VArray(va): [s].concat([for (v in EvalArray.toList(va)) EvalPrinting.valueString(v)]);
-					case _: [s];
-				}
-				'$fileName:$lineNumber: ${l.join(",")}' + EvalStdLibA.lineEnd;
-		}
+				case VNull: s + EvalStdLibA.lineEnd;
+				case _:
+					var infos = EvalDecode.decodeObject(infos);
+					var fileName = EvalDecode.decodeString(EvalField.objectField(infos, key_fileName));
+					var lineNumber = EvalDecode.decodeInt(EvalField.objectField(infos, key_lineNumber));
+					var l = switch EvalField.objectField(infos, key_customParams) {
+							case VArray(va): [s].concat([for (v in EvalArray.toList(va)) EvalPrinting.valueString(v)]);
+							case _: [s];
+						}
+					'$fileName:$lineNumber: ${l.join(",")}' + EvalStdLibA.lineEnd;
+			}
 		CompilerIo.writeOut(EvalContext.getCtx().curapi.getCom().requestScope.io, s);
 		VNull;
 	});
@@ -177,7 +178,8 @@ class StdIntMap {
 	});
 
 	public static final get = EvalEncode.vifun1((vthis, vkey) -> {
-		try thisValue(vthis).find(EvalDecode.decodeInt(vkey)) catch (_:NotFound) VNull;
+		try thisValue(vthis).find(EvalDecode.decodeInt(vkey))
+		catch (_:NotFound) VNull;
 	});
 
 	public static final iterator = EvalEncode.vifun0(vthis -> {
@@ -216,8 +218,11 @@ class StdIntMap {
 	public static final toString = EvalEncode.vifun0(vthis -> {
 		var self = thisValue(vthis);
 		var l = self.fold((key, vvalue, acc:Array<Vstring>) -> {
-			acc.push(EvalString.join(EvalString.emptyString,
-				[EvalString.createAscii(Std.string(key)), EvalString.createAscii(" => "), EvalPrinting.sValue(0, vvalue)]));
+			acc.push(EvalString.join(EvalString.emptyString, [
+				EvalString.createAscii(Std.string(key)),
+				EvalString.createAscii(" => "),
+				EvalPrinting.sValue(0, vvalue)
+			]));
 			acc;
 		}, []);
 		l.reverse();
@@ -254,7 +259,8 @@ class StdInt64Map {
 	});
 
 	public static final get = EvalEncode.vifun1((vthis, vkey) -> {
-		try thisValue(vthis).find(EvalIntegers.decodeI64(vkey)) catch (_:NotFound) VNull;
+		try thisValue(vthis).find(EvalIntegers.decodeI64(vkey))
+		catch (_:NotFound) VNull;
 	});
 
 	public static final iterator = EvalEncode.vifun0(vthis -> {
@@ -293,8 +299,11 @@ class StdInt64Map {
 	public static final toString = EvalEncode.vifun0(vthis -> {
 		var self = thisValue(vthis);
 		var l = self.fold((key, vvalue, acc:Array<Vstring>) -> {
-			acc.push(EvalString.join(EvalString.emptyString,
-				[EvalString.createAscii(haxe.Int64.toStr(key)), EvalString.createAscii(" => "), EvalPrinting.sValue(0, vvalue)]));
+			acc.push(EvalString.join(EvalString.emptyString, [
+				EvalString.createAscii(haxe.Int64.toStr(key)),
+				EvalString.createAscii(" => "),
+				EvalPrinting.sValue(0, vvalue)
+			]));
 			acc;
 		}, []);
 		l.reverse();
@@ -331,7 +340,8 @@ class StdStringMap {
 	});
 
 	public static final get = EvalEncode.vifun1((vthis, vkey) -> {
-		try thisValue(vthis).find(EvalDecode.decodeVstring(vkey)).value catch (_:NotFound) VNull;
+		try thisValue(vthis).find(EvalDecode.decodeVstring(vkey)).value
+		catch (_:NotFound) VNull;
 	});
 
 	public static final iterator = EvalEncode.vifun0(vthis -> {
@@ -407,7 +417,8 @@ class StdObjectMap {
 	});
 
 	public static final get = EvalEncode.vifun1((vthis, vkey) -> {
-		try thisValue(vthis).find(vkey) catch (_:NotFound) VNull;
+		try thisValue(vthis).find(vkey)
+		catch (_:NotFound) VNull;
 	});
 
 	public static final iterator = EvalEncode.vifun0(vthis -> {
@@ -445,7 +456,11 @@ class StdObjectMap {
 	public static final toString = EvalEncode.vifun0(vthis -> {
 		var self = thisValue(vthis);
 		var l = self.fold((key, vvalue, acc:Array<Vstring>) -> {
-			acc.push(EvalString.join(EvalString.emptyString, [EvalPrinting.sValue(0, key), EvalString.createAscii(" => "), EvalPrinting.sValue(0, vvalue)]));
+			acc.push(EvalString.join(EvalString.emptyString, [
+				EvalPrinting.sValue(0, key),
+				EvalString.createAscii(" => "),
+				EvalPrinting.sValue(0, vvalue)
+			]));
 			acc;
 		}, []);
 		l.reverse();
@@ -537,7 +552,8 @@ class StdMath {
 
 	public static final sqrt = EvalEncode.vfun1(v -> {
 		var v = EvalDecode.num(v);
-		if (v < 0.) nan else VFloat(Math.sqrt(v));
+		if (v < 0.) nan
+		else VFloat(Math.sqrt(v));
 	});
 
 	public static final tan = EvalEncode.vfun1(v -> VFloat(Math.tan(EvalDecode.num(v))));
@@ -592,7 +608,11 @@ class StdSemaphore {
 	}
 
 	public static final acquire = EvalEncode.vifun0(vthis -> {
-		thisValue(vthis).acquire();
+		var sem = thisValue(vthis);
+		if (!sem.tryAcquire()) EvalLock.blocking(() -> {
+			sem.acquire();
+			true;
+		});
 		VNull;
 	});
 
@@ -608,7 +628,7 @@ class StdSemaphore {
 					while (true) {
 						if (sem.tryAcquire()) return VTrue;
 						else if (Sys.time() >= t) return VFalse;
-						else Sys.sleep(0.0);
+						else EvalLock.yieldNow();
 					}
 				}
 				loop();
@@ -632,7 +652,7 @@ class StdCondition {
 	// The host condition owns its mutex: Mutex.lock cond.cmutex
 	public static final acquire = EvalEncode.vifun0(vthis -> {
 		var cond = thisValue(vthis);
-		cond.cond.acquire();
+		EvalLock.acquireCondition(cond.cond);
 		VNull;
 	});
 
@@ -649,7 +669,10 @@ class StdCondition {
 
 	public static final wait = EvalEncode.vifun0(vthis -> {
 		var c = thisValue(vthis);
-		c.cond.wait();
+		EvalLock.blocking(() -> {
+			c.cond.wait();
+			true;
+		});
 		VNull;
 	});
 
@@ -693,7 +716,8 @@ class StdNativeProcess {
 	});
 
 	public static final exitCode = EvalEncode.vifun0(vthis -> {
-		thisValue(vthis).exit().vint();
+		var p = thisValue(vthis);
+		EvalLock.blocking(() -> p.exit()).vint();
 	});
 
 	public static final getPid = EvalEncode.vifun0(vthis -> {
@@ -709,11 +733,13 @@ class StdNativeProcess {
 	});
 
 	public static final readStderr = EvalEncode.vifun3((vthis, bytes, pos, len) -> {
-		try call((p, b, pos, len) -> p.readStderr(b, pos, len), vthis, bytes, pos, len).vint() catch (_:Dynamic) EvalContext.excString("Could not read stderr");
+		try call((p, b, pos, len) -> EvalLock.blocking(() -> p.readStderr(b, pos, len)), vthis, bytes, pos, len).vint()
+		catch (_:Dynamic) EvalContext.excString("Could not read stderr");
 	});
 
 	public static final readStdout = EvalEncode.vifun3((vthis, bytes, pos, len) -> {
-		try call((p, b, pos, len) -> p.readStdout(b, pos, len), vthis, bytes, pos, len).vint() catch (_:Dynamic) EvalContext.excString("Could not read stdout");
+		try call((p, b, pos, len) -> EvalLock.blocking(() -> p.readStdout(b, pos, len)), vthis, bytes, pos, len).vint()
+		catch (_:Dynamic) EvalContext.excString("Could not read stdout");
 	});
 
 	public static final closeStdin = EvalEncode.vifun0(vthis -> {
@@ -725,7 +751,7 @@ class StdNativeProcess {
 	});
 
 	public static final writeStdin = EvalEncode.vifun3((vthis, bytes, pos, len) -> {
-		call((p, b, pos, len) -> p.writeStdin(b, pos, len), vthis, bytes, pos, len).vint();
+		call((p, b, pos, len) -> EvalLock.blocking(() -> p.writeStdin(b, pos, len)), vthis, bytes, pos, len).vint();
 	});
 }
 
@@ -752,8 +778,7 @@ class StdReflect {
 				case [VFunction(f1, _), VFunction(f2, _)]: Reflect.compareMethods(f1, f2);
 				case [VFieldClosure(v1, f1), VFieldClosure(v2, f2)]: Reflect.compareMethods(f1, f2) && EvalMisc.compare(v1, v2) == CEq;
 				case _: false;
-			}
-		}
+			}}
 		loop(a, b).vbool();
 	});
 
@@ -799,7 +824,8 @@ class StdReflect {
 
 	// field' upstream
 	public static final fieldValue = EvalEncode.vfun2((o, name) -> {
-		if (o.match(VNull)) VNull else EvalField.dynamicField(o, EvalHash.hash(EvalDecode.decodeVstring(name).sstring));
+		if (o.match(VNull)) VNull
+		else EvalField.dynamicField(o, EvalHash.hash(EvalDecode.decodeVstring(name).sstring));
 	});
 
 	public static final fields = EvalEncode.vfun1(o -> {
@@ -808,40 +834,42 @@ class StdReflect {
 			acc;
 		}, []);
 		var fields = switch o.vresolve() {
-			case VObject(o): [for (f in EvalContext.objectFields(o)) f.name];
-			case VInstance(vi): vi.iproto.pinstanceNames.fold((name, _, acc:Array<Int>) -> {
-					acc.unshift(name);
-					acc;
-				}, []);
-			case VPrototype(proto): protoFields(proto);
-			case VNull: [];
-			case VString(_) | VArray(_) | VVector(_): [EvalHash.key_length];
-			case _: EvalExceptions.unexpectedValue(o, "object");
-		}
+				case VObject(o): [for (f in EvalContext.objectFields(o)) f.name];
+				case VInstance(vi): vi.iproto.pinstanceNames.fold((name, _, acc:Array<Int>) -> {
+						acc.unshift(name);
+						acc;
+					}, []);
+				case VPrototype(proto): protoFields(proto);
+				case VNull: [];
+				case VString(_) | VArray(_) | VVector(_): [EvalHash.key_length];
+				case _: EvalExceptions.unexpectedValue(o, "object");
+			}
 		EvalEncode.encodeArray([for (i in fields) EvalEncode.encodeString(EvalHash.revHash(i))]);
 	});
 
 	public static final getProperty = EvalEncode.vfun2((o, name) -> {
-		if (o.match(VNull)) VNull else {
+		if (o.match(VNull)) VNull
+		else {
 			var name = EvalDecode.decodeVstring(name);
 			var nameGet = EvalHash.hash(EvalString.concat(r_get_, name).sstring);
 			var vget = EvalField.field(o, nameGet);
-			if (!vget.match(VNull)) EvalPrinting.callValueOn(o, vget, []) else EvalField.dynamicField(o, EvalHash.hash(name.sstring));
+			if (!vget.match(VNull)) EvalPrinting.callValueOn(o, vget, [])
+			else EvalField.dynamicField(o, EvalHash.hash(name.sstring));
 		}
 	});
 
 	public static final hasField = EvalEncode.vfun2((o, field) -> {
 		var name = EvalHash.hash(EvalDecode.decodeVstring(field).sstring);
 		var b = switch o.vresolve() {
-			case VObject(o):
-				switch o.oproto {
-					case OProto(proto): proto.pinstanceNames.mem(name);
-					case ODictionary(d): d.mem(name);
-				}
-			case VInstance(vi): vi.iproto.pinstanceNames.mem(name) || vi.iproto.pnames.mem(name);
-			case VPrototype(proto): proto.pnames.mem(name);
-			case _: false; // issue #10993
-		}
+				case VObject(o):
+					switch o.oproto {
+						case OProto(proto): proto.pinstanceNames.mem(name);
+						case ODictionary(d): d.mem(name);
+					}
+				case VInstance(vi): vi.iproto.pinstanceNames.mem(name) || vi.iproto.pnames.mem(name);
+				case VPrototype(proto): proto.pnames.mem(name);
+				case _: false; // issue #10993
+			}
 		b.vbool();
 	});
 
@@ -865,7 +893,8 @@ class StdReflect {
 	});
 
 	public static final setField = EvalEncode.vfun3((o, name, v) -> {
-		try EvalMisc.setFieldRuntime(o, EvalHash.hash(EvalDecode.decodeVstring(name).sstring), v) catch (_:NotFound) {}
+		try EvalMisc.setFieldRuntime(o, EvalHash.hash(EvalDecode.decodeVstring(name).sstring), v)
+		catch (_:NotFound) {}
 		VNull;
 	});
 
@@ -873,8 +902,10 @@ class StdReflect {
 		var name = EvalDecode.decodeVstring(name);
 		var nameSet = EvalHash.hash(EvalString.concat(r_set_, name).sstring);
 		var vset = EvalField.field(o, nameSet);
-		if (!vset.match(VNull)) EvalPrinting.callValueOn(o, vset, [v]) else {
-			try EvalMisc.setFieldRuntime(o, EvalHash.hash(name.sstring), v) catch (_:NotFound) {}
+		if (!vset.match(VNull)) EvalPrinting.callValueOn(o, vset, [v])
+		else {
+			try EvalMisc.setFieldRuntime(o, EvalHash.hash(name.sstring), v)
+			catch (_:NotFound) {}
 			VNull;
 		}
 	});
@@ -924,7 +955,6 @@ private typedef SocketHost = macros.eval.EvalHostNet;
 	upstream's names and argument checks, then fail ("... is not supported by
 	haxe-in-haxe").
 **/
-
 class StdSocket {
 	static function thisValue(vthis:Value):Dynamic {
 		return switch vthis {
@@ -947,7 +977,10 @@ class StdSocket {
 	static function encodeAddr(a:Null<Array<Int>>, cmd:String):Value {
 		if (a == null) unixError(cmd);
 		if (a[1] < 0) Globals.die("", "evalStdLib.ml:StdSocket");
-		return EvalEncode.encodeObj([{name: EvalHash.key_ip, value: VInt32(a[0])}, {name: EvalHash.key_port, value: VInt32(a[1])}]);
+		return EvalEncode.encodeObj([
+			{name: EvalHash.key_ip, value: VInt32(a[0])},
+			{name: EvalHash.key_port, value: VInt32(a[1])}
+		]);
 	}
 
 	static function timeoutValue(timeout:Value):Float {
@@ -963,7 +996,7 @@ class StdSocket {
 	public static final accept = EvalEncode.vifun0(vthis -> {
 		var self = thisValue(vthis);
 		#if (target.name == "hxc" || hl)
-		var socket = check(SocketHost.accept(self), "accept");
+		var socket = check(EvalLock.blocking(() -> SocketHost.accept(self)), "accept");
 		EvalEncode.encodeInstance(EvalHash.key_eval_vm_NativeSocket, ISocket(socket));
 		#else
 		StdLibBHelpers.socketsNotSupported();
@@ -997,7 +1030,7 @@ class StdSocket {
 		var host = EvalDecode.decodeI32(host);
 		var port = EvalDecode.decodeInt(port);
 		#if (target.name == "hxc" || hl)
-		check(SocketHost.connect(self, host, port), "connect");
+		check(EvalLock.blocking(() -> SocketHost.connect(self, host, port)), "connect");
 		VNull;
 		#else
 		StdLibBHelpers.socketsNotSupported();
@@ -1039,7 +1072,7 @@ class StdSocket {
 		var pos = EvalDecode.decodeInt(pos);
 		var len = EvalDecode.decodeInt(len);
 		#if (target.name == "hxc" || hl)
-		VInt32(check(SocketHost.recv(self, buf, pos, len), "recv"));
+		VInt32(check(EvalLock.blocking(() -> SocketHost.recv(self, buf, pos, len)), "recv"));
 		#else
 		StdLibBHelpers.socketsNotSupported();
 		#end
@@ -1049,7 +1082,8 @@ class StdSocket {
 		#if (target.name == "hxc" || hl)
 		var buf = Bytes.alloc(1);
 		buf.set(0, 0);
-		check(SocketHost.recv(thisValue(vthis), buf, 0, 1), "recv");
+		var self = thisValue(vthis);
+		check(EvalLock.blocking(() -> SocketHost.recv(self, buf, 0, 1)), "recv");
 		VInt32(buf.get(0));
 		#else
 		thisValue(vthis);
@@ -1081,7 +1115,7 @@ class StdSocket {
 		var readFds = [for (p in read) p.fd];
 		var writeFds = [for (p in write) p.fd];
 		var othersFds = [for (p in others) p.fd];
-		check(SocketHost.select(readFds, writeFds, othersFds, timeout), "select");
+		check(EvalLock.blocking(() -> SocketHost.select(readFds, writeFds, othersFds, timeout)), "select");
 		// Unix.select lists the ready descriptors in reverse input order; List.assq
 		// maps each back to the first pair holding it
 		function ready(pairs:Array<{fd:Int, v:Value}>, fds:Array<Int>):Array<Value> {
@@ -1118,7 +1152,7 @@ class StdSocket {
 		var pos = EvalDecode.decodeInt(pos);
 		var len = EvalDecode.decodeInt(len);
 		#if (target.name == "hxc" || hl)
-		VInt32(check(SocketHost.send(self, buf, pos, len), "send"));
+		VInt32(check(EvalLock.blocking(() -> SocketHost.send(self, buf, pos, len)), "send"));
 		#else
 		StdLibBHelpers.socketsNotSupported();
 		#end
@@ -1132,7 +1166,7 @@ class StdSocket {
 		if (char < 0 || char > 255) throw new InvalidArgument("char_of_int");
 		var buf = Bytes.alloc(1);
 		buf.set(0, char);
-		check(SocketHost.send(self, buf, 0, 1), "send");
+		check(EvalLock.blocking(() -> SocketHost.send(self, buf, 0, 1)), "send");
 		VNull;
 		#else
 		StdLibBHelpers.socketsNotSupported();
@@ -1176,11 +1210,11 @@ class StdSocket {
 	public static final shutdown = EvalEncode.vifun2((vthis, read, write) -> {
 		var self = thisValue(vthis);
 		var mode = switch [read, write] {
-			case [VTrue, VTrue]: 2; // SHUTDOWN_ALL
-			case [VTrue, _]: 0; // SHUTDOWN_RECEIVE
-			case [_, VTrue]: 1; // SHUTDOWN_SEND
-			case _: EvalContext.excString("Nothing to shut down");
-		}
+				case [VTrue, VTrue]: 2; // SHUTDOWN_ALL
+				case [VTrue, _]: 0; // SHUTDOWN_RECEIVE
+				case [_, VTrue]: 1; // SHUTDOWN_SEND
+				case _: EvalContext.excString("Nothing to shut down");
+			}
 		#if (target.name == "hxc" || hl)
 		check(SocketHost.shutdown(self, mode), "shutdown");
 		VNull;
@@ -1218,15 +1252,18 @@ class StdStd {
 	});
 
 	public static final int = EvalEncode.vfun1(v -> {
-		try StdLibBHelpers.intOfFloat(EvalDecode.num(v)).vint() catch (_:Dynamic) VNull;
+		try StdLibBHelpers.intOfFloat(EvalDecode.num(v)).vint()
+		catch (_:Dynamic) VNull;
 	});
 
 	public static final parseInt = EvalEncode.vfun1(v -> {
-		try core.Numeric.parseInt(EvalDecode.decodeString(v)).vint32() catch (_:Dynamic) VNull;
+		try core.Numeric.parseInt(EvalDecode.decodeString(v)).vint32()
+		catch (_:Dynamic) VNull;
 	});
 
 	public static final parseFloat = EvalEncode.vfun1(v -> {
-		try core.Numeric.parseFloat(EvalDecode.decodeString(v)).vfloat() catch (_:Dynamic) VFloat(Math.NaN);
+		try core.Numeric.parseFloat(EvalDecode.decodeString(v)).vfloat()
+		catch (_:Dynamic) VFloat(Math.NaN);
 	});
 
 	public static final random = EvalEncode.vfun1(v -> {
@@ -1246,18 +1283,21 @@ class StdString {
 	public static final charAt = EvalEncode.vifun1((vthis, index) -> {
 		var self = thisValue(vthis);
 		var i = EvalDecode.decodeInt(index);
-		if (i < 0 || i >= self.slength) EvalString.vEmptyString else VString(EvalString.fromCharCode(EvalString.charAt(self, i)));
+		if (i < 0 || i >= self.slength) EvalString.vEmptyString
+		else VString(EvalString.fromCharCode(EvalString.charAt(self, i)));
 	});
 
 	public static final charCodeAt = EvalEncode.vifun1((vthis, index) -> {
 		var self = thisValue(vthis);
 		var i = EvalDecode.decodeInt(index);
-		if (i < 0 || i >= self.slength) VNull else EvalString.charAt(self, i).vint();
+		if (i < 0 || i >= self.slength) VNull
+		else EvalString.charAt(self, i).vint();
 	});
 
 	public static final fromCharCode = EvalEncode.vfun1(i -> {
 		var i = EvalDecode.decodeInt(i);
-		try VString(EvalString.fromCharCode(i)) catch (_:NotFound) VNull;
+		try VString(EvalString.fromCharCode(i))
+		catch (_:NotFound) VNull;
 	});
 
 	public static final indexOf = EvalEncode.vifun2((vthis, str, startIndex) -> {
@@ -1266,11 +1306,12 @@ class StdString {
 		var i = EvalDecode.defaultInt(startIndex, 0);
 		var i = i < 0 ? 0 : i;
 		try {
-			if (str.slength == 0) (i < self.slength ? i : self.slength).vint() else {
+			if (str.slength == 0) (i < self.slength ? i : self.slength).vint()
+			else {
 				var i = if (i >= self.slength) throw NotFound.raise() else if (i < 0) {
-					var j = self.slength + i;
-					j < 0 ? 0 : j;
-				} else i;
+						var j = self.slength + i;
+						j < 0 ? 0 : j;
+					} else i;
 				var b = EvalString.getOffset(self, i);
 				var r = EvalString.findSubstring(self, str, false)(i, b);
 				r.c.vint();
@@ -1287,7 +1328,7 @@ class StdString {
 			if (str.slength == 0) {
 				var i = EvalDecode.defaultInt(startIndex, self.slength);
 				var m = i < self.slength ? i : self.slength;
-				(m > 0 ? m : 0).vint();
+					(m > 0 ? m : 0).vint();
 			} else {
 				var i = EvalDecode.defaultInt(startIndex, self.slength - str.slength);
 				var i = if (i < 0) throw NotFound.raise() else if (i >= self.slength - str.slength) self.slength - str.slength else i;
@@ -1343,16 +1384,17 @@ class StdString {
 		var self = thisValue(vthis);
 		var clThis = self.slength;
 		var cPos = EvalDecode.decodeInt(pos);
-		if (cPos >= clThis) EvalString.vEmptyString else {
+		if (cPos >= clThis) EvalString.vEmptyString
+		else {
 			var cPos = if (cPos < 0) {
-				var cPos = self.slength + cPos;
-				cPos < 0 ? 0 : cPos;
-			} else cPos;
+					var cPos = self.slength + cPos;
+					cPos < 0 ? 0 : cPos;
+				} else cPos;
 			var cLen = switch len {
-				case VNull: clThis - cPos;
-				case VInt32(i): i;
-				case _: EvalExceptions.unexpectedValue(len, "int");
-			}
+					case VNull: clThis - cPos;
+					case VInt32(i): i;
+					case _: EvalExceptions.unexpectedValue(len, "int");
+				}
 			var cLen = if (cLen < 0) clThis + cLen - cPos else if (cLen > clThis - cPos) clThis - cPos else cLen;
 			VString(EvalString.substr(self, cPos, cLen));
 		}
@@ -1370,7 +1412,8 @@ class StdString {
 		var cLast2 = swap ? cFirst : cLast;
 		var cFirst = cFirst2;
 		var cLast = cLast2 > clThis ? clThis : cLast2;
-		if (cFirst > clThis || cFirst == cLast) EvalString.vEmptyString else {
+		if (cFirst > clThis || cFirst == cLast) EvalString.vEmptyString
+		else {
 			var bOffset1 = EvalString.getOffset(self, cFirst);
 			var cLen = cLast - cFirst;
 			var bLen = if (cLast == clThis) self.sstring.length - bOffset1 else EvalString.move(self, bOffset1, cLen) - bOffset1;
@@ -1406,9 +1449,9 @@ class StdStringBuf {
 	public static final add = EvalEncode.vifun1((vthis, x) -> {
 		var self = thisValue(vthis);
 		var s = switch x {
-			case VString(s): s;
-			case _: EvalString.createAscii(EvalPrinting.valueString(x));
-		}
+				case VString(s): s;
+				case _: EvalString.createAscii(EvalPrinting.valueString(x));
+			}
 		EvalString.bufferAddString(self, s);
 		VNull;
 	});
@@ -1426,10 +1469,10 @@ class StdStringBuf {
 		var s = EvalDecode.decodeVstring(s);
 		var cPos = EvalDecode.decodeInt(pos);
 		var cLen = switch len {
-			case VNull: s.slength - cPos;
-			case VInt32(i): i;
-			case _: EvalExceptions.unexpectedValue(len, "int");
-		}
+				case VNull: s.slength - cPos;
+				case VInt32(i): i;
+				case _: EvalExceptions.unexpectedValue(len, "int");
+			}
 		if (cLen > 0) {
 			var bOffset1 = EvalString.getOffset(s, cPos);
 			var bOffset2 = EvalString.move(s, bOffset1, cLen);
@@ -1475,10 +1518,12 @@ class StdStringTools {
 		var buf = new StringBuf();
 		var replaceCount = 0;
 		function create():Value {
-			return VString(EvalString.createWithLength(buf.toString(), s2.slength + by.slength * replaceCount - sub.slength * replaceCount));
+			return VString(EvalString.createWithLength(buf.toString(),
+				s2.slength + by.slength * replaceCount - sub.slength * replaceCount));
 		}
 		if (sub.slength == 0) {
-			if (by.slength == 0) s else {
+			if (by.slength == 0) s
+			else {
 				for (uc in new haxe.iterators.StringIteratorUnicode(s2.sstring)) {
 					buf.addChar(uc);
 					// don't add for the final char
@@ -1521,10 +1566,10 @@ class StdStringTools {
 		function add(s:Vstring) EvalString.bufferAddString(b, s);
 		var len = s.length;
 		function decode(c:Int):Null<Int> {
-			return if (c >= "0".code && c <= "9".code) c - "0".code
-			else if (c >= "a".code && c <= "f".code) c - "a".code + 10
-			else if (c >= "A".code && c <= "F".code) c - "A".code + 10
-			else null;
+			return if (c >= "0".code && c <= "9".code) c - "0".code else if (c >= "a".code && c <= "f".code) c - "a".code + 10 else
+				if (c >= "A".code
+					&& c <= "F".code) c
+					- "A".code + 10 else null;
 		}
 		function decodeHex(i:Int):Null<Int> {
 			var p1 = i < len ? decode(StringTools.fastCodeAt(s, i)) : null;
@@ -1535,7 +1580,8 @@ class StdStringTools {
 			// String.unsafe_get: reading past the end is not checked upstream
 			return if (i < len && StringTools.fastCodeAt(s, i) == "%".code) {
 				var c = decodeHex(i + 1);
-				if (c == null) EvalContext.excString("Malformed") else c;
+				if (c == null) EvalContext.excString("Malformed")
+				else c;
 			} else EvalContext.excString("Malformed");
 		}
 		var i = 0;
@@ -1610,13 +1656,14 @@ class StdSys {
 	public static final getChar = EvalEncode.vfun1(echo -> {
 		var echo = EvalDecode.decodeBool(echo);
 		var com = com();
-		CompilerIo.getch(com.requestScope.io, echo).vint();
+		EvalLock.blocking(() -> CompilerIo.getch(com.requestScope.io, echo)).vint();
 	});
 
 	public static final getCwd = EvalEncode.vfun0(() -> {
 		var dir = EvalStdLib.catchUnixError(_ -> Sys.getCwd(), null);
 		var l = dir.length;
-		if (l == 0) EvalEncode.encodeString("./") else switch dir.charAt(l - 1) {
+		if (l == 0) EvalEncode.encodeString("./")
+		else switch dir.charAt(l - 1) {
 			case "/" | "\\": EvalString.createUnknown(dir);
 			case _: EvalString.createUnknown(dir + "/");
 		}
@@ -1643,7 +1690,8 @@ class StdSys {
 	public static final programPath = EvalEncode.vfun0(() -> {
 		var com = com();
 		var file:Null<String> = com.main.mainFile;
-		if (file != null) EvalString.createUnknown(core.Path.getFullPath(file)) else VNull;
+		if (file != null) EvalString.createUnknown(core.Path.getFullPath(file))
+		else VNull;
 	});
 
 	public static final putEnv = EvalEncode.vfun2((s, v) -> {
@@ -1668,7 +1716,10 @@ class StdSys {
 
 	public static final sleep = EvalEncode.vfun1(f -> {
 		var t = EvalDecode.num(f);
-		if (t > 0.0) Sys.sleep(t);
+		if (t > 0.0) EvalLock.blocking(() -> {
+			Sys.sleep(t);
+			true;
+		});
 		VNull;
 	});
 
@@ -1692,12 +1743,12 @@ class StdSys {
 	// Upstream runs `uname` on Unix (mapping Darwin to Mac); the host's Sys.systemName is used here.
 	public static final systemName = EvalEncode.vfun0(() -> {
 		var s = switch cachedSysName {
-			case null:
-				var n = Sys.systemName();
-				cachedSysName = n;
-				n;
-			case n: n;
-		}
+				case null:
+					var n = Sys.systemName();
+					cachedSysName = n;
+					n;
+				case n: n;
+			}
 		EvalEncode.encodeString(s);
 	});
 
@@ -1716,7 +1767,10 @@ class StdThread {
 
 	public static final delay = EvalEncode.vfun1(f -> {
 		var t = EvalDecode.num(f);
-		if (t > 0.0) Sys.sleep(t);
+		if (t > 0.0) EvalLock.blocking(() -> {
+			Sys.sleep(t);
+			true;
+		});
 		VNull;
 	});
 
@@ -1745,10 +1799,10 @@ class StdThread {
 		switch thisValue(thread).threadMode {
 			case Domain(_, finished) | Thread(_, finished):
 				// wait, then release again so that later joins return at once
-				finished.wait();
+				EvalLock.blocking(() -> finished.wait());
 				finished.release();
 			case LuvThread(t):
-				t.join();
+				EvalLock.blocking(() -> t.join());
 			case null:
 		}
 		VNull;
@@ -1776,7 +1830,7 @@ class StdThread {
 
 	public static final yield = EvalEncode.vfun0(() -> {
 		// Thread.yield / Domain.cpu_relax upstream
-		Sys.sleep(0.0);
+		EvalLock.yieldNow();
 		VNull;
 	});
 }
@@ -1902,7 +1956,8 @@ class StdType {
 	public static final enumEq = EvalEncode.vfun2((a, b) -> {
 		function weirdEq(a:Value, b:Value):Bool {
 			return switch [a, b] {
-				case [VEnumValue(a), VEnumValue(b)]: a == b || a.eindex == b.eindex && EvalMisc.arraysEqual(weirdEq, a.eargs, b.eargs) && a.epath == b.epath;
+				case [VEnumValue(a), VEnumValue(b)]: a == b || a.eindex == b.eindex && EvalMisc.arraysEqual(weirdEq, a.eargs,
+						b.eargs) && a.epath == b.epath;
 				case _: a.equals(b);
 			}
 		}
@@ -1922,7 +1977,8 @@ class StdType {
 	});
 
 	public static final getClass = EvalEncode.vfun1(v -> switch v {
-		case VInstance(vi) if (vi.iproto.pkind.match(PInstance)): EvalContext.getStaticPrototypeAsValue(EvalContext.getCtx(), vi.iproto.ppath, Globals.nullPos);
+		case VInstance(vi) if (vi.iproto.pkind.match(PInstance)): EvalContext.getStaticPrototypeAsValue(EvalContext.getCtx(),
+				vi.iproto.ppath, Globals.nullPos);
 		case VString(_): EvalContext.getStaticPrototypeAsValue(EvalContext.getCtx(), EvalHash.key_String, Globals.nullPos);
 		case VArray(_): EvalContext.getStaticPrototypeAsValue(EvalContext.getCtx(), EvalHash.key_Array, Globals.nullPos);
 		case VVector(_): EvalContext.getStaticPrototypeAsValue(EvalContext.getCtx(), EvalHash.key_eval_Vector, Globals.nullPos);
@@ -1970,9 +2026,9 @@ class StdType {
 			try {
 				function loop(acc:GlobalsIntMap<Int>, proto:Vprototype):GlobalsIntMap<Int> {
 					var acc = switch proto.pparent {
-						case null: acc;
-						case proto: loop(acc, proto);
-					}
+							case null: acc;
+							case proto: loop(acc, proto);
+						}
 					var acc = proto.pinstanceNames.fold((name, _, acc:GlobalsIntMap<Int>) -> acc.add(name, 0), acc);
 					return proto.pnames.fold((name, _, acc:GlobalsIntMap<Int>) -> acc.add(name, 0), acc);
 				}
@@ -1994,7 +2050,8 @@ class StdType {
 
 	public static final resolveClass = EvalEncode.vfun1(v -> {
 		var name = EvalDecode.decodeVstring(v).sstring;
-		try EvalContext.getStaticPrototypeRaise(EvalContext.getCtx(), EvalHash.hash(name)).pvalue catch (_:NotFound) VNull;
+		try EvalContext.getStaticPrototypeRaise(EvalContext.getCtx(), EvalHash.hash(name)).pvalue
+		catch (_:NotFound) VNull;
 	});
 
 	public static final resolveEnum = EvalEncode.vfun1(v -> {
@@ -2022,7 +2079,12 @@ class StdType {
 				case VInstance(vi): {i: 7, vl: [EvalContext.getStaticPrototypeAsValue(ctx, vi.iproto.ppath, Globals.nullPos)]};
 				case VString(_): {i: 7, vl: [EvalContext.getStaticPrototypeAsValue(ctx, EvalHash.key_String, Globals.nullPos)]};
 				case VArray(_): {i: 7, vl: [EvalContext.getStaticPrototypeAsValue(ctx, EvalHash.key_Array, Globals.nullPos)]};
-				case VVector(_): {i: 7, vl: [EvalContext.getStaticPrototypeAsValue(ctx, EvalHash.key_eval_Vector, Globals.nullPos)]};
+				case VVector(_): {
+						i: 7,
+						vl: [
+							EvalContext.getStaticPrototypeAsValue(ctx, EvalHash.key_eval_Vector, Globals.nullPos)
+						]
+					};
 				case VObject(_) | VPrototype(_): {i: 5, vl: []};
 				case VFunction(_) | VFieldClosure(_): {i: 6, vl: []};
 				case VEnumValue(ve): {i: 8, vl: [EvalContext.getStaticPrototypeAsValue(ctx, ve.epath, Globals.nullPos)]};
@@ -2079,7 +2141,8 @@ class StdUncompress {
 		while (true) {
 			var r = zlibInflate(zip, src, pos, src.length - pos, tmp, 0, bufsize, StdCompress.Z_SYNC_FLUSH);
 			buf.addBytes(tmp, 0, r.zWrote);
-			if (!r.zFinish) pos = pos + r.zRead else break;
+			if (!r.zFinish) pos = pos + r.zRead
+			else break;
 		}
 		EvalEncode.encodeBytes(buf.getBytes());
 	});
@@ -2165,7 +2228,8 @@ class StdUtf8 {
 			var c = StringTools.fastCodeAt(s, i);
 			if (c >= 0xD800 && c <= 0xDBFF) {
 				var d = i + 1 < s.length ? StringTools.fastCodeAt(s, i + 1) : -1;
-				if (d >= 0xDC00 && d <= 0xDFFF) i++ else {
+				if (d >= 0xDC00 && d <= 0xDFFF) i++
+				else {
 					valid = false;
 					break;
 				}
@@ -2215,13 +2279,15 @@ class StdNativeString {
 	public static final char = EvalEncode.vfun2((v1, v2) -> {
 		var s = EvalDecode.decodeNativeString(v1);
 		var index = EvalDecode.decodeInt(v2);
-		if (index < 0 || index >= s.length) EvalMisc.throwString("index out of bounds", Globals.nullPos) else EvalEncode.encodeString(String.fromCharCode(s.get(index)));
+		if (index < 0 || index >= s.length) EvalMisc.throwString("index out of bounds", Globals.nullPos)
+		else EvalEncode.encodeString(String.fromCharCode(s.get(index)));
 	});
 
 	public static final code = EvalEncode.vfun2((v1, v2) -> {
 		var s = EvalDecode.decodeNativeString(v1);
 		var index = EvalDecode.decodeInt(v2);
-		if (index < 0 || index >= s.length) EvalMisc.throwString("index out of bounds", Globals.nullPos) else s.get(index).vint();
+		if (index < 0 || index >= s.length) EvalMisc.throwString("index out of bounds", Globals.nullPos)
+		else s.get(index).vint();
 	});
 
 	public static final getLength = EvalEncode.vfun1(v -> {
@@ -2234,10 +2300,12 @@ class StdNativeString {
 		var start = EvalDecode.decodeInt(v2);
 		var maxLength = s.length - start;
 		function stringSub(start:Int, length:Int):Value {
-			if (start < 0 || length < 0 || start > s.length - length) return EvalMisc.throwString("Invalid arguments for eval.NativeString.sub", Globals.nullPos);
+			if (start < 0 || length < 0 || start > s.length - length) return
+				EvalMisc.throwString("Invalid arguments for eval.NativeString.sub", Globals.nullPos);
 			return VNativeString(s.sub(start, length));
 		}
-		if (v3.match(VNull)) stringSub(start, maxLength) else {
+		if (v3.match(VNull)) stringSub(start, maxLength)
+		else {
 			var length = {
 				var l = EvalDecode.decodeInt(v3);
 				l > maxLength ? maxLength : l;

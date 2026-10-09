@@ -51,7 +51,7 @@ void *hxc_NativeNet_reverse(int32_t ip) { no_net(); return NULL; }
 #include <sys/time.h>
 #include <unistd.h>
 
-static int last_errno;
+static RT_TLS int last_errno; // per thread, as errno
 
 static int32_t ret(int r) {
 	if (r < 0) last_errno = errno;
@@ -66,7 +66,7 @@ int32_t hxc_NativeNet_errno(void) { return last_errno; }
 // and the thread waits for the descriptor in the scheduler. Sockets the
 // program made non-blocking keep failing with EAGAIN (haxe.io.Error.Blocked).
 static int cooperative(int fd) {
-	if (rt_nthreads <= 1) return 0;
+	if (RT_NTHREADS() <= 1) return 0;
 	int flags = fcntl(fd, F_GETFL);
 	return flags >= 0 && !(flags & O_NONBLOCK);
 }
@@ -231,7 +231,7 @@ int32_t hxc_NativeNet_select(void *r, void *w, void *o, double timeout) {
 		return -1;
 	}
 	struct timeval tv, *tvp = NULL;
-	if (rt_nthreads > 1 && timeout != 0) {
+	if (RT_NTHREADS() > 1 && timeout != 0) {
 		// other threads run until a descriptor is ready or the timeout passes,
 		// then select looks without waiting
 		int32_t nr = r ? ARR_LEN(r) : 0, nw = w ? ARR_LEN(w) : 0, no = o ? ARR_LEN(o) : 0;
@@ -318,14 +318,26 @@ void *hxc_NativeNet_gethostname(void) {
 	return hx_str_of_utf8(buf, (int32_t)strlen(buf));
 }
 
+// gethostbyname/gethostbyaddr return static data: one thread at a time, in a
+// safe region (they may block on the network), results copied out under the lock
+static rt_lock_t resolver_lock = RT_LOCK_INIT;
+
 void *hxc_NativeNet_resolve(void *name) {
 	char *n = hx_str_to_utf8(name);
+	uint32_t ip;
+	int found = 0;
+	rt_blocking_enter();
+	rt_lock(&resolver_lock);
 	struct hostent *h = gethostbyname(n);
+	if (h && h->h_addrtype == AF_INET && h->h_addr_list[0]) {
+		memcpy(&ip, h->h_addr_list[0], 4);
+		found = 1;
+	}
+	rt_unlock(&resolver_lock);
+	rt_blocking_leave();
 	free(n);
 	last_errno = 0;
-	if (!h || h->h_addrtype != AF_INET || !h->h_addr_list[0]) return NULL;
-	uint32_t ip;
-	memcpy(&ip, h->h_addr_list[0], 4);
+	if (!found) return NULL;
 	void *a = hx_arr_new(AK_I32, 1);
 	((int32_t *)ARR_DATA(a))[0] = (int32_t)ntohl(ip);
 	return a;
@@ -333,10 +345,18 @@ void *hxc_NativeNet_resolve(void *name) {
 
 void *hxc_NativeNet_reverse(int32_t ip) {
 	uint32_t a = htonl((uint32_t)ip);
+	char *name = NULL;
+	rt_blocking_enter();
+	rt_lock(&resolver_lock);
 	struct hostent *h = gethostbyaddr(&a, 4, AF_INET);
+	if (h && h->h_name) name = strdup(h->h_name);
+	rt_unlock(&resolver_lock);
+	rt_blocking_leave();
 	last_errno = 0;
-	if (!h || !h->h_name) return NULL;
-	return hx_str_of_utf8(h->h_name, (int32_t)strlen(h->h_name));
+	if (!name) return NULL;
+	void *s = hx_str_of_utf8(name, (int32_t)strlen(name));
+	free(name);
+	return s;
 }
 
 #endif

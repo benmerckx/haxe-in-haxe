@@ -13,19 +13,21 @@ class FilterContext {
 		var id = Timer.determineId(level, ["filters"], [label], identifier);
 		return Timer.time(timerCtx, id, function(_:Null<Bool>) return f(), null);
 	}
+
 	public static function isRemovableClass(c:TClass):Bool {
 		return switch c.clKind {
-			case KGeneric:
-				Meta.has(core.MetaList.StrictMeta.Remove, c.clMeta) || (c.clSuper != null && isRemovableClass(c.clSuper.cls))
-					|| core.ds.ArrayTools.exists(c.clParams, tp -> TypeOps.hasCtorConstraint(tp.ttpClass) || Meta.has(core.MetaList.StrictMeta.Const, tp.ttpClass.clMeta));
+			case KGeneric: Meta.has(core.MetaList.StrictMeta.Remove,
+					c.clMeta) || (c.clSuper != null && isRemovableClass(c.clSuper.cls)) || core.ds.ArrayTools.exists(c.clParams,
+					tp -> TypeOps.hasCtorConstraint(tp.ttpClass) || Meta.has(core.MetaList.StrictMeta.Const, tp.ttpClass.clMeta));
 			case KTypeParameter(_): true; // Upstream: investigate why this happens (#4092).
 			case _: false;
 		};
 	}
+
 	public static function isRemovableField(isMacroContext:Bool, f:TClassField):Bool {
-		return !TypeOps.hasClassFieldFlag(f, CfOverride) && (TypeOps.hasClassFieldFlag(f, CfExtern)
-			|| TypeOps.hasClassFieldFlag(f, CfGeneric) || switch f.cfKind {
-				case Var({vRead:AccRequire(_, _)}): true;
+		return !TypeOps.hasClassFieldFlag(f, CfOverride)
+			&& (TypeOps.hasClassFieldFlag(f, CfExtern) || TypeOps.hasClassFieldFlag(f, CfGeneric) || switch f.cfKind {
+				case Var({vRead: AccRequire(_, _)}): true;
 				case Method(MethMacro): !isMacroContext;
 				case _: false;
 			});

@@ -17,6 +17,7 @@ class GlobalsIntMap<V> {
 
 	// The map is persistent, so one empty instance is shared (OCaml's Map.empty).
 	static final emptyMap:GlobalsIntMap<Dynamic> = new GlobalsIntMap([], []);
+
 	public static inline function empty<V>():GlobalsIntMap<V> return cast emptyMap;
 
 	// index of the first key not above `key` (keys are sorted in decreasing order)
@@ -24,7 +25,8 @@ class GlobalsIntMap<V> {
 		var lo = 0, hi = keys.length;
 		while (lo < hi) {
 			var mid = (lo + hi) >> 1;
-			if (keys[mid] > key) lo = mid + 1 else hi = mid;
+			if (keys[mid] > key) lo = mid + 1
+			else hi = mid;
 		}
 		return lo;
 	}
@@ -52,7 +54,8 @@ class GlobalsIntMap<V> {
 	public function add(key:Int, value:V):GlobalsIntMap<V> {
 		var i = lowerBound(key);
 		var k = keys.copy(), v = values.copy();
-		if (i < k.length && k[i] == key) v[i] = value else {
+		if (i < k.length && k[i] == key) v[i] = value
+		else {
 			k.insert(i, key);
 			v.insert(i, value);
 		}

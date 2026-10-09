@@ -31,7 +31,8 @@ class DisplayTexpr {
 
 	public static function findClassByPosition(decls:Array<TypeDecl>, p:Pos):ClassDefinition {
 		for (d in decls) switch d.definition {
-			case EClass(c) if (posEq(c.name.pos, p)): return c;
+			case EClass(c) if (posEq(c.name.pos, p)):
+				return c;
 			case _:
 		}
 		throw core.ds.NotFound.raise();
@@ -39,7 +40,8 @@ class DisplayTexpr {
 
 	public static function findModuleStaticByPosition(decls:Array<TypeDecl>, p:Pos):StaticDefinition {
 		for (d in decls) switch d.definition {
-			case EStatic(s) if (posEq(s.name.pos, p)): return s;
+			case EStatic(s) if (posEq(s.name.pos, p)):
+				return s;
 			case _:
 		}
 		throw core.ds.NotFound.raise();
@@ -47,7 +49,8 @@ class DisplayTexpr {
 
 	public static function findEnumByPosition(decls:Array<TypeDecl>, p:Pos):EnumDefinition {
 		for (d in decls) switch d.definition {
-			case EEnum(en) if (posEq(en.name.pos, p)): return en;
+			case EEnum(en) if (posEq(en.name.pos, p)):
+				return en;
 			case _:
 		}
 		throw core.ds.NotFound.raise();
@@ -55,7 +58,8 @@ class DisplayTexpr {
 
 	public static function findTypedefByPosition(decls:Array<TypeDecl>, p:Pos):TypedefDefinition {
 		for (d in decls) switch d.definition {
-			case ETypedef(td) if (posEq(td.name.pos, p)): return td;
+			case ETypedef(td) if (posEq(td.name.pos, p)):
+				return td;
 			case _:
 		}
 		throw core.ds.NotFound.raise();
@@ -63,7 +67,8 @@ class DisplayTexpr {
 
 	public static function findAbstractByPosition(decls:Array<TypeDecl>, p:Pos):AbstractDefinition {
 		for (d in decls) switch d.definition {
-			case EAbstract(a) if (posEq(a.name.pos, p)): return a;
+			case EAbstract(a) if (posEq(a.name.pos, p)):
+				return a;
 			case _:
 		}
 		throw core.ds.NotFound.raise();
@@ -88,7 +93,8 @@ class DisplayTexpr {
 
 	public static function checkDisplayClass(ctx:Typer, decls:Array<TypeDecl>, c:TClass):Void {
 		function checkField_(sc:Array<ClassField>, cf:TClassField):Void {
-			if (!hasClassFieldFlag(cf, CfNoLookup) && DisplayPosition.displayPosition.enclosedIn(cf.cfPos)) checkDisplayField(ctx, sc, c, cf);
+			if (!hasClassFieldFlag(cf, CfNoLookup)
+				&& DisplayPosition.displayPosition.enclosedIn(cf.cfPos)) checkDisplayField(ctx, sc, c, cf);
 			DisplayEmitter.checkDisplayMetadata(ctx, cf.cfMeta);
 		}
 		function checkField(sc:Array<ClassField>, cf:TClassField):Void {
@@ -164,10 +170,14 @@ class DisplayTexpr {
 			var infos = tInfos(md);
 			if (DisplayPosition.displayPosition.enclosedIn(infos.mtNamePos)) DisplayEmitter.displayModuleType(ctx, md, infos.mtNamePos);
 			if (DisplayPosition.displayPosition.enclosedIn(infos.mtPos)) switch md {
-				case TClassDecl(c): checkDisplayClass(ctx, decls, c);
-				case TEnumDecl(en): checkDisplayEnum(ctx, decls, en);
-				case TTypeDecl(td): checkDisplayTypedef(ctx, decls, td);
-				case TAbstractDecl(a): checkDisplayAbstract(ctx, decls, a);
+				case TClassDecl(c):
+					checkDisplayClass(ctx, decls, c);
+				case TEnumDecl(en):
+					checkDisplayEnum(ctx, decls, en);
+				case TTypeDecl(td):
+					checkDisplayTypedef(ctx, decls, td);
+				case TAbstractDecl(a):
+					checkDisplayAbstract(ctx, decls, a);
 			}
 			DisplayEmitter.checkDisplayMetadata(ctx, infos.mtMeta);
 		}

@@ -34,7 +34,8 @@ class ExploreClassPathTask extends ServerTask {
 	final pack:Array<String>;
 	final platformStr:String;
 
-	public function new(com:CommonContext, checked:haxe.ds.StringMap<Bool>, recursive:Bool, fPack:GlobalTypePath->Void, fModule:String->GlobalTypePath->Void, dir:String, pack:Array<String>) {
+	public function new(com:CommonContext, checked:haxe.ds.StringMap<Bool>, recursive:Bool, fPack:GlobalTypePath->Void,
+			fModule:String->GlobalTypePath->Void, dir:String, pack:Array<String>) {
 		super(["explore", dir], 50);
 		this.com = com;
 		this.checked = checked;
@@ -63,10 +64,14 @@ class ExploreClassPathTask extends ServerTask {
 		for (file in entries) {
 			switch file {
 				case "." | "..":
-				case _ if (isDirectory(dir + file) && StringTools.fastCodeAt(file, 0) >= "a".code && StringTools.fastCodeAt(file, 0) <= "z".code):
+				case _
+					if (isDirectory(dir + file)
+						&& StringTools.fastCodeAt(file, 0) >= "a".code
+						&& StringTools.fastCodeAt(file, 0) <= "z".code):
 					if (!com.packageRules.exists(file)) {
 						fPack({pack: revPack, name: file});
-						if (recursive) new ExploreClassPathTask(com, checked, recursive, fPack, fModule, dir + file + "/", [file].concat(pack)).run();
+						if (recursive) new ExploreClassPathTask(com, checked, recursive, fPack, fModule, dir + file + "/",
+							[file].concat(pack)).run();
 					}
 				case _:
 					var l = file.length;
@@ -77,7 +82,9 @@ class ExploreClassPathTask extends ServerTask {
 								var dotPos = name.lastIndexOf(".");
 								if (dotPos >= 0) {
 									var secondExt = file.substr(dotPos, name.length - dotPos);
-									if ((com.customExt != null && com.customExt == secondExt) || platformStr == secondExt) file.substr(0, dotPos); else throw core.ds.Exit.raise();
+									if ((com.customExt != null && com.customExt == secondExt)
+										|| platformStr == secondExt) file.substr(0, dotPos);
+									else throw core.ds.Exit.raise();
 								} else name;
 							};
 							var path:GlobalTypePath = {pack: revPack, name: name};
@@ -106,7 +113,14 @@ private class SysError extends haxe.Exception {
 	public var items:Array<CompletionItemData>;
 	public var names:haxe.ds.StringMap<CompletionItemData>;
 	public var paths:haxe.ds.StringMap<Bool>;
-	public inline function new(ctx:Typer, items:Array<CompletionItemData>, names:haxe.ds.StringMap<CompletionItemData>, paths:haxe.ds.StringMap<Bool>) { this.ctx = ctx; this.items = items; this.names = names; this.paths = paths; }
+
+	public inline function new(ctx:Typer, items:Array<CompletionItemData>, names:haxe.ds.StringMap<CompletionItemData>,
+			paths:haxe.ds.StringMap<Bool>) {
+		this.ctx = ctx;
+		this.items = items;
+		this.names = names;
+		this.paths = paths;
+	}
 
 	public static function create(ctx:Typer):CollectionContext return {
 		ctx: ctx,
@@ -126,7 +140,8 @@ private class SysError extends haxe.Exception {
 			return Shadowed;
 		}
 		function checkWildcard():Bool {
-			return core.ds.ArrayTools.exists(ctx.m.importResolution.extractWildcardPackages(), function(w) return CompilationCache.pathEq({pack: w.pack, name: path.name}, path));
+			return core.ds.ArrayTools.exists(ctx.m.importResolution.extractWildcardPackages(),
+				function(w) return CompilationCache.pathEq({pack: w.pack, name: path.name}, path));
 		}
 		return (isImport || path.pack.length == 0 || checkWildcard()) ? Imported : Unimported;
 	}
@@ -179,7 +194,8 @@ class DisplayToplevel {
 
 	public static var exclude:Array<String> = [];
 
-	public static function exploreClassPaths(com:CommonContext, timer:Array<String>, classPaths:Array<IClassPath>, recursive:Bool, fPack:GlobalTypePath->Void, fModule:String->GlobalTypePath->Void):Void {
+	public static function exploreClassPaths(com:CommonContext, timer:Array<String>, classPaths:Array<IClassPath>, recursive:Bool,
+			fPack:GlobalTypePath->Void, fModule:String->GlobalTypePath->Void):Void {
 		var cs:Cache = com.cs;
 		Timer.time(com.timerCtx, timer.concat(["class path exploration"]), function(_:Null<Bool>) {
 			var checked = new haxe.ds.StringMap<Bool>();
@@ -195,16 +211,17 @@ class DisplayToplevel {
 	}
 
 	public static function readClassPaths(com:CommonContext, timer:Array<String>):Void {
-		exploreClassPaths(com, timer, (com.classPaths : core.ClassPaths).filter(cp -> cp.path != ""), true, function(_) {}, function(file, path) {
-			// Don't parse the display file as that would maybe overwrite the content from stdin with the file contents.
-			if (!DisplayPosition.displayPosition.isInFile(com.partScope.fileKeys.get(file))) {
-				var r = Display.parseModule_(com, path, Globals.nullPos);
-				if (!CompilationCache.pathEq({pack: r.pack, name: ""}, {pack: path.pack, name: ""})) {
-					var fileKey = com.partScope.fileKeys.get(file);
-					CommonCache.getCache(com).removeFileForReal(fileKey);
+		exploreClassPaths(com, timer, (com.classPaths : core.ClassPaths).filter(cp -> cp.path != ""), true, function(_) {},
+			function(file, path) {
+				// Don't parse the display file as that would maybe overwrite the content from stdin with the file contents.
+				if (!DisplayPosition.displayPosition.isInFile(com.partScope.fileKeys.get(file))) {
+					var r = Display.parseModule_(com, path, Globals.nullPos);
+					if (!CompilationCache.pathEq({pack: r.pack, name: ""}, {pack: path.pack, name: ""})) {
+						var fileKey = com.partScope.fileKeys.get(file);
+						CommonCache.getCache(com).removeFileForReal(fileKey);
+					}
 				}
-			}
-		});
+			});
 	}
 
 	public static function initOrUpdateServer(cs:Cache, com:CommonContext, timerName:Array<String>):Void {
@@ -224,7 +241,8 @@ class DisplayToplevel {
 			try {
 				cc.findFile(fileKey);
 			} catch (_:core.ds.NotFound) {
-				try typing.SourceParser.parseModuleFile(com, filePath, Globals.nullPos) catch (_:Dynamic) {}
+				try typing.SourceParser.parseModuleFile(com, filePath, Globals.nullPos)
+				catch (_:Dynamic) {}
 			}
 		});
 		for (k in removedRemovedFiles) removedFiles.remove(k);
@@ -242,11 +260,13 @@ class DisplayToplevel {
 		var i = 0;
 		while (true) {
 			if (i >= pack1.length) return true;
-			if (i < pack2.length && pack1[i] == pack2[i]) i++; else return false;
+			if (i < pack2.length && pack1[i] == pack2[i]) i++;
+			else return false;
 		}
 	}
 
-	public static function isPackVisible(pack:Array<String>):Bool return !core.ds.ArrayTools.exists(pack, s -> s.length > 0 && s.charAt(0) == "_");
+	public static function isPackVisible(pack:Array<String>):Bool return !core.ds.ArrayTools.exists(pack,
+		s -> s.length > 0 && s.charAt(0) == "_");
 
 	static function collect_(ctx:Typer, tk:ToplevelKind, withType:WithTypeValue, sort:Bool):Array<CompletionItemData> {
 		var cctx = CollectionContext.create(ctx);
@@ -286,7 +306,11 @@ class DisplayToplevel {
 						case EEnum(d): {tname: d.name.name, isPrivate: d.flags.contains(EPrivate), meta: d.meta};
 						case ETypedef(d): {tname: d.name.name, isPrivate: d.flags.contains(TDPrivate), meta: d.meta};
 						case EAbstract(d): {tname: d.name.name, isPrivate: d.flags.contains(AbPrivate), meta: d.meta};
-						case EStatic(d): {tname: d.name.name, isPrivate: core.ds.ArrayTools.exists(d.flags, a -> a.access == APrivate), meta: d.meta};
+						case EStatic(d): {
+								tname: d.name.name,
+								isPrivate: core.ds.ArrayTools.exists(d.flags, a -> a.access == APrivate),
+								meta: d.meta
+							};
 						case EImport(_) | EUsing(_): throw core.ds.Exit.raise();
 					};
 					var fp = core.Path.fullDotPath(pack, name, r.tname);
@@ -341,7 +365,9 @@ class DisplayToplevel {
 					};
 					var origin = r.origin, cf = r.cf;
 					var isQualified = cctx.isQualified(cf.cfName);
-					add(CompletionItem.makeCiClassField(CompletionClassField.make(cf, scope, origin, isQualified), tpair(Ast.getValueMeta(cf.cfMeta), cf.cfType)), cf.cfName);
+					add(CompletionItem.makeCiClassField(CompletionClassField.make(cf, scope, origin, isQualified),
+						tpair(Ast.getValueMeta(cf.cfMeta), cf.cfType)),
+						cf.cfName);
 				}
 				function maybeAddField(scope:ClassFieldScope, origin:ClassFieldOrigin, cf:TClassField):Void {
 					if (!Meta.has(MetaTag.NoCompletion, cf.cfMeta)) addField(scope, origin, cf);
@@ -386,7 +412,9 @@ class DisplayToplevel {
 								cctx.addPath(a.aPath);
 								for (cf in c.clOrderedStatics) {
 									var ccf = CompletionClassField.make(cf, CFSMember, Self(CompletionItem.declOfClass(c)), true);
-									if (hasClassFieldFlag(cf, CfEnum) && !Meta.has(MetaTag.NoCompletion, cf.cfMeta)) add(CompletionItem.makeCiEnumAbstractField(a, ccf, tpair(cf.cfType)), cf.cfName);
+									if (hasClassFieldFlag(cf, CfEnum)
+										&& !Meta.has(MetaTag.NoCompletion,
+											cf.cfMeta)) add(CompletionItem.makeCiEnumAbstractField(a, ccf, tpair(cf.cfType)), cf.cfName);
 								}
 							case TTypeDecl(t):
 								switch follow(t.tType) {
@@ -398,7 +426,8 @@ class DisplayToplevel {
 								var origin = Self(TEnumDecl(e));
 								core.ds.PMap.iter(function(_, ef:TEnumField) {
 									var isQualified = cctx.isQualified(ef.efName);
-									add(CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, origin, isQualified), tpair(ef.efType)), ef.efName);
+									add(CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, origin, isQualified), tpair(ef.efType)),
+										ef.efName);
 								}, e.eConstrs);
 							case _:
 						}
@@ -409,7 +438,8 @@ class DisplayToplevel {
 					// enum constructors of expected type
 					switch withType {
 						case WithType(t, _):
-							try enumCtors(moduleTypeOfType(follow(t))) catch (_:core.ds.Exit) {}
+							try enumCtors(moduleTypeOfType(follow(t)))
+							catch (_:core.ds.Exit) {}
 						case _:
 					}
 					return null;
@@ -429,16 +459,23 @@ class DisplayToplevel {
 									cf2;
 								};
 								var r = switch c.clKind {
-									case KAbstractImpl(a): {decl: TAbstractDecl(a), make: hasClassFieldFlag(cf, CfEnum) ? CompletionItem.makeCiEnumAbstractField.bind(a) : CompletionItem.makeCiClassField};
+									case KAbstractImpl(a): {
+											decl: TAbstractDecl(a),
+											make: hasClassFieldFlag(cf,
+												CfEnum) ? CompletionItem.makeCiEnumAbstractField.bind(a) : CompletionItem.makeCiClassField
+										};
 									case _: {decl: TClassDecl(c), make: CompletionItem.makeCiClassField};
 								};
 								var origin = StaticImport(r.decl);
 								if (Typecore.canAccess(ctx, c, cf, true) && !Meta.has(MetaTag.NoCompletion, cf.cfMeta)) {
-									add(r.make(CompletionClassField.make(cf, CFSStatic, origin, isQualified), tpair(Ast.getValueMeta(cf.cfMeta), cf.cfType)), name);
+									add(r.make(CompletionClassField.make(cf, CFSStatic, origin, isQualified),
+										tpair(Ast.getValueMeta(cf.cfMeta), cf.cfType)),
+										name);
 								}
 							}
 							switch resolveTypedef(mt) {
-								case TClassDecl(c): classImport(c);
+								case TClassDecl(c):
+									classImport(c);
 								case TEnumDecl(en):
 									var ef = core.ds.PMap.find(s, en.eConstrs);
 									var ef = if (name == ef.efName) ef else {
@@ -447,9 +484,12 @@ class DisplayToplevel {
 										ef2;
 									};
 									var origin = StaticImport(TEnumDecl(en));
-									add(CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, origin, isQualified), tpair(ef.efType)), s);
-								case TAbstractDecl({aImpl: c}) if (c != null): classImport(c);
-								case _: throw core.ds.NotFound.raise();
+									add(CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, origin, isQualified), tpair(ef.efType)),
+										s);
+								case TAbstractDecl({aImpl: c}) if (c != null):
+									classImport(c);
+								case _:
+									throw core.ds.NotFound.raise();
 							}
 						} catch (_:core.ds.NotFound) {}
 					});
@@ -476,11 +516,16 @@ class DisplayToplevel {
 					}
 
 					// keywords
-					var kwds:Array<Keyword> = [Function, Var, Final, If, Else, While, Do, For, Break, Return, Continue, Switch, Try, New, Throw, Untyped, Cast, Inline];
+					var kwds:Array<Keyword> = [
+						Function, Var, Final, If, Else, While, Do, For, Break, Return, Continue, Switch, Try, New, Throw, Untyped, Cast,
+						Inline
+					];
 					for (kwd in kwds) add(CompletionItem.makeCiKeyword(kwd), Ast.sKeyword(kwd));
 
 					// builtins
-					add(CompletionItem.makeCiLiteral("trace", tpair(TFun({args: [{name: "value", optional: false, type: tDynamic}], ret: ctx.com.basic.tvoid}))), "trace");
+					add(CompletionItem.makeCiLiteral("trace",
+						tpair(TFun({args: [{name: "value", optional: false, type: tDynamic}], ret: ctx.com.basic.tvoid}))),
+						"trace");
 					return null;
 				}, null);
 		}
@@ -554,12 +599,15 @@ class DisplayToplevel {
 	}
 
 	public static function collect(ctx:Typer, tk:ToplevelKind, withType:WithTypeValue, sort:Bool):Array<CompletionItemData> {
-		return Timer.time(ctx.com.timerCtx, ["display", "toplevel collect"], function(sort:Bool) return collect_(ctx, tk, withType, sort), sort);
+		return Timer.time(ctx.com.timerCtx, ["display", "toplevel collect"], function(sort:Bool) return collect_(ctx, tk, withType, sort),
+			sort);
 	}
 
-	public static function collectAndRaise<R>(ctx:Typer, tk:ToplevelKind, withType:WithTypeValue, cr:CompletionResultKindValue, name:String, pname:Pos, pinsert:Pos):R {
+	public static function collectAndRaise<R>(ctx:Typer, tk:ToplevelKind, withType:WithTypeValue, cr:CompletionResultKindValue,
+			name:String, pname:Pos, pinsert:Pos):R {
 		var p_ = DisplayException.lastCompletionPos;
-		var fields = if (p_ != null && pname.pmin == p_.pmin) DisplayException.lastCompletionResult.copy() else collect(ctx, tk, withType, name == "");
+		var fields = if (p_ != null && pname.pmin == p_.pmin) DisplayException.lastCompletionResult.copy() else collect(ctx, tk, withType,
+			name == "");
 		return DisplayException.raiseFields(fields, cr, DisplayTypes.makeSubject(name, pinsert, pname));
 	}
 
@@ -574,7 +622,8 @@ class DisplayToplevel {
 		// StringError.filter_similar
 		var similar = [];
 		for (e in cl) {
-			if (e.i <= Std.int((e.s.length < i.length ? e.s.length : i.length) / 3)) similar.push(e) else break;
+			if (e.i <= Std.int((e.s.length < i.length ? e.s.length : i.length) / 3)) similar.push(e)
+			else break;
 		}
 		var cm = DiagnosticsPrinter.makeUnresolvedIdentifierMessage(i, p, similar.map(e -> {s: e.s, item: e.it, r: e.i}));
 		compiler.io.CompilerMessage.addModuleDiagnostic(ctx.com, ctx.m.curmod, cm);

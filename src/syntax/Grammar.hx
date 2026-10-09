@@ -44,7 +44,8 @@ class Grammar {
 	static inline function peek(s:S):ParserToken return s.peek();
 
 	static function tail<T>(f:Void->T):T {
-		try return f() catch (_:StreamFailure) throw new StreamError("Parse error.");
+		try return f()
+		catch (_:StreamFailure) throw new StreamError("Parse error.");
 	}
 
 	// Inline so the result is the caller's concrete {v:T} (HashLink otherwise
@@ -169,13 +170,15 @@ class Grammar {
 			var r = tryHead(function() return f(s));
 			if (r == null) break;
 			acc.push(r.v);
-			if (isTok(s, sep)) s.junk() else break;
+			if (isTok(s, sep)) s.junk()
+			else break;
 		}
 		return acc;
 	}
 
 	static function pignore(f:Void->Dynamic):Void {
-		try f() catch (_:StreamError) {} catch (_:StreamFailure) {}
+		try f()
+		catch (_:StreamError) {} catch (_:StreamFailure) {}
 	}
 
 	static function expectUnlessResumeP(ctx:ParserContext, t:Token, s:S):Pos {
@@ -327,13 +330,15 @@ class Grammar {
 		return {pack: [], decls: l};
 	}
 
-	static function parseTypeDecls(ctx:ParserContext, mode:TypeDeclCompletionMode, pmax:Int, pack:Array<String>, acc:Array<TypeDecl>, s:S):Array<TypeDecl> {
+	static function parseTypeDecls(ctx:ParserContext, mode:TypeDeclCompletionMode, pmax:Int, pack:Array<String>, acc:Array<TypeDecl>,
+			s:S):Array<TypeDecl> {
 		while (true) {
 			Parser.checkTypeDeclCompletion(ctx, mode, pmax, s);
 			var result:DeclResult<TypeDecl>;
 			try {
 				var r = tryHead(function() return parseTypeDecl(ctx, mode, s));
-				if (r != null) result = DSuccess(r.v) else {
+				if (r != null) result = DSuccess(r.v)
+				else {
 					var tk = peek(s);
 					if (tk.token == Eof) {
 						s.junk();
@@ -385,7 +390,8 @@ class Grammar {
 		}
 	}
 
-	static function parseAbstract(ctx:ParserContext, doc:Null<String>, meta:Metadata, flags:Array<AbstractFlag>, p1:Pos, s:S):{d:AbstractDefinition, p:Pos} {
+	static function parseAbstract(ctx:ParserContext, doc:Null<String>, meta:Metadata, flags:Array<AbstractFlag>, p1:Pos,
+			s:S):{d:AbstractDefinition, p:Pos} {
 		var name = typeName(ctx, s);
 		var tl = tail(function() return parseConstraintParams(ctx, s));
 		var st = tail(function() return parseAbstractSubtype(ctx, s));
@@ -415,13 +421,18 @@ class Grammar {
 		};
 	}
 
-	static function parseClassContent(ctx:ParserContext, doc:Null<String>, meta:Metadata, flags:Array<{flag:DeclFlag, pos:Pos}>, n:Array<ClassFlag>, p1:Pos, s:S):TypeDecl {
+	static function parseClassContent(ctx:ParserContext, doc:Null<String>, meta:Metadata, flags:Array<{flag:DeclFlag, pos:Pos}>,
+			n:Array<ClassFlag>, p1:Pos, s:S):TypeDecl {
 		var name = typeName(ctx, s);
 		var tl = parseConstraintParams(ctx, s);
 		function loop(hadDisplay:Bool, p0:Pos, acc:Array<ClassFlag>):Array<ClassFlag> {
 			inline function checkDisplay(p1:Pos) {
-				if (!hadDisplay && ctx.config.inDisplayFile && ctx.config.displayMode == DMDefault && DisplayPosition.displayPosition.enclosedIn(p1))
-					Parser.syntaxCompletion(n.indexOf(HInterface) >= 0 ? SCInterfaceRelation : SCClassRelation, null, DisplayPosition.displayPosition.withPos(p1));
+				if (!hadDisplay
+					&& ctx.config.inDisplayFile
+					&& ctx.config.displayMode == DMDefault
+					&& DisplayPosition.displayPosition.enclosedIn(p1))
+					Parser.syntaxCompletion(n.indexOf(HInterface) >= 0 ? SCInterfaceRelation : SCClassRelation, null,
+						DisplayPosition.displayPosition.withPos(p1));
 			}
 			var tk = peek(s);
 			switch tk.token {
@@ -455,7 +466,8 @@ class Grammar {
 				case _:
 					switch tk.token {
 						case Const(Ident(name)) if (DisplayPosition.displayPosition.enclosedIn(tk.pos)):
-							return Parser.syntaxCompletion(n.indexOf(HInterface) >= 0 ? SCInterfaceRelation : SCClassRelation, name, tk.pos);
+							return Parser.syntaxCompletion(n.indexOf(HInterface) >= 0 ? SCInterfaceRelation : SCClassRelation, name,
+								tk.pos);
 						case _:
 							checkDisplay({pfile: p1.pfile, pmin: p0.pmax, pmax: Parser.nextPos(ctx, s).pmax});
 							var l = acc.copy();
@@ -587,7 +599,8 @@ class Grammar {
 					case Kwd(Abstract):
 						var p1 = tk2.pos;
 						s.junk();
-						var r = tail(function() return parseAbstract(ctx, doc, meta, [AbEnum].concat(Parser.convertAbstractFlags(ctx, c)), p1, s));
+						var r = tail(function() return parseAbstract(ctx, doc, meta, [AbEnum].concat(Parser.convertAbstractFlags(ctx, c)),
+							p1, s));
 						return {definition: EAbstract(r.d), pos: r.p};
 					case _:
 						var name = typeName(ctx, s);
@@ -666,7 +679,12 @@ class Grammar {
 								doc: docFromStringOpt(doc),
 								meta: meta,
 								params: [],
-								flags: moduleFieldFlags(ctx, crest).concat([{access: AFinal, pos: p1}]),
+								flags: moduleFieldFlags(ctx, crest).concat([
+									{
+										access: AFinal,
+										pos: p1
+									}
+								]),
 								data: FVar(t, a.e)
 							}),
 							pos: punion(p1, a.pos)
@@ -681,7 +699,8 @@ class Grammar {
 		}
 	}
 
-	static function parseClass(ctx:ParserContext, doc:Documentation, meta:Metadata, cflags:Array<{flag:ClassFlag, pos:Pos}>, needName:Bool, s:S):TypeDecl {
+	static function parseClass(ctx:ParserContext, doc:Documentation, meta:Metadata, cflags:Array<{flag:ClassFlag, pos:Pos}>,
+			needName:Bool, s:S):TypeDecl {
 		var optName:S->PlacedName = needName ? function(s) return typeName(ctx, s) : function(s) {
 			var n = popt(function(s) return typeName(ctx, s), s);
 			return n == null ? pn("", Globals.nullPos) : n;
@@ -777,7 +796,9 @@ class Grammar {
 				s.junk();
 				loop(tk.pos, [pn(name, tk.pos)]);
 			case _:
-				if (Parser.wouldSkipDisplayPosition(ctx, p1, true, s)) ({path: [], mode: INormal} : core.Ast.Import) else Parser.syntaxError(ctx, Expected(["identifier"]), s, ({path: [], mode: INormal} : core.Ast.Import));
+				if (Parser.wouldSkipDisplayPosition(ctx, p1, true,
+					s)) ({path: [], mode: INormal} : core.Ast.Import) else Parser.syntaxError(ctx, Expected(["identifier"]), s,
+					({path: [], mode: INormal} : core.Ast.Import));
 		}
 	}
 
@@ -785,7 +806,9 @@ class Grammar {
 		var imp = parseImport2(ctx, s, p1);
 		var p2 = acceptTok(s, Semicolon);
 		if (p2 == null) {
-			p2 = if (Parser.wouldSkipDisplayPosition(ctx, p1, true, s)) DisplayPosition.displayPosition.withPos(p1) else Parser.syntaxError(ctx, Expected([".", ";", "as"]), s, Parser.lastPos(ctx, s));
+			p2 = if (Parser.wouldSkipDisplayPosition(ctx, p1, true,
+				s)) DisplayPosition.displayPosition.withPos(p1) else Parser.syntaxError(ctx, Expected([".", ";", "as"]), s,
+				Parser.lastPos(ctx, s));
 		}
 		return {definition: EImport(imp), pos: punion(p1, p2)};
 	}
@@ -839,14 +862,18 @@ class Grammar {
 		var path = parseUsing2(ctx, s, p1);
 		var p2 = acceptTok(s, Semicolon);
 		if (p2 == null) {
-			p2 = if (Parser.wouldSkipDisplayPosition(ctx, p1, true, s)) DisplayPosition.displayPosition.withPos(p1) else Parser.syntaxError(ctx, Expected([".", ";"]), s, Parser.lastPos(ctx, s));
+			p2 = if (Parser.wouldSkipDisplayPosition(ctx, p1, true,
+				s)) DisplayPosition.displayPosition.withPos(p1) else
+				Parser.syntaxError(ctx, Expected([".", ";"]), s, Parser.lastPos(ctx, s));
 		}
 		return {definition: EUsing(path), pos: punion(p1, p2)};
 	}
 
 	static function parseAbstractRelations(ctx:ParserContext, s:S):AbstractFlag {
 		function checkDisplay(p1:Pos, t:TypeHint):TypeHint {
-			if (ctx.config.inDisplayFile && p1.pmax < DisplayPosition.displayPosition.get().pmin && t.pos.pmin >= DisplayPosition.displayPosition.get().pmax)
+			if (ctx.config.inDisplayFile
+				&& p1.pmax < DisplayPosition.displayPosition.get().pmin
+				&& t.pos.pmin >= DisplayPosition.displayPosition.get().pmax)
 				// This means we skipped the display position between the to/from and the type-hint we parsed.
 				// Very weird case, it was probably a {} like in #7137. Let's discard it and use magic.
 				return Parser.magicTypeTh(DisplayPosition.displayPosition.withPos(t.pos));
@@ -946,12 +973,12 @@ class Grammar {
 				return true;
 			}
 			if (fdecl && switch l[0] {
-				case Kwd(Macro | Public | Static | Var | Final | Override | Dynamic | Inline | Overload): true;
-				case _: false;
-			}) {
+					case Kwd(Macro | Public | Static | Var | Final | Override | Dynamic | Inline | Overload): true;
+					case _: false;
+				}) {
 				junkTokens(k - 1);
 				return true;
-			}
+				}
 			if (tdecl && l[0] == BrClose) {
 				junkTokens(k - 1);
 				return false;
@@ -972,7 +999,8 @@ class Grammar {
 			var result:DeclResult<ClassField>;
 			try {
 				var r = tryHead(function() return parseClassField(ctx, tdecl, s));
-				if (r != null) result = DSuccess(r.v) else {
+				if (r != null) result = DSuccess(r.v)
+				else {
 					var tk = peek(s);
 					if (tk.token == BrClose) {
 						s.junk();
@@ -1058,7 +1086,8 @@ class Grammar {
 		if (tk.token != At) return fail();
 		var p1 = tk.pos;
 		s.junk();
-		var meta:Null<MetadataEntry> = Parser.checkResume(ctx, p1, function():MetadataEntry return {meta: StrictMeta.HxCompletion, exprs: [], pos: p1}, function() return null);
+		var meta:Null<MetadataEntry> = Parser.checkResume(ctx, p1,
+			function():MetadataEntry return {meta: StrictMeta.HxCompletion, exprs: [], pos: p1}, function() return null);
 		var r = tryHead(function() return parseMetaName(ctx, p1, s));
 		if (r != null) {
 			var params = tail(function() return parseMetaParams(ctx, r.v.pos, s));
@@ -1107,7 +1136,8 @@ class Grammar {
 			case DblDot if (tk.pos.pmin == p1.pmax):
 				var p = tk.pos;
 				s.junk();
-				var meta:Null<{meta:StrictMeta, pos:Pos}> = Parser.checkResume(ctx, p, function() return {meta: StrictMeta.HxCompletion, pos: p}, function() return null);
+				var meta:Null<{meta:StrictMeta, pos:Pos}> = Parser.checkResume(ctx, p,
+					function() return {meta: StrictMeta.HxCompletion, pos: p}, function() return null);
 				var r = tryHead(function() return parseMetaName2(ctx, p, [], s));
 				if (r != null) return {meta: core.Meta.parse(Parser.revConcat(".", r.v.names)), pos: r.v.pos};
 				return meta == null ? fail() : meta;
@@ -1277,7 +1307,8 @@ class Grammar {
 		}
 		inline function checkDisplay(f:Void->PlacedTypePath):PlacedTypePath {
 			var p = p0 == null ? p1 : punion(p0, p1);
-			if (ctx.config.inDisplayFile && DisplayPosition.displayPosition.enclosedIn(p)) return makePtp(mkTypePath(revPack(pack), name), p);
+			if (ctx.config.inDisplayFile
+				&& DisplayPosition.displayPosition.enclosedIn(p)) return makePtp(mkTypePath(revPack(pack), name), p);
 			return f();
 		}
 		if (isLowerIdent(name)) {
@@ -1286,7 +1317,9 @@ class Grammar {
 				case Dot:
 					var p = tk.pos;
 					s.junk();
-					return Parser.checkResume(ctx, p, function() return throw new TypePathCompletion(revPack([name].concat(pack)), null, false, punion(p0 == null ? p1 : p0, p)),
+					return Parser.checkResume(ctx, p,
+						function() return throw new TypePathCompletion(revPack([name].concat(pack)), null, false,
+							punion(p0 == null ? p1 : p0, p)),
 						function() return parseTypePath1(ctx, p0 == null ? p1 : p0, [name].concat(pack), s));
 				case Semicolon:
 					s.junk();
@@ -1300,16 +1333,19 @@ class Grammar {
 		if (tk.token == Dot) {
 			var p = tk.pos;
 			s.junk();
-			var r = Parser.checkResume(ctx, p, function() return throw new TypePathCompletion(revPack(pack), {name: name, isSub: false}, false, punion(p0 == null ? p1 : p0, p)), function() {
-				var tk2 = peek(s);
-				return switch tk2.token {
-					case Const(Ident(name)) if (!isLowerIdent(name)):
-						s.junk();
-						{sub: name, p2: tk2.pos};
-					case _:
-						serror();
-				}
-			});
+			var r = Parser.checkResume(ctx, p,
+				function() return throw new TypePathCompletion(revPack(pack), {name: name, isSub: false}, false,
+					punion(p0 == null ? p1 : p0, p)),
+				function() {
+					var tk2 = peek(s);
+					return switch tk2.token {
+						case Const(Ident(name)) if (!isLowerIdent(name)):
+							s.junk();
+							{sub: name, p2: tk2.pos};
+						case _:
+							serror();
+					}
+				});
 			sub = r.sub;
 			p2 = r.p2;
 		} else {
@@ -1342,7 +1378,8 @@ class Grammar {
 		return switch tk.token {
 			case Const(Ident(name)):
 				s.junk();
-				if (isLowerIdent(name)) Parser.syntaxError(ctx, Custom("Type name should start with an uppercase letter"), s, pn(name, tk.pos), tk.pos) else pn(name, tk.pos);
+				if (isLowerIdent(name)) Parser.syntaxError(ctx, Custom("Type name should start with an uppercase letter"), s,
+					pn(name, tk.pos), tk.pos) else pn(name, tk.pos);
 			case Dollar(name):
 				s.junk();
 				pn("$" + name, tk.pos);
@@ -1394,7 +1431,8 @@ class Grammar {
 		var r = tryHead(function() return expr(ctx, s));
 		if (r != null) return TPExpr(r.v);
 		if (ctx.config.inDisplayFile) {
-			if (Parser.wouldSkipDisplayPosition(ctx, plt, false, s)) return TPType(Parser.magicTypeTh(DisplayPosition.displayPosition.withPos(plt)));
+			if (Parser.wouldSkipDisplayPosition(ctx, plt, false,
+				s)) return TPType(Parser.magicTypeTh(DisplayPosition.displayPosition.withPos(plt)));
 			return fail();
 		}
 		return serror();
@@ -1560,7 +1598,13 @@ class Grammar {
 			fType: t,
 			fExpr: e
 		};
-		return {name: name, pos: punion(p1, p2), kind: FFun(f), access: al, meta: meta};
+		return {
+			name: name,
+			pos: punion(p1, p2),
+			kind: FFun(f),
+			access: al,
+			meta: meta
+		};
 	}
 
 	static function parseVarFieldAssignment(ctx:ParserContext, s:S):{e:Null<Expr>, pos:Pos} {
@@ -1611,11 +1655,23 @@ class Grammar {
 					expectTok(s, PClose);
 					var t = popt(function(s) return parseTypeHint(ctx, s), s);
 					var a = parseVarFieldAssignment(ctx, s);
-					parts = {name: q.name, pos: punion(p1, a.pos), kind: FProp(i1, i2, t, a.e), access: al, meta: meta};
+					parts = {
+						name: q.name,
+						pos: punion(p1, a.pos),
+						kind: FProp(i1, i2, t, a.e),
+						access: al,
+						meta: meta
+					};
 				} else {
 					var t = popt(function(s) return parseTypeHint(ctx, s), s);
 					var a = parseVarFieldAssignment(ctx, s);
-					parts = {name: q.name, pos: punion(p1, a.pos), kind: FVar(t, a.e), access: al, meta: meta};
+					parts = {
+						name: q.name,
+						pos: punion(p1, a.pos),
+						kind: FVar(t, a.e),
+						access: al,
+						meta: meta
+					};
 				}
 			case Kwd(Final):
 				var p1 = tk.pos;
@@ -1633,20 +1689,34 @@ class Grammar {
 						var t = tail(function() return popt(function(s) return parseTypeHint(ctx, s), s));
 						var a = tail(function() return parseVarFieldAssignment(ctx, s));
 						var meta = checkOptional(opt, name);
-						parts = {name: name, pos: punion(p1, a.pos), kind: FProp(i1, i2, t, a.e), access: al.concat([{access: AFinal, pos: p1}]), meta: meta};
+						parts = {
+							name: name,
+							pos: punion(p1, a.pos),
+							kind: FProp(i1, i2, t, a.e),
+							access: al.concat([{access: AFinal, pos: p1}]),
+							meta: meta
+						};
 					} else {
 						var t = popt(function(s) return parseTypeHint(ctx, s), s);
 						var a = tail(function() return parseVarFieldAssignment(ctx, s));
 						var meta = checkOptional(opt, name);
-						parts = {name: name, pos: punion(p1, a.pos), kind: FVar(t, a.e), access: al.concat([{access: AFinal, pos: p1}]), meta: meta};
+						parts = {
+							name: name,
+							pos: punion(p1, a.pos),
+							kind: FVar(t, a.e),
+							access: al.concat([{access: AFinal, pos: p1}]),
+							meta: meta
+						};
 					}
 				} else {
 					var al2 = plist(parseCfRights, s);
-					parts = tail(function() return parseFunctionField(ctx, doc, meta, al.concat([{access: AFinal, pos: p1}]).concat(al2), s));
+					parts = tail(function() return parseFunctionField(ctx, doc, meta, al.concat([{access: AFinal, pos: p1}]).concat(al2),
+						s));
 				}
 			case _:
 				var r = tryHead(function() return parseFunctionField(ctx, doc, meta, al, s));
-				if (r != null) parts = r.v else {
+				if (r != null) parts = r.v
+				else {
 					if (al.length == 0) return fail();
 					var last = al[al.length - 1];
 					switch last.access {
@@ -1666,7 +1736,13 @@ class Grammar {
 								pos: punion(po, c.pos),
 								kind: FFun(f),
 								access: al,
-								meta: ([{meta: StrictMeta.DisplayOverride, exprs: [], pos: Globals.nullPos}] : Array<core.Ast.MetadataEntry>).concat(meta)
+								meta: ([
+									{
+										meta: StrictMeta.DisplayOverride,
+										exprs: [],
+										pos: Globals.nullPos
+									}
+								] : Array<core.Ast.MetadataEntry>).concat(meta)
 							};
 						case _:
 							return serror();
@@ -1719,14 +1795,26 @@ class Grammar {
 				var n = tail(function() return dollarIdent(s));
 				var t = tail(function() return popt(function(s) return parseTypeHint(ctx, s), s));
 				var c = tail(function() return parseFunParamValue(ctx, s));
-				return {name: n, optional: true, meta: meta, type: t, expr: c};
+				return {
+					name: n,
+					optional: true,
+					meta: meta,
+					type: t,
+					expr: c
+				};
 			case _:
 		}
 		var r = tryHead(function() return dollarIdent(s));
 		if (r != null) {
 			var t = tail(function() return popt(function(s) return parseTypeHint(ctx, s), s));
 			var c = tail(function() return parseFunParamValue(ctx, s));
-			return {name: r.v, optional: false, meta: meta, type: t, expr: c};
+			return {
+				name: r.v,
+				optional: false,
+				meta: meta,
+				type: t,
+				expr: c
+			};
 		}
 		var tk = peek(s);
 		if (tk.token == Spread) {
@@ -1736,7 +1824,13 @@ class Grammar {
 			var c = tail(function() return parseFunParamValue(ctx, s));
 			var t:TypeHint = t != null ? t : {type: ctMono(), pos: Globals.nullPos};
 			var t:TypeHint = {type: CTPath(makePtp(mkTypePath(["haxe"], "Rest", [TPType(t)]), t.pos)), pos: t.pos};
-			return {name: n, optional: false, meta: meta, type: t, expr: c};
+			return {
+				name: n,
+				optional: false,
+				meta: meta,
+				type: t,
+				expr: c
+			};
 		}
 		return fail();
 	}
@@ -1864,7 +1958,8 @@ class Grammar {
 		}
 	}
 
-	static function blockWithPos(ctx:ParserContext, acc:Array<Expr>, p:Pos, s:S):{el:Array<Expr>, pos:Pos} return blockWithPos2(ctx, acc, function(s) return parseBlockElt(ctx, s), p, s);
+	static function blockWithPos(ctx:ParserContext, acc:Array<Expr>, p:Pos, s:S):{el:Array<Expr>, pos:Pos}
+		return blockWithPos2(ctx, acc, function(s) return parseBlockElt(ctx, s), p, s);
 
 	static function parseBlockVar(ctx:ParserContext, s:S):{vl:Array<EVar>, pos:Pos} {
 		var tk = peek(s);
@@ -1921,7 +2016,11 @@ class Grammar {
 				s.junk();
 				var r = tryHead(function() return parseBlockVar(ctx, s));
 				if (r != null) {
-					var vl = [for (ev in r.v.vl) ({evName: ev.evName, evFinal: ev.evFinal, evStatic: true, evType: ev.evType, evExpr: ev.evExpr, evMeta: ev.evMeta} : EVar)];
+					var vl = [
+						for (ev in r.v.vl) ({
+							evName:ev.evName, evFinal:ev.evFinal, evStatic:true, evType:ev.evType, evExpr:ev.evExpr, evMeta:ev.evMeta
+						} : EVar)
+					];
 					return mk(EVars(vl), r.v.pos);
 				}
 				return Parser.syntaxError(ctx, Expected(["var", "final"]), s, Parser.mkNullExpr(p));
@@ -1956,7 +2055,8 @@ class Grammar {
 				return true;
 			}
 			inline function next(key) {
-				if (acceptTok(s, DblDot) != null) nextExpr(key) else Parser.syntaxError(ctx, Expected([":"]), s, nextExpr(key));
+				if (acceptTok(s, DblDot) != null) nextExpr(key)
+				else Parser.syntaxError(ctx, Expected([":"]), s, nextExpr(key));
 			}
 			var r = tryHead(function() return ident(s));
 			if (r != null) {
@@ -2035,15 +2135,33 @@ class Grammar {
 		return mk(EArrayDecl(el), punion(p1, p2));
 	}
 
-	static function parseVarDeclHead(ctx:ParserContext, isFinal:Bool, s:S):{meta:Metadata, name:String, isFinal:Bool, t:Null<TypeHint>, pos:Pos} {
+	static function parseVarDeclHead(ctx:ParserContext, isFinal:Bool, s:S):{
+		meta:Metadata,
+		name:String,
+		isFinal:Bool,
+		t:Null<TypeHint>,
+		pos:Pos
+	} {
 		var meta = parseMeta(ctx, s);
 		var r = tryHead(function() return dollarIdent(s));
 		if (r != null) {
 			var t = popt(function(s) return parseTypeHint(ctx, s), s);
-			return {meta: meta, name: r.v.name, isFinal: isFinal, t: t, pos: r.v.pos};
+			return {
+				meta: meta,
+				name: r.v.name,
+				isFinal: isFinal,
+				t: t,
+				pos: r.v.pos
+			};
 		}
 		// This nonsense is here for the var @ case in issue #9639
-		for (m in meta) if (Type.enumEq(m.meta, StrictMeta.HxCompletion)) return {meta: meta, name: "", isFinal: false, t: null, pos: Globals.nullPos};
+		for (m in meta) if (Type.enumEq(m.meta, StrictMeta.HxCompletion)) return {
+			meta: meta,
+			name: "",
+			isFinal: false,
+			t: null,
+			pos: Globals.nullPos
+		};
 		return Parser.noKeyword("variable name", s);
 	}
 
@@ -2052,7 +2170,8 @@ class Grammar {
 		return null;
 	}
 
-	static function parseVarAssignmentResume(ctx:ParserContext, isFinal:Bool, name:String, pn0:Pos, t:Null<TypeHint>, meta:Metadata, s:S):EVar {
+	static function parseVarAssignmentResume(ctx:ParserContext, isFinal:Bool, name:String, pn0:Pos, t:Null<TypeHint>, meta:Metadata,
+			s:S):EVar {
 		var eo = parseVarAssignment(ctx, s);
 		return mkEvar(pn(name, pn0), t, eo, meta, isFinal);
 	}
@@ -2168,7 +2287,8 @@ class Grammar {
 				fExpr: ret
 			}), punion(p1, p));
 		}
-		for (a in al) if (a.meta.length > 0) Parser.syntaxError(ctx, Custom("Metadata on arrow function arguments is not allowed"), s, null, a.meta[0].pos);
+		for (a in al) if (a.meta.length > 0) Parser.syntaxError(ctx, Custom("Metadata on arrow function arguments is not allowed"), s,
+			null, a.meta[0].pos);
 		return make(er);
 	}
 
@@ -2183,15 +2303,39 @@ class Grammar {
 	static function arrowFirstParam(ctx:ParserContext, e:Expr, s:S):FuncArg {
 		return switch e.expr {
 			case EConst(Ident("true" | "false" | "null" | "this" | "super")):
-				Parser.syntaxError(ctx, Custom("Invalid argument name"), s, ({name: pn("", Globals.nullPos), optional: false, meta: [], type: null, expr: null} : core.Ast.FuncArg), e.pos);
+				Parser.syntaxError(ctx, Custom("Invalid argument name"), s, ({
+					name: pn("", Globals.nullPos),
+					optional: false,
+					meta: [],
+					type: null,
+					expr: null
+				} : core.Ast.FuncArg), e.pos);
 			case EConst(Ident(n)):
-				{name: pn(n, e.pos), optional: false, meta: [], type: null, expr: null};
+				{
+					name: pn(n, e.pos),
+					optional: false,
+					meta: [],
+					type: null,
+					expr: null
+				};
 			case EBinop(OpAssign, e1, e2) | EParenthesis({expr: EBinop(OpAssign, e1, e2)}):
 				var r = arrowIdentChecktype(e1);
-				{name: r.np, optional: true, meta: [], type: r.t, expr: e2};
+				{
+					name: r.np,
+					optional: true,
+					meta: [],
+					type: r.t,
+					expr: e2
+				};
 			case EParenthesis(e):
 				var r = arrowIdentChecktype(e);
-				{name: r.np, optional: false, meta: [], type: r.t, expr: null};
+				{
+					name: r.np,
+					optional: false,
+					meta: [],
+					type: r.t,
+					expr: null
+				};
 			case _:
 				serror();
 		}
@@ -2362,13 +2506,17 @@ class Grammar {
 				s.junk();
 				expectTok(s, POpen);
 				var it = tail(function() return secureExpr(ctx, s));
-				var e = if (acceptTok(s, PClose) != null) tail(function() return secureExpr(ctx, s)) else Parser.syntaxError(ctx, Expected([")"]), s, Parser.mkNullExpr(it.pos));
+				var e = if (acceptTok(s,
+					PClose) != null) tail(function() return secureExpr(ctx,
+						s)) else Parser.syntaxError(ctx, Expected([")"]), s, Parser.mkNullExpr(it.pos));
 				return mk(EFor(it, e), punion(p, e.pos));
 			case Kwd(If):
 				s.junk();
 				expectTok(s, POpen);
 				var cond = tail(function() return secureExpr(ctx, s));
-				var e1 = if (acceptTok(s, PClose) != null) tail(function() return secureExpr(ctx, s)) else Parser.syntaxError(ctx, Expected([")"]), s, Parser.mkNullExpr(cond.pos));
+				var e1 = if (acceptTok(s,
+					PClose) != null) tail(function() return secureExpr(ctx,
+						s)) else Parser.syntaxError(ctx, Expected([")"]), s, Parser.mkNullExpr(cond.pos));
 				var e2:Null<Expr> = if (acceptKwd(s, Else) != null) tail(function() return secureExpr(ctx, s)) else {
 					// We check this in two steps to avoid the lexer missing tokens (#8565).
 					var l1 = s.npeek(1);
@@ -2386,7 +2534,8 @@ class Grammar {
 				s.junk();
 				var r = tryHead(function() return expr(ctx, s));
 				if (r != null) return mk(EReturn(r.v), punion(p, r.v.pos));
-				if (Parser.wouldSkipDisplayPosition(ctx, p, true, s)) return mk(EReturn(Parser.mkNullExpr(Parser.punionNext(ctx, p, s))), p);
+				if (Parser.wouldSkipDisplayPosition(ctx, p, true,
+					s)) return mk(EReturn(Parser.mkNullExpr(Parser.punionNext(ctx, p, s))), p);
 				return mk(EReturn(null), p);
 			case Kwd(Break):
 				s.junk();
@@ -2399,7 +2548,9 @@ class Grammar {
 				s.junk();
 				expectTok(s, POpen);
 				var cond = tail(function() return secureExpr(ctx, s));
-				var e = if (acceptTok(s, PClose) != null) tail(function() return secureExpr(ctx, s)) else Parser.syntaxError(ctx, Expected([")"]), s, Parser.mkNullExpr(cond.pos));
+				var e = if (acceptTok(s,
+					PClose) != null) tail(function() return secureExpr(ctx,
+						s)) else Parser.syntaxError(ctx, Expected([")"]), s, Parser.mkNullExpr(cond.pos));
 				return mk(EWhile(cond, e, NormalWhile), punion(p1, e.pos));
 			case Kwd(Do):
 				var p1 = p;
@@ -2465,7 +2616,15 @@ class Grammar {
 				var er = tail(function() return arrowExpr(ctx, s));
 				if (al.length == 0) throw "die";
 				var a0 = al[0];
-				al = [({name: a0.name, optional: true, meta: [], type: a0.type, expr: a0.expr} : FuncArg)].concat(al.slice(1));
+				al = [
+					({
+						name: a0.name,
+						optional: true,
+						meta: [],
+						type: a0.type,
+						expr: a0.expr
+					} : FuncArg)
+				].concat(al.slice(1));
 				return arrowFunction(ctx, p1, al, er, s);
 			case _:
 		}
@@ -2500,14 +2659,30 @@ class Grammar {
 					expectTok(s, PClose);
 					var er = tail(function() return arrowExpr(ctx, s));
 					var np = arrowIdentChecktype(e).np;
-					return arrowFunction(ctx, p1, [({name: np, optional: false, meta: [], type: t, expr: null} : FuncArg)].concat(al), er, s);
+					return arrowFunction(ctx, p1, [
+						({
+							name: np,
+							optional: false,
+							meta: [],
+							type: t,
+							expr: null
+						} : FuncArg)
+					].concat(al), er, s);
 				case Binop(OpAssign):
 					s.junk();
 					var ea1 = tail(function() return expr(ctx, s));
 					inline function withArgs(al:Array<FuncArg>, er:Expr):Expr {
 						return switch e.expr {
 							case EConst(Ident(n)):
-								arrowFunction(ctx, p1, [({name: pn(n, e.pos), optional: true, meta: [], type: t, expr: ea1} : FuncArg)].concat(al), er, s);
+								arrowFunction(ctx, p1, [
+									({
+										name: pn(n, e.pos),
+										optional: true,
+										meta: [],
+										type: t,
+										expr: ea1
+									} : FuncArg)
+								].concat(al), er, s);
 							case _: serror();
 						}
 					}
@@ -2534,7 +2709,8 @@ class Grammar {
 	}
 
 	static function exprNext(ctx:ParserContext, e1:Expr, s:S):Expr {
-		try return exprNext2(ctx, e1, s) catch (e:StreamError) {
+		try return exprNext2(ctx, e1, s)
+		catch (e:StreamError) {
 			if (!ctx.config.inDisplay) throw e;
 			Parser.handleStreamError(ctx, e.message, s);
 			return e1;
@@ -2550,7 +2726,8 @@ class Grammar {
 				var eparam = tail(function() return expr(ctx, s));
 				var p2 = expectTok(s, BrClose);
 				return switch e1.expr {
-					case EConst(Ident(n)): exprNext(ctx, mk(EMeta({meta: core.Meta.fromString(n), exprs: [], pos: e1.pos}, eparam), punion(p1, p2)), s);
+					case EConst(Ident(n)): exprNext(ctx,
+							mk(EMeta({meta: core.Meta.fromString(n), exprs: [], pos: e1.pos}, eparam), punion(p1, p2)), s);
 					case _: throw "die";
 				}
 			case Dot:
@@ -2680,7 +2857,8 @@ class Grammar {
 				case _:
 					// turn an integer followed by a dot into a float
 					return switch e1.expr {
-						case EConst(Int(v, null)) if (e1.pos.pmax == p.pmin): exprNext(ctx, mk(EConst(Float(v + ".", null)), punion(p, e1.pos)), s);
+						case EConst(Int(v,
+							null)) if (e1.pos.pmax == p.pmin): exprNext(ctx, mk(EConst(Float(v + ".", null)), punion(p, e1.pos)), s);
 						case _: serror();
 					}
 			}
@@ -2715,7 +2893,8 @@ class Grammar {
 		return secureExpr(ctx, s);
 	}
 
-	static function parseSwitchCases(ctx:ParserContext, eswitch:Expr, cases:Array<SwitchCase>, s:S):{cases:Array<SwitchCase>, def:Null<SwitchDefault>} {
+	static function parseSwitchCases(ctx:ParserContext, eswitch:Expr, cases:Array<SwitchCase>,
+			s:S):{cases:Array<SwitchCase>, def:Null<SwitchDefault>} {
 		var tk = peek(s);
 		switch tk.token {
 			case Kwd(Default):
@@ -2737,7 +2916,8 @@ class Grammar {
 				var eg = tail(function() return popt(function(s) return parseGuard(ctx, s), s));
 				var pdot = expectUnlessResumeP(ctx, DblDot, s);
 				if (ctx.config.wasAutoTriggered) Parser.checkResume(ctx, pdot, function() {}, function() {});
-				if (el.length == 0) return Parser.syntaxError(ctx, Custom("case without a pattern is not allowed"), s, {cases: [], def: null}, p1);
+				if (el.length == 0) return Parser.syntaxError(ctx, Custom("case without a pattern is not allowed"), s,
+					{cases: [], def: null}, p1);
 				var r = blockWithPos(ctx, [], p1, s);
 				var b:Null<Expr>, p:Pos;
 				if (r.el.length == 0) {
@@ -2747,7 +2927,12 @@ class Grammar {
 					p = punion(p1, r.pos);
 					b = mk(EBlock(r.el), p);
 				}
-				cases.unshift({values: el, guard: eg, expr: b, pos: p});
+				cases.unshift({
+					values: el,
+					guard: eg,
+					expr: b,
+					pos: p
+				});
 				return parseSwitchCases(ctx, eswitch, cases, s);
 			case _:
 				var l = cases.copy();
@@ -2765,13 +2950,29 @@ class Grammar {
 		if (rt != null) {
 			expectTok(s, PClose);
 			var e = tail(function() return secureExpr(ctx, s));
-			return {c: {name: n, type: rt.v, expr: e, pos: punion(p, e.pos)}, pmax: e.pos};
+			return {
+				c: {
+					name: n,
+					type: rt.v,
+					expr: e,
+					pos: punion(p, e.pos)
+				},
+				pmax: e.pos
+			};
 		}
 		var tk = peek(s);
 		if (tk.token == PClose) {
 			s.junk();
 			var e = tail(function() return secureExpr(ctx, s));
-			return {c: {name: n, type: null, expr: e, pos: punion(p, e.pos)}, pmax: e.pos};
+			return {
+				c: {
+					name: n,
+					type: null,
+					expr: e,
+					pos: punion(p, e.pos)
+				},
+				pmax: e.pos
+			};
 		}
 		s.junk();
 		return Parser.error(MissingType, tk.pos);
@@ -2830,7 +3031,7 @@ class Grammar {
 								// wrap the argument that was just parsed
 								var e = Parser.mkDisplayExpr(e, DKMarked);
 								return f(finish([e]), p3);
-							// then check wether the display position is between the comma and the closing parenthesis
+								// then check wether the display position is between the comma and the closing parenthesis
 							} else if (DisplayPosition.enclosesPositionGt(DisplayPosition.displayPosition.get(), commaParenPos)) {
 								// add a dummy final argument
 								var e2 = Parser.mkDisplayExpr(Parser.mkNullExpr(commaParenPos), DKMarked);
@@ -2892,7 +3093,8 @@ class Grammar {
 	static function parseMacroIdent(ctx:ParserContext, t:String, p:Pos, s:S):Expr {
 		if (t == "display") {
 			Parser.syntaxWarningWithPos(ctx, core.WarningList.fromString("WIfDisplay"), p);
-			if (ctx.config.specialIdentifierFiles != null) ctx.config.specialIdentifierFiles.replace(core.Path.UniqueKey.create(p.pfile), t);
+			if (ctx.config.specialIdentifierFiles != null) ctx.config.specialIdentifierFiles.replace(core.Path.UniqueKey.create(p.pfile),
+				t);
 		}
 		return mk(EConst(Ident(t)), p);
 	}
@@ -2903,9 +3105,10 @@ class Grammar {
 			var cond = parseMacroCond2(ctx, s);
 			parsingMacroCond = false;
 			return cond;
-		} catch(e:haxe.Exception){
+		} catch (e:haxe.Exception) {
 			parsingMacroCond = false;
-			throw e;}
+			throw e;
+		}
 	}
 
 	static function parseMacroCond2(ctx:ParserContext, s:S):{token:Null<ParserToken>, expr:Expr} {

@@ -25,9 +25,11 @@ class Numeric {
 		if (!Math.isFinite(f)) return f < 0.0 ? "neg_infinity" : "infinity";
 		var floatVal = {
 			var s1 = core.ds.OcamlPrintf.formatG(12, f);
-			if (f == Std.parseFloat(s1)) s1 else {
+			if (f == Std.parseFloat(s1)) s1
+			else {
 				var s2 = core.ds.OcamlPrintf.formatG(15, f);
-				if (f == Std.parseFloat(s2)) s2 else core.ds.OcamlPrintf.formatG(18, f);
+				if (f == Std.parseFloat(s2)) s2
+				else core.ds.OcamlPrintf.formatG(18, f);
 			}
 		}
 		return validFloatLexeme(floatVal);
@@ -45,7 +47,12 @@ class Numeric {
 			if (start == index && (code == " ".code || isWhitespace(code))) {
 				start++;
 				index++;
-			} else if ((code >= "0".code && code <= "9".code) || code == "-".code || code == "+".code || code == "e".code || code == "E".code || code == ".".code) {
+			} else if ((code >= "0".code && code <= "9".code)
+				|| code == "-".code
+				|| code == "+".code
+				|| code == "e".code
+				|| code == "E".code
+				|| code == ".".code) {
 				index++;
 			} else {
 				break;
@@ -58,23 +65,23 @@ class Numeric {
 		function loopHex(sp:Int, i:Int):String {
 			while (i < value.length) {
 				var c = value.charCodeAt(i);
-				if ((c >= "0".code && c <= "9".code) || (c >= "a".code && c <= "f".code) || (c >= "A".code && c <= "F".code)) i++ else break;
+				if ((c >= "0".code && c <= "9".code) || (c >= "a".code && c <= "f".code) || (c >= "A".code && c <= "F".code)) i++
+				else break;
 			}
 			return value.substr(sp, i - sp);
 		}
 		function loopDec(sp:Int, i:Int):String {
 			while (i < value.length) {
 				var c = value.charCodeAt(i);
-				if (c >= "0".code && c <= "9".code) i++ else break;
+				if (c >= "0".code && c <= "9".code) i++
+				else break;
 			}
 			return value.substr(sp, i - sp);
 		}
 		function handleDigits(sp:Int, i:Int):String {
-			return if (i + 1 < value.length && value.charCodeAt(i) == "0".code
-				&& (value.charCodeAt(i + 1) == "x".code || value.charCodeAt(i + 1) == "X".code))
-				loopHex(sp, i + 2)
-			else
-				loopDec(sp, i);
+			return if (i + 1 < value.length
+				&& value.charCodeAt(i) == "0".code
+				&& (value.charCodeAt(i + 1) == "x".code || value.charCodeAt(i + 1) == "X".code)) loopHex(sp, i + 2) else loopDec(sp, i);
 		}
 		function loop(sp:Int):String {
 			while (true) {

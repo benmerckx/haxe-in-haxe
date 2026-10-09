@@ -24,6 +24,10 @@
 # git and patch (backend/tools/cosmo-deps.sh, once).
 # SKIP_GEN=1 reuses the generated C, SKIP_COM=1 reuses the binary, NO_DEPS=1
 # leaves mbedtls and libuv out (stubs that throw).
+# NATIVE_CC=clang (or gcc, tcc...) builds a package for this machine only, without
+# cosmocc: bin/hxc-native is compiled with "$NATIVE_CC -O2" (no mbedtls/libuv:
+# macros run in the user's Haxe, the bundled Eval is not used for lowering) and
+# bin/hxc.com is a shell script running it (Build.toC runs hxc.com with sh).
 set -eu
 cd "$(dirname "$0")/../.."
 HAXE=${HAXE:-haxe/haxe}
@@ -44,7 +48,12 @@ fi
 # use mbedtls and libuv built with cosmocc (backend/tools/cosmo-deps.sh, into
 # $DEPS); NO_DEPS=1 builds without them (their natives fail when called)
 DEPS=${COSMO_DEPS:-bin/cosmo-deps}
-if [ -z "${NO_DEPS:-}" ]; then
+if [ -n "${NATIVE_CC:-}" ]; then
+	NO_DEPS=1
+	if [ -z "${SKIP_COM:-}" ] || [ ! -f "$B/hxc-native" ]; then
+		$NATIVE_CC -O2 -w -fno-strict-aliasing -DHXC_NO_SSL -DHXC_NO_UV -I backend/rt "$B/hxc.c" backend/rt/rt*.c -lm -o "$B/hxc-native"
+	fi
+elif [ -z "${NO_DEPS:-}" ]; then
 	sh backend/tools/cosmo-deps.sh "$DEPS"
 	RT="-I$DEPS/include"
 	RT_LIBS="-L$DEPS/lib -lmbedtls -lmbedx509 -lmbedcrypto -luv"
@@ -52,17 +61,25 @@ else
 	RT="-DHXC_NO_SSL -DHXC_NO_UV"
 	RT_LIBS=
 fi
-if [ -z "${SKIP_COM:-}" ] || [ ! -f "$B/hxc.com" ]; then
+if [ -n "${NATIVE_CC:-}" ]; then
+	:
+elif [ -z "${SKIP_COM:-}" ] || [ ! -f "$B/hxc.com" ]; then
 	cosmocc -O2 -w -fno-strict-aliasing $RT -I backend/rt "$B/hxc.c" backend/rt/rt*.c -lm $RT_LIBS -o "$B/hxc.com"
 fi
 
 # 3. the package
 rm -rf "$P" && mkdir -p "$P/bin" "$P/rt"
-cp "$B/hxc.com" "$P/bin/hxc.com"
-rm -rf "$B/std" && mkdir -p "$B/std"
-cp haxe/std/*.hx "$B/std/"
-cp -r haxe/std/haxe haxe/std/sys haxe/std/eval "$B/std/"
-(cd "$B" && zip -qr -9 "../../../$P/bin/hxc.com" std)
+if [ -n "${NATIVE_CC:-}" ]; then
+	cp "$B/hxc-native" "$P/bin/hxc-native"
+	printf '#!/bin/sh\nexec "$(dirname "$0")/hxc-native" "$@"\n' > "$P/bin/hxc.com"
+	chmod +x "$P/bin/hxc.com"
+else
+	cp "$B/hxc.com" "$P/bin/hxc.com"
+	rm -rf "$B/std" && mkdir -p "$B/std"
+	cp haxe/std/*.hx "$B/std/"
+	cp -r haxe/std/haxe haxe/std/sys haxe/std/eval "$B/std/"
+	(cd "$B" && zip -qr -9 "../../../$P/bin/hxc.com" std)
+fi
 # not std/: haxe looks for its own std in ./std, and haxelib runs Run.hx from the library root
 cp -r backend/std "$P/hxstd"
 cp -r backend/haxelib/hxc/. "$P/hxstd/hxc/"

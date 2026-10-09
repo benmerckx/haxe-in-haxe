@@ -61,7 +61,6 @@ class TryCatch {
 **/
 class EvalEmitter {
 	// Helper
-
 	public static function unexpectedValueP(v:Value, s:String, p:Pos):Dynamic {
 		var str = switch v {
 			case VNull: "Null Access";
@@ -155,7 +154,6 @@ class EvalEmitter {
 	public static inline function apply(env:Env, exec:Emitter):Value return exec(env);
 
 	// Objects and values
-
 	public static final emitNull:Emitter = _ -> VNull;
 
 	public static function emitLocalDeclaration(i:Int, exec:Emitter):Emitter {
@@ -172,7 +170,7 @@ class EvalEmitter {
 		}
 	}
 
-	public static function emitConst(v:Value):Emitter return _ -> v;
+	public static function emitConst(v:Value):Emitter return _->v;
 
 	public static function emitNullCheck(exec:Emitter, p:Pos):Emitter {
 		return function(env:Env):Value {
@@ -225,7 +223,7 @@ class EvalEmitter {
 		}
 	}
 
-	public static function emitTypeExpr(proto:Value):Emitter return _ -> proto;
+	public static function emitTypeExpr(proto:Value):Emitter return _->proto;
 
 	public static function emitMkPos(p:Pos):Emitter return _ -> EvalEncode.encodePos(p);
 
@@ -309,6 +307,7 @@ class EvalEmitter {
 				while (EvalMisc.isTrue(execCond(env))) {
 					execBody(env);
 					core.ds.GcPolicy.tick(); // loops allocate without calls or typing
+					EvalLock.tick();
 				}
 				return;
 			} catch (_:Continue) {}
@@ -319,19 +318,22 @@ class EvalEmitter {
 		while (EvalMisc.isTrue(execCond(env))) {
 			execBody(env);
 			core.ds.GcPolicy.tick();
+			EvalLock.tick();
 		}
 	}
 
 	public static function emitWhileBreak(execCond:Emitter, execBody:Emitter):Emitter {
 		return function(env:Env):Value {
-			try runWhileContinue(execCond, execBody, env) catch (_:Break) {}
+			try runWhileContinue(execCond, execBody, env)
+			catch (_:Break) {}
 			return VNull;
 		}
 	}
 
 	public static function emitWhileBreakContinue(execCond:Emitter, execBody:Emitter):Emitter {
 		return function(env:Env):Value {
-			try runWhileContinue(execCond, execBody, env) catch (_:Break) {}
+			try runWhileContinue(execCond, execBody, env)
+			catch (_:Break) {}
 			return VNull;
 		}
 	}
@@ -342,7 +344,8 @@ class EvalEmitter {
 				execBody(env);
 				runWhileContinue(execCond, execBody, env);
 			} catch (_:Break) {} catch (_:Continue) {
-				try runWhileContinue(execCond, execBody, env) catch (_:Break) {}
+				try runWhileContinue(execCond, execBody, env)
+				catch (_:Break) {}
 			}
 			return VNull;
 		}
@@ -370,7 +373,8 @@ class EvalEmitter {
 				// finally has popped them by the time its handler builds the stack.
 				while (true) {
 					var env2 = eval.env;
-					if (env2 != null && env2 != env) EvalContext.popEnvironment(ctx, env2) else break;
+					if (env2 != null && env2 != env) EvalContext.popEnvironment(ctx, env2)
+					else break;
 				}
 				EvalExceptions.buildExceptionStack(eval, env);
 				var found:Null<TryCatch> = null;
@@ -408,8 +412,8 @@ class EvalEmitter {
 		}
 	}
 
-	public static function emitSeq8(exec1:Emitter, exec2:Emitter, exec3:Emitter, exec4:Emitter, exec5:Emitter, exec6:Emitter, exec7:Emitter,
-			exec8:Emitter):Emitter {
+	public static function emitSeq8(exec1:Emitter, exec2:Emitter, exec3:Emitter, exec4:Emitter, exec5:Emitter, exec6:Emitter,
+			exec7:Emitter, exec8:Emitter):Emitter {
 		return function(env:Env):Value {
 			exec1(env);
 			exec2(env);
@@ -443,7 +447,6 @@ class EvalEmitter {
 	}
 
 	// Calls
-
 	// super.call() - immediate
 
 	public static function emitSuperFieldCall(slot:Int, proto:Vprototype, i:Int, execs:Array<Emitter>, p:Pos):Emitter {
@@ -490,7 +493,8 @@ class EvalEmitter {
 			checkStackDepth(env);
 			var vthis = exec(env);
 			var proto = getPrototype(vthis, p);
-			var vf = try EvalField.protoFieldRaise(proto, name) catch (_:NotFound)
+			var vf = try EvalField.protoFieldRaise(proto,
+				name) catch (_:NotFound)
 				EvalMisc.throwString('Field ${EvalHash.revHash(name)} not found on prototype ${EvalHash.revHash(proto.ppath)}', p);
 			var vl = applyAll(execs, env);
 			env.envLeavePmin = p.pmin;
@@ -541,8 +545,10 @@ class EvalEmitter {
 			var vthis = env.envLocals[0];
 			// This isn't very elegant, but it's probably a rare case to extend these types.
 			switch [vthis, vi2] {
-				case [VInstance(vi), VInstance(vi2)]: vi.ikind = vi2.ikind;
-				case _: Globals.die("", "evalEmitter.ml:emitSpecialSuperCall");
+				case [VInstance(vi), VInstance(vi2)]:
+					vi.ikind = vi2.ikind;
+				case _:
+					Globals.die("", "evalEmitter.ml:emitSpecialSuperCall");
 			}
 			return VNull;
 		}
@@ -583,11 +589,14 @@ class EvalEmitter {
 
 	public static function emitCaptureRead(i:Int):Emitter return env -> env.envCaptures[i];
 
-	public static function emitArrayLengthRead(exec:Emitter, p:Pos):Emitter return env -> EvalValueTools.vint32(asArray(p, exec(env)).alength);
+	public static function emitArrayLengthRead(exec:Emitter,
+			p:Pos):Emitter return env -> EvalValueTools.vint32(asArray(p, exec(env)).alength);
 
-	public static function emitVectorLengthRead(exec:Emitter, p:Pos):Emitter return env -> EvalValueTools.vint32(asVector(p, exec(env)).length);
+	public static function emitVectorLengthRead(exec:Emitter,
+			p:Pos):Emitter return env -> EvalValueTools.vint32(asVector(p, exec(env)).length);
 
-	public static function emitBytesLengthRead(exec:Emitter, p:Pos):Emitter return env -> EvalValueTools.vint32(asBytes(p, exec(env)).length);
+	public static function emitBytesLengthRead(exec:Emitter,
+			p:Pos):Emitter return env -> EvalValueTools.vint32(asBytes(p, exec(env)).length);
 
 	public static function emitProtoFieldRead(proto:Vprototype, i:Int):Emitter return _ -> proto.pfields[i];
 
@@ -762,7 +771,8 @@ class EvalEmitter {
 		return function(env:Env):Value {
 			var v1 = exec1(env);
 			var v2 = exec2(env);
-			try EvalMisc.setField(v1, name, v2) catch (e:RunTimeException) throw new RunTimeException(e.value, e.envs, p1);
+			try EvalMisc.setField(v1, name, v2)
+			catch (e:RunTimeException) throw new RunTimeException(e.value, e.envs, p1);
 			return v2;
 		}
 	}
@@ -839,7 +849,8 @@ class EvalEmitter {
 		}
 	}
 
-	static inline function protoFieldReadWrite(proto:Vprototype, i:Int, exec2:Emitter, fop:Value->Value->Value, prefix:Bool, env:Env):Value {
+	static inline function protoFieldReadWrite(proto:Vprototype, i:Int, exec2:Emitter, fop:Value->Value->Value, prefix:Bool,
+			env:Env):Value {
 		var vf = proto.pfields[i];
 		var v2 = exec2(env);
 		var v = fop(vf, v2);
@@ -859,7 +870,8 @@ class EvalEmitter {
 		return if (prefix) v else vf;
 	}
 
-	public static function emitInstanceFieldReadWrite(exec1:Emitter, p1:Pos, i:Int, exec2:Emitter, fop:Value->Value->Value, prefix:Bool):Emitter {
+	public static function emitInstanceFieldReadWrite(exec1:Emitter, p1:Pos, i:Int, exec2:Emitter, fop:Value->Value->Value,
+			prefix:Bool):Emitter {
 		return function(env:Env):Value {
 			return switch exec1(env) {
 				case VInstance(vi): instanceFieldReadWrite(vi, i, exec2, fop, prefix, env);
@@ -868,7 +880,8 @@ class EvalEmitter {
 		}
 	}
 
-	public static function emitFieldReadWrite(exec1:Emitter, p1:Pos, name:Int, exec2:Emitter, fop:Value->Value->Value, prefix:Bool):Emitter {
+	public static function emitFieldReadWrite(exec1:Emitter, p1:Pos, name:Int, exec2:Emitter, fop:Value->Value->Value,
+			prefix:Bool):Emitter {
 		return function(env:Env):Value {
 			var v1 = exec1(env);
 			return switch EvalValueTools.vresolve(v1) {
@@ -888,13 +901,15 @@ class EvalEmitter {
 					var vf = EvalField.field(v1, name);
 					var v2 = exec2(env);
 					var v = fop(vf, v2);
-					try EvalMisc.setField(v1, name, v) catch (e:RunTimeException) throw new RunTimeException(e.value, e.envs, p1);
+					try EvalMisc.setField(v1, name, v)
+					catch (e:RunTimeException) throw new RunTimeException(e.value, e.envs, p1);
 					if (prefix) v else vf;
 			}
 		}
 	}
 
-	public static function emitArrayReadWrite(exec1:Emitter, p1:Pos, exec2:Emitter, p2:Pos, exec3:Emitter, fop:Value->Value->Value, prefix:Bool):Emitter {
+	public static function emitArrayReadWrite(exec1:Emitter, p1:Pos, exec2:Emitter, p2:Pos, exec3:Emitter, fop:Value->Value->Value,
+			prefix:Bool):Emitter {
 		return function(env:Env):Value {
 			var va = asArray(p1, exec1(env));
 			var i = asInt(p2, exec2(env));
@@ -907,7 +922,8 @@ class EvalEmitter {
 		}
 	}
 
-	public static function emitVectorReadWrite(exec1:Emitter, p1:Pos, exec2:Emitter, p2:Pos, exec3:Emitter, fop:Value->Value->Value, prefix:Bool):Emitter {
+	public static function emitVectorReadWrite(exec1:Emitter, p1:Pos, exec2:Emitter, p2:Pos, exec3:Emitter, fop:Value->Value->Value,
+			prefix:Bool):Emitter {
 		return function(env:Env):Value {
 			var va = asVector(p1, exec1(env));
 			var i = asInt(p2, exec2(env));
@@ -1181,6 +1197,7 @@ class EvalEmitter {
 			return v;
 		}
 	}
+
 	/**
 		[mapping] is upstream's `(i, slot) array`, as two parallel arrays: the
 		closure's capture slots [mappingI] and the outer capture slots [mappingSlot].
@@ -1190,8 +1207,9 @@ class EvalEmitter {
 		return function(env:Env):Value {
 			var refValues = new Array<Value>();
 			for (k in 0...mappingSlot.length) refValues[k] = env.envCaptures[mappingSlot[k]];
-			var f = if (hasret && eci.numCaptures == 0) createFunction(ctx, eci, exec, fl) else if (!hasret && eci.numCaptures == 0)
-				createFunctionNoret(ctx, eci, exec, fl) else createClosure(mappingI, refValues, ctx, eci, exec, fl);
+			var f = if (hasret && eci.numCaptures == 0) createFunction(ctx, eci, exec,
+				fl) else if (!hasret && eci.numCaptures == 0) createFunctionNoret(ctx, eci, exec,
+				fl) else createClosure(mappingI, refValues, ctx, eci, exec, fl);
 			return EvalValueTools.vstaticFunction(f);
 		}
 	}

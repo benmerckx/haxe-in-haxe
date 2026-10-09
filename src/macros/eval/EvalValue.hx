@@ -127,7 +127,8 @@ class RuntimeIntHashtbl<V> {
 class RuntimeInt64Hashtbl<V> {
 	public final h:OcamlHashtbl<haxe.Int64, V>;
 
-	public function new(?h:OcamlHashtbl<haxe.Int64, V>) this.h = h == null ? new OcamlHashtbl(_ -> 0, (a:haxe.Int64, b:haxe.Int64) -> a == b, 0) : h; // typed: Int64 equality, not physical (hxc boxes Int64)
+	public function new(?h:OcamlHashtbl<haxe.Int64, V>) this.h = h == null ? new OcamlHashtbl(_ -> 0,
+		(a:haxe.Int64, b:haxe.Int64) -> a == b, 0) : h; // typed: Int64 equality, not physical (hxc boxes Int64)
 
 	public function add(key:haxe.Int64, v:V):Void h.replace(key, v);
 
@@ -300,8 +301,8 @@ class Vprototype {
 	// The value of this prototype, i.e. VPrototype(this).
 	public var pvalue:Value;
 
-	public function new(ppath:Int, pfields:Array<Value>, pnames:GlobalsIntMap<Int>, pinstanceFields:Array<Value>, pinstanceNames:GlobalsIntMap<Int>,
-			pparent:Null<Vprototype>, pkind:VprototypeKind, pvalue:Value) {
+	public function new(ppath:Int, pfields:Array<Value>, pnames:GlobalsIntMap<Int>, pinstanceFields:Array<Value>,
+			pinstanceNames:GlobalsIntMap<Int>, pparent:Null<Vprototype>, pkind:VprototypeKind, pvalue:Value) {
 		this.ppath = ppath;
 		this.pfields = pfields;
 		this.pnames = pnames;
@@ -444,8 +445,9 @@ class DomainMutex {
 	public function new() {}
 
 	public function lock(id:Int):Void {
-		if (downer == id) ddepth++ else {
-			dmutex.acquire();
+		if (downer == id) ddepth++
+		else {
+			EvalLock.acquireMutex(dmutex);
 			downer = id;
 			ddepth = 1;
 		}
@@ -465,7 +467,8 @@ class DomainMutex {
 	}
 
 	public function unlock():Void {
-		if (ddepth > 1) ddepth-- else {
+		if (ddepth > 1) ddepth--
+		else {
 			downer = -1;
 			dmutex.release();
 		}
@@ -478,15 +481,15 @@ class EvalValueTools {
 	/** `same_handle`: the host objects compare physically (ids by value). **/
 	public static function sameHandle(h1:Vhandle, h2:Vhandle):Bool {
 		return switch [h1, h2] {
-			case [HLoop(h1), HLoop(h2)] | [HIdle(h1), HIdle(h2)] | [HTimer(h1), HTimer(h2)] | [HAsync(h1), HAsync(h2)] | [HBuffer(h1), HBuffer(h2)] |
-				[HSockAddr(h1), HSockAddr(h2)] | [HTcp(h1), HTcp(h2)] | [HPipe(h1), HPipe(h2)] | [HTty(h1), HTty(h2)] | [HFile(h1), HFile(h2)] |
-				[HDir(h1), HDir(h2)] | [HUdp(h1), HUdp(h2)] | [HSignal(h1), HSignal(h2)] | [HProcess(h1), HProcess(h2)] |
-				[HRedirection(h1), HRedirection(h2)] | [HFileRequest(h1), HFileRequest(h2)] | [HNameRequest(h1), HNameRequest(h2)] |
-				[HAddrRequest(h1), HAddrRequest(h2)] | [HRandomRequest(h1), HRandomRequest(h2)] | [HThreadPoolRequest(h1), HThreadPoolRequest(h2)] |
-				[HFileModeNumeric(h1), HFileModeNumeric(h2)] | [HFsEvent(h1), HFsEvent(h2)] | [HOnce(h1), HOnce(h2)] | [HMutex(h1), HMutex(h2)] |
-				[HRwLock(h1), HRwLock(h2)] | [HSemaphore(h1), HSemaphore(h2)] | [HCondition(h1), HCondition(h2)] | [HBarrier(h1), HBarrier(h2)] |
-				[HFsPoll(h1), HFsPoll(h2)] | [HPrepare(h1), HPrepare(h2)] | [HCheck(h1), HCheck(h2)] |
-				[HThread(h1), HThread(h2)]: // Luv.Thread.equal: one EvalLuv.LuvThread per host thread
+			case [HLoop(h1), HLoop(h2)] | [HIdle(h1), HIdle(h2)] | [HTimer(h1), HTimer(h2)] | [HAsync(h1), HAsync(h2)] |
+				[HBuffer(h1), HBuffer(h2)] | [HSockAddr(h1), HSockAddr(h2)] | [HTcp(h1), HTcp(h2)] | [HPipe(h1), HPipe(h2)] |
+				[HTty(h1), HTty(h2)] | [HFile(h1), HFile(h2)] | [HDir(h1), HDir(h2)] | [HUdp(h1), HUdp(h2)] | [HSignal(h1), HSignal(h2)] |
+				[HProcess(h1), HProcess(h2)] | [HRedirection(h1), HRedirection(h2)] | [HFileRequest(h1), HFileRequest(h2)] |
+				[HNameRequest(h1), HNameRequest(h2)] | [HAddrRequest(h1), HAddrRequest(h2)] | [HRandomRequest(h1), HRandomRequest(h2)] |
+				[HThreadPoolRequest(h1), HThreadPoolRequest(h2)] | [HFileModeNumeric(h1), HFileModeNumeric(h2)] |
+				[HFsEvent(h1), HFsEvent(h2)] | [HOnce(h1), HOnce(h2)] | [HMutex(h1), HMutex(h2)] | [HRwLock(h1), HRwLock(h2)] |
+				[HSemaphore(h1), HSemaphore(h2)] | [HCondition(h1), HCondition(h2)] | [HBarrier(h1), HBarrier(h2)] |
+				[HFsPoll(h1), HFsPoll(h2)] | [HPrepare(h1), HPrepare(h2)] | [HCheck(h1), HCheck(h2)] | [HThread(h1), HThread(h2)]: // Luv.Thread.equal: one EvalLuv.LuvThread per host thread
 				h1 == h2;
 			case _: false;
 		}
@@ -499,7 +502,8 @@ class EvalValueTools {
 			case [VFloat(a), VFloat(b)]: a == b;
 			case [VFloat(a), VInt32(b)]: a == (b : Float);
 			case [VInt32(a), VFloat(b)]: (a : Float) == b;
-			case [VEnumValue(a), VEnumValue(b)]: a == b || (a.eindex == b.eindex && a.eargs.length == 0 && b.eargs.length == 0 && a.epath == b.epath);
+			case [VEnumValue(a), VEnumValue(b)]: a == b || (a.eindex == b.eindex && a.eargs.length == 0 && b.eargs.length == 0
+					&& a.epath == b.epath);
 			case [VObject(vo1), VObject(vo2)]: vo1 == vo2;
 			case [VInstance(vi1), VInstance(vi2)]: vi1 == vi2;
 			case [VString(s1), VString(s2)]: vstringEqual(s1, s2);
@@ -570,7 +574,8 @@ class EvalValueTools {
 
 	public static function associateEnumValuePos(ve:Value, p:Pos):Void {
 		switch ve {
-			case VEnumValue(ve): ve.enpos = p;
+			case VEnumValue(ve):
+				ve.enpos = p;
 			case _:
 		}
 	}

@@ -45,11 +45,13 @@ class OcamlHashtbl<K, V> {
 		h.size = size;
 		h.data = [
 			for (b in data) {
-				var head:Null<OcamlHashtblCell<K, V>> = null, tail:Null<OcamlHashtblCell<K, V>> = null;
+				var head:Null<OcamlHashtblCell<K, V>> = null,
+					tail:Null<OcamlHashtblCell<K, V>> = null;
 				var c = b;
 				while (c != null) {
 					var n = new OcamlHashtblCell(c.key, c.data, null);
-					if (tail == null) head = n else tail.next = n;
+					if (tail == null) head = n
+					else tail.next = n;
 					tail = n;
 					c = c.next;
 				}
@@ -71,7 +73,8 @@ class OcamlHashtbl<K, V> {
 				var next = c.next;
 				var nidx = keyIndex(c.key);
 				var tail = tails[nidx];
-				if (tail == null) ndata[nidx] = c else tail.next = c;
+				if (tail == null) ndata[nidx] = c
+				else tail.next = c;
 				tails[nidx] = c;
 				c = next;
 			}
@@ -93,7 +96,8 @@ class OcamlHashtbl<K, V> {
 		while (c != null) {
 			if (equalFn(c.key, key)) {
 				size--;
-				if (prev == null) data[i] = c.next else prev.next = c.next;
+				if (prev == null) data[i] = c.next
+				else prev.next = c.next;
 				return;
 			}
 			prev = c;

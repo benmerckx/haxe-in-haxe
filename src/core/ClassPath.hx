@@ -15,9 +15,15 @@ enum FileKind {
 @:structInit class DirectoryListing {
 	public var directory:String;
 	public var files:Array<String>;
-	public inline function new(directory:String, files:Array<String>) { this.directory = directory; this.files = files; }
+
+	public inline function new(directory:String, files:Array<String>) {
+		this.directory = directory;
+		this.files = files;
+	}
+
 	public inline function clone():DirectoryListing return new DirectoryListing(directory, files);
 }
+
 interface IClassPath {
 	public var path(get, never):String;
 	public var scope(get, never):ClassPathScope;
@@ -42,10 +48,15 @@ class DirectoryClassPath implements IClassPath {
 	}
 
 	public var path(get, never):String;
+
 	function get_path():String return classPath;
+
 	public var scope(get, never):ClassPathScope;
+
 	function get_scope():ClassPathScope return classPathScope;
+
 	public var fileKind(get, never):FileKind;
+
 	function get_fileKind():FileKind return FFile;
 
 	public function clone():IClassPath {
@@ -65,7 +76,8 @@ class DirectoryClassPath implements IClassPath {
 		var directory = ocamlDirname(fullPath);
 		if (directoryCache.exists(directory)) return null;
 		var listing:Null<Array<String>>;
-		try listing = sys.FileSystem.readDirectory(directory) catch (_:Dynamic) listing = null;
+		try listing = sys.FileSystem.readDirectory(directory)
+		catch (_:Dynamic) listing = null;
 		directoryCache.set(directory, listing);
 		return listing == null ? null : {directory: directory, files: listing};
 	}

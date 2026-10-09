@@ -67,9 +67,10 @@ class Socket {
 				remaining -= chunkLength;
 				offset += chunkLength;
 			}
-		} catch(error:haxe.Exception){
+		} catch (error:haxe.Exception) {
 			sendMutex.release();
-			throw error;}
+			throw error;
+		}
 		sendMutex.release();
 	}
 

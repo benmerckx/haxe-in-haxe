@@ -31,7 +31,9 @@ import core.display.CompletionItem;
 
 // haxe/src/typing/typerDisplay.ml
 class TyperDisplay {
-	public static function convertFunctionSignature(ctx:TyperContext, values:haxe.ds.StringMap<Expr>, args:Array<{name:String, optional:Bool, type:T}>, ret:T):{args:Array<{name:String, optional:Bool, type:T}>, ret:T, ctf:CtFunction} {
+	public static function convertFunctionSignature(ctx:TyperContext, values:haxe.ds.StringMap<Expr>,
+			args:Array<{name:String, optional:Bool, type:T}>,
+			ret:T):{args:Array<{name:String, optional:Bool, type:T}>, ret:T, ctf:CtFunction} {
 		return switch CompletionType.fromType(Display.getImportStatus.bind(ctx), values, TFun({args: args, ret: ret})) {
 			case CTFunction(ctf): {args: args, ret: ret, ctf: ctf};
 			case _: throw new core.Globals.InternalCompilerError("typerDisplay.ml: function signature expected", "");
@@ -52,7 +54,8 @@ class TyperDisplay {
 				return false;
 			}
 		}
-		function ofField(e:TExpr, origin:ClassFieldOrigin, cf:TClassField, scope:ClassFieldScope, makeCi:CompletionClassField->TPair->CompletionItemData):CompletionItemData {
+		function ofField(e:TExpr, origin:ClassFieldOrigin, cf:TClassField, scope:ClassFieldScope,
+				makeCi:CompletionClassField->TPair->CompletionItemData):CompletionItemData {
 			var isQualified = retype(e, cf.cfName, e.etype);
 			return makeCi(CompletionClassField.make(cf, scope, origin, isQualified), tpair(ctx, Ast.getValueMeta(cf.cfMeta), e.etype));
 		}
@@ -143,7 +146,9 @@ class TyperDisplay {
 						case TFun(s): TFun({args: s.args, ret: TInst(c, tl)});
 						case t: t;
 					};
-					CompletionItem.makeCiClassField(CompletionClassField.make(cf, CFSConstructor, Self(CompletionItem.declOfClass(c)), true), tpair(ctx, Ast.getValueMeta(cf.cfMeta), t));
+					CompletionItem.makeCiClassField(CompletionClassField.make(cf, CFSConstructor, Self(CompletionItem.declOfClass(c)),
+						true),
+						tpair(ctx, Ast.getValueMeta(cf.cfMeta), t));
 				case TCall(e1 = {eexpr: TConst(TSuper)}, _):
 					itexpr(e1); // TODO
 				case TCast(e1, _):
@@ -198,10 +203,13 @@ class TyperDisplay {
 		var arg = [{name: "expression", optional: false, type: mono}];
 		return switch ctx.com.display.dmsKind {
 			case DMSignature:
-				DisplayException.sendSignaturesRaise(ctx.com, [{sig: convertFunctionSignature(ctx, new haxe.ds.StringMap(), arg, mono), doc: doc}], 0, 0, SKCall);
+				DisplayException.sendSignaturesRaise(ctx.com, [
+					{sig: convertFunctionSignature(ctx, new haxe.ds.StringMap(), arg, mono), doc: doc}
+				], 0, 0, SKCall);
 			case DMHover:
 				var t = TFun({args: arg, ret: mono});
-				DisplayException.raiseHover(CompletionItem.makeCiExpr(mk(TIdent("trace"), t, p), makeType(t)), WithTypeTools.namedArgument("expression"), p);
+				DisplayException.raiseHover(CompletionItem.makeCiExpr(mk(TIdent("trace"), t, p), makeType(t)),
+					WithTypeTools.namedArgument("expression"), p);
 			case DMDefinition | DMTypeDefinition:
 				DisplayException.sendPositionsRaise(ctx.com, []);
 			case _:
@@ -213,10 +221,22 @@ class TyperDisplay {
 		ctx.f.inDisplay = true;
 		var p = eAst.pos;
 		function handleCall(tl:Array<{t:T, doc:Documentation, values:haxe.ds.StringMap<Expr>}>, el:Array<Expr>, p0:Pos):TExpr {
-			function followWithCallable(x:{t:T, doc:Documentation, values:haxe.ds.StringMap<Expr>}):{args:Array<{name:String, optional:Bool, type:T}>, ret:T, doc:Documentation, values:haxe.ds.StringMap<Expr>} {
+			function followWithCallable(x:{t:T, doc:Documentation, values:haxe.ds.StringMap<Expr>}):{
+				args:Array<{name:String, optional:Bool, type:T}>,
+				ret:T,
+				doc:Documentation,
+				values:haxe.ds.StringMap<Expr>
+			} {
 				return switch follow(x.t) {
-					case TAbstract(a, tl) if (Meta.has(MetaTag.Callable, a.aMeta)): followWithCallable({t: core.Abstract.getUnderlyingType(a, tl), doc: x.doc, values: x.values});
-					case TFun(s): {args: s.args, ret: s.ret, doc: x.doc, values: x.values};
+					case TAbstract(a,
+						tl) if (Meta.has(MetaTag.Callable,
+							a.aMeta)): followWithCallable({t: core.Abstract.getUnderlyingType(a, tl), doc: x.doc, values: x.values});
+					case TFun(s): {
+							args: s.args,
+							ret: s.ret,
+							doc: x.doc,
+							values: x.values
+						};
 					case _: Error.raiseTypingError("Not a callable type: " + TPrinting.sType(TPrinting.printContext(), x.t), p);
 				};
 			}
@@ -262,10 +282,14 @@ class TyperDisplay {
 				if (keep()) acc.unshift(x);
 			}
 			var overloads = acc.length == 0 ? tl : acc;
-			var overloads:Array<SignatureInfo> = overloads.map(x -> {sig: convertFunctionSignature(ctx, x.values, x.args, x.ret), doc: x.doc});
+			var overloads:Array<SignatureInfo> = overloads.map(x -> {
+				sig: convertFunctionSignature(ctx, x.values, x.args, x.ret),
+				doc: x.doc
+			});
 			return DisplayException.sendSignaturesRaise(ctx.com, overloads, 0, displayArg, SKCall); // ?
 		}
-		function processOverloads(stat:Bool, co:Null<TClass>, map:T->T, cf:TClassField, t:T):Array<{t:T, doc:Documentation, values:haxe.ds.StringMap<Expr>}> {
+		function processOverloads(stat:Bool, co:Null<TClass>, map:T->T, cf:TClassField,
+				t:T):Array<{t:T, doc:Documentation, values:haxe.ds.StringMap<Expr>}> {
 			var isWackyOverload = !hasClassFieldFlag(cf, CfOverload);
 			function canAccess(cf:TClassField):Bool return co == null ? true : Typecore.canAccess(ctx, co, cf, stat);
 			// List.rev_map
@@ -285,7 +309,8 @@ class TyperDisplay {
 				case TInst(c = {clKind: KTypeParameter(ttp)}, _):
 					function loop(tl:Array<T>):T {
 						for (t in tl) switch follow(t) {
-							case TAbstract({aPath: {pack: ["haxe"], name: "Constructible"}}, [t]): return t;
+							case TAbstract({aPath: {pack: ["haxe"], name: "Constructible"}}, [t]):
+								return t;
 							case _:
 						}
 						return Error.raiseTypingErrorExt(Error.makeError(NoConstructor(TClassDecl(c)), p));
@@ -313,7 +338,8 @@ class TyperDisplay {
 								var e:Expr = {expr: EField(e, "trace", EFNormal), pos: p};
 								return Typecore.typeExpr(ctx, e, WithTypeTools.value);
 							case Some({errMessage: UnknownIdent("$type"), errPos: p}):
-								return displayDollarType(ctx, p, t -> ({t: t, ct: CompletionType.fromType(Display.getImportStatus.bind(ctx), t)} : TPair));
+								return displayDollarType(ctx, p,
+									t -> ({t: t, ct: CompletionType.fromType(Display.getImportStatus.bind(ctx), t)} : TPair));
 							case _:
 								throw exc;
 						}
@@ -357,8 +383,10 @@ class TyperDisplay {
 				var e1 = Typecore.typeExpr(ctx, e1, WithTypeTools.value);
 				switch follow(e1.etype) {
 					case TInst({clPath: {pack: [], name: "Array"}}, [t]):
-						var res = convertFunctionSignature(ctx, new haxe.ds.StringMap(), [{name: "index", optional: false, type: ctx.t.tint}], t);
-						DisplayException.sendSignaturesRaise(ctx.com, [{sig: res, doc: Ast.docFromString("The array index")}], 0, 0, SKCall);
+						var res = convertFunctionSignature(ctx, new haxe.ds.StringMap(),
+							[{name: "index", optional: false, type: ctx.t.tint}], t);
+						DisplayException.sendSignaturesRaise(ctx.com, [{sig: res, doc: Ast.docFromString("The array index")}], 0, 0,
+							SKCall);
 					case TAbstract(a, tl):
 						if (a.aImpl != null) a.aImpl.clBuild();
 						var sigs:Array<SignatureInfo> = [];
@@ -384,10 +412,12 @@ class TyperDisplay {
 		};
 	}
 
-	public static function displayExpr(ctx:TyperContext, eAst:Expr, e:TExpr, dk:DisplayKind, mode:AccessMode, withType:WithTypeValue, p:Pos):TExpr {
+	public static function displayExpr(ctx:TyperContext, eAst:Expr, e:TExpr, dk:DisplayKind, mode:AccessMode, withType:WithTypeValue,
+			p:Pos):TExpr {
 		function getSuperConstructor():{cf:TClassField, c:TClass} {
 			if (ctx.c.curclass.clSuper == null) return Error.raiseTypingError("Current class does not have a super", p);
-			var c = ctx.c.curclass.clSuper.cls, params = ctx.c.curclass.clSuper.params;
+			var c = ctx.c.curclass.clSuper.cls,
+				params = ctx.c.curclass.clSuper.params;
 			var fa = FieldAccessTools.getConstructorAccess(c, params, p);
 			return {cf: fa.faField, c: c};
 		}
@@ -427,7 +457,8 @@ class TyperDisplay {
 		// in order to resolve the correct overload (issue #7753).
 		var e = switch e.eexpr {
 			case TField(e1, FStatic(c, cf)): maybeExpandOverload(elTyped, e, e1, FHStatic(c), cf);
-			case TField(e1, FInstance(c, tl, cf) | FClosure({cls: c, params: tl}, cf)): maybeExpandOverload(elTyped, e, e1, FHInstance(c, tl), cf);
+			case TField(e1,
+				FInstance(c, tl, cf) | FClosure({cls: c, params: tl}, cf)): maybeExpandOverload(elTyped, e, e1, FHInstance(c, tl), cf);
 			case TField(e1, FAnon(cf) | FClosure(null, cf)): maybeExpandOverload(elTyped, e, e1, FHAnon, cf);
 			case _: e;
 		};
@@ -494,7 +525,7 @@ class TyperDisplay {
 							} catch (_:core.ds.NotFound) {
 								[];
 							};
-							[cf.cfNamePos].concat(l);
+								[cf.cfNamePos].concat(l);
 						case TField(_, FAnon(cf) | FInstance(_, _, cf) | FStatic(_, cf) | FClosure(_, cf)): [cf.cfNamePos];
 						case TLocal(v) | TVar(v, _): [v.vPos];
 						case TTypeExpr(TClassDecl(c)) if (Meta.has(MetaTag.CoreApi, c.clMeta)):
@@ -538,12 +569,16 @@ class TyperDisplay {
 					var l = so == null ? 0 : so.length;
 					var fields = context.display.DisplayFields.collect(ctx, eAst, e1, dk, withType, p);
 					var item = completionItemOfExpr(ctx, e1);
-					return DisplayException.raiseFields(fields, CRField(item, e1.epos, null, null), DisplayTypes.makeSubject(so, {pfile: e.epos.pfile, pmin: e.epos.pmax - l, pmax: e.epos.pmax}, eAst.pos));
+					return DisplayException.raiseFields(fields, CRField(item, e1.epos, null, null),
+						DisplayTypes.makeSubject(so, {pfile: e.epos.pfile, pmin: e.epos.pmax - l, pmax: e.epos.pmax}, eAst.pos));
 				}
 				switch [eAst.expr, e.eexpr] {
 					case [EField(e1, s, _), TField(e2, _)]:
 						displayFields(e1, e2, s);
-					case [EObjectDecl([{key: {name: name, pos: pn}, expr: {expr: EConst(Ident("null")), pos: pe}}]), _] if (pe.pmin == -1):
+					case [
+						EObjectDecl([{key: {name: name, pos: pn}, expr: {expr: EConst(Ident("null")), pos: pe}}]),
+						_
+					] if (pe.pmin == -1):
 						// This is what the parser emits for #8651. Bit of a dodgy heuristic but should be fine.
 						raiseToplevel(ctx, dk, withType, name, pn);
 					case _:
@@ -566,7 +601,8 @@ class TyperDisplay {
 						case t: t;
 					}
 				} catch (exc:Dynamic) {
-					if (core.ds.ExceptionTools.typing(exc) != None || Std.isOfType(exc, core.ds.NotFound)) null else throw exc;
+					if (core.ds.ExceptionTools.typing(exc) != None || Std.isOfType(exc, core.ds.NotFound)) null
+					else throw exc;
 				};
 				var keyValueIterator = try {
 					var r = ForLoop.IterationKind.trySyncIterator(ctx, "keyValueIterator", e, true);
@@ -579,9 +615,11 @@ class TyperDisplay {
 							null;
 					}
 				} catch (exc:Dynamic) {
-					if (core.ds.ExceptionTools.typing(exc) != None || Std.isOfType(exc, core.ds.NotFound)) null else throw exc;
+					if (core.ds.ExceptionTools.typing(exc) != None || Std.isOfType(exc, core.ds.NotFound)) null
+					else throw exc;
 				};
-				DisplayException.raiseFields(fields, CRField(item, e.epos, iterator, keyValueIterator), DisplayTypes.makeSubject(null, DisplayPosition.displayPosition.withPos(p)));
+				DisplayException.raiseFields(fields, CRField(item, e.epos, iterator, keyValueIterator),
+					DisplayTypes.makeSubject(null, DisplayPosition.displayPosition.withPos(p)));
 		};
 	}
 
@@ -594,16 +632,23 @@ class TyperDisplay {
 				return compiler.CompilationCache.pathEq({pack: pack, name: mt.moduleName}, ctx.m.curmod.mPath);
 			}
 			return switch item.ciKind {
-				case ITType(mt, _) if ((mt.kind == Class || mt.kind == Abstract || mt.kind == TypeAlias) && (!mt.isPrivate || isPrivateToCurrentModule(mt))):
+				case ITType(mt, _)
+					if ((mt.kind == Class || mt.kind == Abstract || mt.kind == TypeAlias)
+						&& (!mt.isPrivate || isPrivateToCurrentModule(mt))):
 					switch mt.hasConstructor {
 						case Yes: true;
 						case YesButPrivate:
-							if (Meta.has(MetaTag.PrivateAccess, ctx.f.meta)) true;
-							else {
+							if (Meta.has(MetaTag.PrivateAccess, ctx.f.meta)) true; else {
 								(switch ctx.c.curclass.clKind {
-									case KAbstractImpl({aPath: {pack: pack, name: name}}): pack.join(".") == mt.pack.join(".") && pack.length == mt.pack.length && name == mt.name;
+									case KAbstractImpl({
+										aPath: {
+											pack: pack,
+											name: name
+										}
+									}): pack.join(".") == mt.pack.join(".") && pack.length == mt.pack.length && name == mt.name;
 									case _: false;
-								}) || {
+								})
+								|| {
 									var path:GlobalTypePath = {pack: mt.pack, name: mt.name};
 									function loop(c:TClass):Bool {
 										if (compiler.CompilationCache.pathEq(c.clPath, path)) return true;
@@ -615,7 +660,12 @@ class TyperDisplay {
 						case No: false;
 						case Maybe:
 							try {
-								var mt = ctx.g.doLoadTypeDef(ctx, Globals.nullPos, {tpackage: mt.pack, tname: mt.moduleName, tsub: mt.name, tparams: []});
+								var mt = ctx.g.doLoadTypeDef(ctx, Globals.nullPos, {
+									tpackage: mt.pack,
+									tname: mt.moduleName,
+									tsub: mt.name,
+									tparams: []
+								});
 								switch resolveTypedef(mt) {
 									case TClassDecl(c): hasConstructor(c);
 									case TAbstractDecl(a):
@@ -630,7 +680,8 @@ class TyperDisplay {
 								false;
 							}
 					}
-				case ITTypeParameter({clKind: KTypeParameter(ttp)}) if (TyperBase.getConstructibleConstraint(ctx, getConstraints(ttp), Globals.nullPos) != null):
+				case ITTypeParameter({clKind: KTypeParameter(ttp)})
+					if (TyperBase.getConstructibleConstraint(ctx, getConstraints(ttp), Globals.nullPos) != null):
 					true;
 				case _: false;
 			};
@@ -655,10 +706,13 @@ class TyperDisplay {
 				var p = eAst.pos;
 				switch ctx.com.display.dmsKind {
 					case DMSignature:
-						DisplayException.sendSignaturesRaise(ctx.com, [{sig: convertFunctionSignature(ctx, new haxe.ds.StringMap(), arg, ret), doc: doc}], 0, 0, SKCall);
+						DisplayException.sendSignaturesRaise(ctx.com, [
+							{sig: convertFunctionSignature(ctx, new haxe.ds.StringMap(), arg, ret), doc: doc}
+						], 0, 0, SKCall);
 					case DMHover:
 						var t = TFun({args: arg, ret: ret});
-						DisplayException.raiseHover(CompletionItem.makeCiExpr(mk(TIdent("trace"), t, p), tpair_(t)), WithTypeTools.namedArgument("value"), p);
+						DisplayException.raiseHover(CompletionItem.makeCiExpr(mk(TIdent("trace"), t, p), tpair_(t)),
+							WithTypeTools.namedArgument("value"), p);
 					case DMDefinition | DMTypeDefinition:
 						DisplayException.sendPositionsRaise(ctx.com, []);
 					case _:
@@ -672,7 +726,8 @@ class TyperDisplay {
 				} catch (de:DisplayException) {
 					switch de.kind {
 						case DisplayFields(r = {fkind: CRTypeHint}) if (eAst.expr.match(ENew(_))):
-							var l = core.Timer.time(ctx.com.timerCtx, ["display", "toplevel", "filter ctors"], function(r) return filterCtors(ctx, r), r);
+							var l = core.Timer.time(ctx.com.timerCtx, ["display", "toplevel", "filter ctors"],
+								function(r) return filterCtors(ctx, r), r);
 							DisplayException.raiseFields(l, CRNew, r.fsubject);
 						case _:
 							throw de;
@@ -690,7 +745,10 @@ class TyperDisplay {
 		};
 		var e = switch [eAst, e.eexpr] {
 			case [_, TField(e1, FDynamic("bind"))] if (follow(e1.etype).match(TFun(_))): e1;
-			case [{expr: EField(_, "new", _)}, TFunction({tfExpr: {eexpr: TReturn(e1 = {eexpr: TNew(_)})}})]: e1;
+			case [
+				{expr: EField(_, "new", _)},
+				TFunction({tfExpr: {eexpr: TReturn(e1 = {eexpr: TNew(_)})}})
+			]: e1;
 			case _: e;
 		};
 		var isDisplayDebug = Meta.has(MetaTag.Custom(":debug.display"), ctx.f.curfield.cfMeta);
@@ -703,7 +761,8 @@ class TyperDisplay {
 			case WithType(t, _):
 				// We don't want to actually use the transformed expression which may have inserted implicit cast calls.
 				// It only matters that unification takes place.
-				try context.AbstractCast.castOrUnifyRaise(ctx, t, e, e.epos) catch (exc:Dynamic) {
+				try context.AbstractCast.castOrUnifyRaise(ctx, t, e, e.epos)
+				catch (exc:Dynamic) {
 					switch core.ds.ExceptionTools.typing(exc) {
 						case Some({errMessage: Unify(_)}):
 						case _: throw exc;
@@ -725,7 +784,8 @@ class TyperDisplay {
 		} else return f();
 	}
 
-	public static function handleStructureDisplay(ctx:TyperContext, e:Expr, fields:haxe.ds.StringMap<TClassField>, origin:ClassFieldOrigin):TExpr {
+	public static function handleStructureDisplay(ctx:TyperContext, e:Expr, fields:haxe.ds.StringMap<TClassField>,
+			origin:ClassFieldOrigin):TExpr {
 		var p = e.pos;
 		var fields = core.ds.PMap.foldi(function(_, cf:TClassField, acc:Array<TClassField>) {
 			acc.unshift(cf);
@@ -733,7 +793,8 @@ class TyperDisplay {
 		}, fields, []);
 		haxe.ds.ArraySort.sort(fields, (cf1, cf2) -> -Reflect.compare(cf1.cfPos.pmin, cf2.cfPos.pmin));
 		function makeFieldItem(cf:TClassField):CompletionItemData {
-			return CompletionItem.makeCiClassField(CompletionClassField.make(cf, CFSMember, origin, true), tpair(ctx, Ast.getValueMeta(cf.cfMeta), cf.cfType));
+			return CompletionItem.makeCiClassField(CompletionClassField.make(cf, CFSMember, origin, true),
+				tpair(ctx, Ast.getValueMeta(cf.cfMeta), cf.cfType));
 		}
 		return switch e.expr {
 			case EObjectDecl(fl):
@@ -745,8 +806,10 @@ class TyperDisplay {
 						var cf = core.ds.ArrayTools.find(fields, cf -> cf.cfName == n);
 						return cf != null ? WithTypeTools.withType(cf.cfType) : WithTypeTools.value;
 					}
-					if (DisplayPosition.displayPosition.enclosedIn(p)) subj = {name: n, p: p} else {
-						if (DisplayPosition.displayPosition.enclosedIn(e.pos)) handleDisplay(ctx, e, DKMarked, MGet, wt()) else {
+					if (DisplayPosition.displayPosition.enclosedIn(p)) subj = {name: n, p: p}
+					else {
+						if (DisplayPosition.displayPosition.enclosedIn(e.pos)) handleDisplay(ctx, e, DKMarked, MGet, wt())
+						else {
 							// If we are between the : and the expression, we don't want to use the actual expression as a filter string (issue #10414)
 							var pBetween:Pos = {pfile: p.pfile, pmin: p.pmax + 1, pmax: e.pos.pmin - 1};
 							if (DisplayPosition.displayPosition.enclosedIn(pBetween)) {
@@ -778,7 +841,8 @@ class TyperDisplay {
 	}
 
 	public static function handleEdisplay(ctx:TyperContext, e:Expr, dk:DisplayKind, mode:AccessMode, withType:WithTypeValue):TExpr {
-		function handleDisplay_(ctx:TyperContext, e:Expr, dk:DisplayKind, withType:WithTypeValue):TExpr return handleDisplay(ctx, e, dk, mode, withType);
+		function handleDisplay_(ctx:TyperContext, e:Expr, dk:DisplayKind,
+				withType:WithTypeValue):TExpr return handleDisplay(ctx, e, dk, mode, withType);
 		return switch [dk, ctx.com.display.dmsKind] {
 			case [DKCall, DMSignature | DMDefault]:
 				handleSignatureDisplay(ctx, e, withType);

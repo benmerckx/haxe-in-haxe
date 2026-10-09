@@ -113,10 +113,35 @@ extern const int rt_nsigs;
 extern void *const rt_bound_tramps[];
 extern const int32_t rt_bound_types[];
 
+// ---- threads: 1:1 (OS threads, parallel) or green (M:1, rt_thread.c)
+// Native gcc/clang/cosmocc builds run Haxe threads on OS threads (pthreads):
+// the per-thread runtime state below is thread-local. tcc has no TLS
+// (__thread/_Thread_local), so tcc builds (and -DRT_GREEN_THREADS) keep the
+// M:1 green threads, which swap these variables when they switch; under
+// Emscripten there are no threads.
+#if defined(__TINYC__) || defined(RT_GREEN_THREADS)
+#define RT_GREEN 1
+#else
+#define RT_GREEN 0
+#endif
+#if RT_GREEN || defined(__EMSCRIPTEN__)
+#define RT_MT 0
+#define RT_TLS
+#else
+#define RT_MT 1
+// local-exec: one %fs-relative access, as cheap as a global (an executable,
+// never a shared library)
+#define RT_TLS __thread __attribute__((tls_model("local-exec")))
+#endif
+
 // ---- allocation
-extern char *rt_young_start, *rt_young_ptr, *rt_young_limit;
-extern void **rt_sp; // shadow stack top
-extern void **rt_stack_base; // shadow stack bottom (of the running thread)
+// The nursery is [rt_young_start, rt_young_end) (fixed between collections);
+// each thread bumps through its own chunk of it [rt_young_ptr, rt_young_limit)
+// (a TLAB; with one thread, the whole free nursery).
+extern char *rt_young_start, *rt_young_end;
+extern RT_TLS char *rt_young_ptr, *rt_young_limit;
+extern RT_TLS void **rt_sp; // shadow stack top
+extern RT_TLS void **rt_stack_base; // shadow stack bottom (of the running thread)
 extern void **rt_globals;
 void *rt_alloc_slow(uint64_t header, uint32_t bytes);
 void rt_write_barrier(void *obj, void **slot, void *val);
@@ -163,9 +188,11 @@ static inline void *rt_alloc_init(uint32_t nslots, uint32_t tindex, uint32_t kin
 static inline void rt_set_ptr(void *obj, void **slot, void *val) {
 	void *prev = *slot;
 	*slot = val;
-	if ((char *)obj < rt_young_start || (char *)obj >= rt_young_limit)
-		if ((char *)val >= rt_young_start && (char *)val < rt_young_limit)
-			if ((char *)prev < rt_young_start || (char *)prev >= rt_young_limit) rt_write_barrier(obj, slot, val);
+	// (with OS threads the slot's entry may be in another thread's remembered
+	// set: all of them are processed by the next minor collection)
+	if ((char *)obj < rt_young_start || (char *)obj >= rt_young_end)
+		if ((char *)val >= rt_young_start && (char *)val < rt_young_end)
+			if ((char *)prev < rt_young_start || (char *)prev >= rt_young_end) rt_write_barrier(obj, slot, val);
 }
 
 // natives keep references across allocations in shadow-stack slots
@@ -179,7 +206,7 @@ static inline void rt_set_ptr(void *obj, void **slot, void *val) {
 // can be hoisted above the calls that throw. setjmp is returns_twice, which
 // GCC treats conservatively. _setjmp does not save the signal mask.
 #include <setjmp.h>
-#if defined(__EMSCRIPTEN__) || defined(__TINYC__)
+#if defined(__EMSCRIPTEN__) || defined(__TINYC__) || defined(__SANITIZE_THREAD__) // TSan intercepts setjmp/longjmp
 #define RT_SETJMP(b) setjmp(b)
 #define RT_LONGJMP(b) longjmp(b, 1)
 #else
@@ -192,8 +219,8 @@ typedef struct rt_handler {
 	struct rt_handler *prev;
 	void **sp;
 } rt_handler;
-extern rt_handler *rt_hcur;
-extern void *rt_exn;
+extern RT_TLS rt_handler *rt_hcur;
+extern RT_TLS void *rt_exn;
 #if defined(__cplusplus) && defined(__EMSCRIPTEN__)
 }
 struct rt_cxx_exn {};
@@ -215,11 +242,18 @@ __attribute__((noreturn)) void rt_throw(void *v);
 #endif
 __attribute__((noreturn)) void hx_throw_str(const char *msg);
 
-// ---- green threads (rt_thread.c): M:1, switched only at blocking points.
-// Switching swaps rt_sp, rt_stack_base, rt_hcur and rt_exn; with one thread
-// (rt_nthreads == 1) the blocking natives keep their plain blocking calls.
+// ---- threads (rt_thread.c)
+// rt_nthreads: live Haxe threads. With one, the blocking natives keep their
+// plain blocking calls (nothing else runs; with green threads nothing else
+// can run anyway while they block).
 extern int32_t rt_nthreads;
-void rt_threads_scan(void *(*fwd)(void *)); // GC: roots of the threads not running
+#if RT_MT
+// a heuristic (whether other threads may run): a relaxed load, written atomically under the world lock
+#define RT_NTHREADS() __atomic_load_n(&rt_nthreads, __ATOMIC_RELAXED)
+#else
+#define RT_NTHREADS() rt_nthreads
+#endif
+void rt_threads_scan(void *(*fwd)(void *)); // GC: roots of the threads (stacks of the others, entry closures, Tls values)
 // wait until fd is readable (write 0) or writable (write 1), letting other
 // threads run: 1 ready, 0 timeout (seconds; < 0: none), -1 the fd was closed meanwhile
 int rt_wait_fd(int fd, int write, double timeout);
@@ -229,6 +263,36 @@ void rt_preempt(void); // lets other runnable threads (and due timers/descriptor
 void rt_fd_closed(int fd); // before close(fd): waiters on fd fail instead of polling a reused number
 void rt_run_main(void (*body)(void)); // runs the program's main on a large stack
 extern void (*rt_spawn_hook)(void); // called after a thread is spawned (rt_uv.c: a running uv loop gives way)
+// Blocking natives (1:1 threads): between rt_blocking_enter and
+// rt_blocking_leave the thread is in a safe region, where a collection may
+// run (and move objects) without it: it must hold no heap pointer other than
+// in its shadow-stack slots (read them again after leaving) and must not
+// touch the heap. No-ops with green threads (the scheduler switches there).
+#if RT_MT
+void rt_blocking_enter(void);
+void rt_blocking_leave(void);
+#else
+#define rt_blocking_enter() ((void)0)
+#define rt_blocking_leave() ((void)0)
+#endif
+#define RT_BLOCKING(stmt) do { rt_blocking_enter(); stmt; rt_blocking_leave(); } while (0)
+
+// Leaf locks of the runtime tables (no allocation, no safepoint while held):
+// pthread mutexes taken only once a second thread was ever started.
+#if RT_MT
+#include <pthread.h>
+extern int rt_mt; // set (forever) when the second thread is spawned
+typedef pthread_mutex_t rt_lock_t;
+#define RT_LOCK_INIT PTHREAD_MUTEX_INITIALIZER
+#define rt_lock(l) do { if (rt_mt) pthread_mutex_lock(l); } while (0)
+#define rt_unlock(l) do { if (rt_mt) pthread_mutex_unlock(l); } while (0)
+#else
+#define rt_mt 0
+typedef int rt_lock_t;
+#define RT_LOCK_INIT 0
+#define rt_lock(l) ((void)(l))
+#define rt_unlock(l) ((void)(l))
+#endif
 
 // ---- Haxe Int semantics: wrapping 32-bit arithmetic
 #define IADD(a, b) ((int32_t)((uint32_t)(a) + (uint32_t)(b)))
@@ -297,9 +361,19 @@ typedef struct {
 	void *fn; // method implementation
 	int32_t sig; // method's bound signature
 } rt_icache;
-void rt_icache_fill(void *o, int32_t fid, rt_icache *c);
+// With several OS threads, a filled entry is never rewritten (a reader could
+// see half of it): it is filled once (t: 0 -> busy -> type index, published
+// with release order), and a miss on a filled entry looks the field up into a
+// thread-local entry. Before the second thread starts, entries are refilled
+// on each miss as with one thread.
+rt_icache *rt_icache_miss(void *o, int32_t fid, rt_icache *c);
+#define RT_IC_BUSY 0xFFFFFFFFu
 static inline rt_icache *rt_ic(void *o, int32_t fid, rt_icache *c) {
-	if (__builtin_expect(c->t != TINDEX(o), 0)) rt_icache_fill(o, fid, c);
+#if RT_MT
+	if (__builtin_expect(__atomic_load_n(&c->t, __ATOMIC_ACQUIRE) != TINDEX(o), 0)) return rt_icache_miss(o, fid, c);
+#else
+	if (__builtin_expect(c->t != TINDEX(o), 0)) return rt_icache_miss(o, fid, c);
+#endif
 	return c;
 }
 void *hx_anon_get_slow(void *o, int32_t fid); // boxed

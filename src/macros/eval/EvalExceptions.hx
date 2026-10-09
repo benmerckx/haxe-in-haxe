@@ -117,8 +117,10 @@ class EvalExceptions {
 				acc.push(env2);
 				if (env == env2) return acc;
 				switch env2.envParent {
-					case null: return Globals.die("", "EvalExceptions.buildExceptionStack");
-					case env3: env2 = env3;
+					case null:
+						return Globals.die("", "EvalExceptions.buildExceptionStack");
+					case env3:
+						env2 = env3;
 				}
 			}
 		}
@@ -262,7 +264,8 @@ class EvalExceptions {
 							case _: Error.raiseError(Error.makeError(Custom(s.sstring), p, stack.map(e -> Error.makeError(e.msg, e.pos))));
 						}
 					case v:
-						Error.raiseTypingError('Invalid exception value where string was expected: ${EvalPrinting.sValue(0, v).sstring}', Globals.nullPos);
+						Error.raiseTypingError('Invalid exception value where string was expected: ${EvalPrinting.sValue(0, v).sstring}',
+							Globals.nullPos);
 				}
 			} else {
 				var stack = getStack(ctx);

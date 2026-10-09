@@ -109,7 +109,8 @@ class MacroContext {
 		}
 	}
 
-	public static function macroTimer<A, R>(timerCtx:core.Timer.TimerContext, level:Int, s:Array<String>, identifier:Null<String>, f:A->R, arg:A):R {
+	public static function macroTimer<A, R>(timerCtx:core.Timer.TimerContext, level:Int, s:Array<String>, identifier:Null<String>, f:A->R,
+			arg:A):R {
 		var id = Timer.determineId(level, ["macro"], s, identifier);
 		return Timer.time(timerCtx, id, f, arg);
 	}
@@ -155,8 +156,8 @@ class MacroContext {
 		var timerLevel = Timer.levelFromDefine(com.defines, Define.MacroTimes);
 		inline function parseMetadata(s:String, p:Pos):Metadata {
 			try {
-				return switch ParserEntry.parseString(ParserConfig.defaultConfig(com.defines), @:privateAccess syntax.Grammar.parseMeta, s, Globals.nullPos,
-					parseErrorCallback, false) {
+				return switch ParserEntry.parseString(ParserConfig.defaultConfig(com.defines), @:privateAccess syntax.Grammar.parseMeta, s,
+					Globals.nullPos, parseErrorCallback, false) {
 					case ParseSuccess(meta, _): meta;
 					case ParseError(_, _, _): Error.raiseTypingError("Malformed metadata string", p);
 				}
@@ -177,8 +178,8 @@ class MacroContext {
 			getMacroStack: function() {
 				var envs = macros.eval.EvalContext.callStack(macros.eval.EvalContext.getEval(macros.eval.EvalContext.getCtx()));
 				var envs = envs.length > 0 ? envs.slice(1) : envs; // Skip call to getMacroStack()
-				return envs.map(function(env:macros.eval.EvalContext.Env):Pos
-					return {pfile: macros.eval.EvalHash.revHash(env.envInfo.pfile), pmin: env.envLeavePmin, pmax: env.envLeavePmax});
+				return envs.map(function(env:macros.eval.EvalContext.Env):Pos return
+					{pfile: macros.eval.EvalHash.revHash(env.envInfo.pfile), pmin: env.envLeavePmin, pmax: env.envLeavePmax});
 			},
 			initMacrosDone: () -> Type.enumIndex(com.stage) >= Type.enumIndex(CInitMacrosDone),
 			getType: function(s) return badStage(),
@@ -241,7 +242,8 @@ class MacroContext {
 
 				try {
 					var r = switch ParserEntry.parseExprString(ParserConfig.fileParserConfig(com, p.pfile), s, p, parseErrorCallback, inl) {
-						case ParseSuccess(data, {pdWasDisplayFile: true}) if (inl): data; // ignore errors when inline-parsing in display file
+						case ParseSuccess(data,
+							{pdWasDisplayFile: true}) if (inl): data; // ignore errors when inline-parsing in display file
 						case ParseSuccess(data, _): data;
 						case ParseError(_): macros.eval.EvalContext.excString("Invalid expression");
 					};
@@ -259,7 +261,8 @@ class MacroContext {
 				}
 			},
 			parse: function(entry, s) {
-				return switch ParserEntry.parseString(ParserConfig.defaultConfig(com.defines), entry, s, Globals.nullPos, parseErrorCallback, false) {
+				return switch ParserEntry.parseString(ParserConfig.defaultConfig(com.defines), entry, s, Globals.nullPos,
+					parseErrorCallback, false) {
 					case ParseSuccess(r, _): r;
 					case ParseError(_, info, _): Parser.error(info.message, info.pos);
 				};
@@ -287,7 +290,11 @@ class MacroContext {
 			moduleDependency: function(mpath, file) badStage(),
 			currentModule: function() return nullModule,
 			formatString: function(s, p) {
-				return context.FormatString.formatString(ParserConfig.fileParserConfig(com, p.pfile), s, p, function(e:ExprDef, p:Pos):Expr return {expr: e, pos: p});
+				return context.FormatString.formatString(ParserConfig.fileParserConfig(com, p.pfile), s, p,
+					function(e:ExprDef, p:Pos):Expr return {
+						expr: e,
+						pos: p
+					});
 			},
 			castOrUnify: function(t, e, p) return badStage(),
 			addGlobalMetadata: function(s1, s2, config, p) {
@@ -319,7 +326,8 @@ class MacroContext {
 			getHxbWriterConfig: function() {
 				if (com.hxbWriterConfig != null)
 					// HxbWriterConfigWriterEval.write_writer_config config
-					return macros.eval.EvalContext.excString("Compiler.getHxbWriterConfig is not supported by haxe-in-haxe (no HxbWriterConfig writer over Eval values)");
+					return
+						macros.eval.EvalContext.excString("Compiler.getHxbWriterConfig is not supported by haxe-in-haxe (no HxbWriterConfig writer over Eval values)");
 				else
 					return VNull;
 			},
@@ -343,8 +351,9 @@ class MacroContext {
 	public static function makeMacroApi(ctx:TyperContext, mctx:TyperContext, p:Pos):CompilerApi {
 		inline function parseMetadata(s:String, p:Pos):Metadata {
 			try {
-				return switch ParserEntry.parseString(ParserConfig.defaultConfig(mctx.com.defines), @:privateAccess syntax.Grammar.parseMeta, s, Globals.nullPos,
-					parseErrorCallback, false) {
+				return switch ParserEntry.parseString(ParserConfig.defaultConfig(mctx.com.defines),
+					@:privateAccess syntax.Grammar.parseMeta, s,
+					Globals.nullPos, parseErrorCallback, false) {
 					case ParseSuccess(meta, _): meta;
 					case ParseError(_, _, _): Error.raiseTypingError("Malformed metadata string", p);
 				}
@@ -365,7 +374,8 @@ class MacroContext {
 				var path = AstTools.parsePath(s);
 				var rpack = path.pack.copy();
 				rpack.reverse();
-				var tp = if (rpack.length > 0 && rpack[0].length > 0 && rpack[0].charCodeAt(0) >= 'A'.code && rpack[0].charCodeAt(0) <= 'Z'.code) {
+				var tp = if (rpack.length > 0 && rpack[0].length > 0 && rpack[0].charCodeAt(0) >= 'A'.code
+					&& rpack[0].charCodeAt(0) <= 'Z'.code) {
 					var sl = rpack.slice(1);
 					sl.reverse();
 					mkTypePath({pack: sl, name: rpack[0]}, path.name);
@@ -542,8 +552,12 @@ class MacroContext {
 					ctx.com.cs.taintModule(mpath, DefineType);
 					var mdep = mdep == null ? ctx.m.curmod : ModuleTyping.loadModule(ctx, AstTools.parsePath(mdep), pos, MDepFromMacro);
 					var mnew = ModuleTyping.typeModule(ctx.com, ctx.g, mpath,
-						ctx.com.partScope.fileKeys.generateVirtual(mpath, ctx.com.partScope.compilationStep), [{definition: tdef, pos: pos}], pos,
-						hasNativeMeta);
+						ctx.com.partScope.fileKeys.generateVirtual(mpath, ctx.com.partScope.compilationStep), [
+						{
+							definition: tdef,
+							pos: pos
+						}
+					], pos, hasNativeMeta);
 					mnew.mExtra.mKind = isMacro ? MMacro : MFake;
 					addDependency(mnew, mdep, MDepFromMacro);
 					addDependency(mdep, mnew, MDepFromMacroDefine);
@@ -554,18 +568,24 @@ class MacroContext {
 			// if we are adding a class which has a macro field, we also have to add it to the macro context (issue #1497)
 			if (!ctx.com.isMacroContext)
 				switch tdef {
-					case EClass(c) if (Lambda.exists(c.data, function(cff) return Lambda.exists(cff.cffAccess, function(a) return a.access == AMacro))):
+					case EClass(c)
+						if (Lambda.exists(c.data,
+							function(cff) return Lambda.exists(cff.cffAccess, function(a) return a.access == AMacro))):
 						add(true, mctx);
 					case _:
 				}
 		};
 		api.defineModule = function(m, types, imports, usings) {
 			var types:Array<TypeDecl> = types.map(function(v):TypeDecl {
-				var d = try MacroApiImpl.decodeTypeDef(v) catch (_:InvalidExpr) macros.eval.EvalContext.excString("Invalid type definition");
+				var d = try MacroApiImpl.decodeTypeDef(v) catch (_:InvalidExpr)
+					macros.eval.EvalContext.excString("Invalid type definition");
 				return {definition: d.def, pos: d.pos};
 			});
 			var pos = types.length == 0 ? Globals.nullPos : types[0].pos;
-			var imports:Array<TypeDecl> = imports.map(function(i):TypeDecl return {definition: EImport({path: i.path, mode: i.mode}), pos: pos});
+			var imports:Array<TypeDecl> = imports.map(function(i):TypeDecl return {
+				definition: EImport({path: i.path, mode: i.mode}),
+				pos: pos
+			});
 			var usings:Array<TypeDecl> = usings.map(function(tp):TypeDecl {
 				var sl = tp.tpackage.concat([tp.tname]).concat(tp.tsub == null ? [] : [tp.tsub]);
 				return {definition: EUsing(sl.map(function(s):PlacedName return {name: s, pos: Globals.nullPos})), pos: pos};
@@ -580,8 +600,8 @@ class MacroContext {
 					ModuleTyping.typeTypesIntoModule(ctx.com, ctx.g, ctx.m.curmod, types, pos);
 			} catch (_:NotFound) {
 				ctx.com.cs.taintModule(mpath, DefineModule);
-				var mnew = ModuleTyping.typeModule(ctx.com, ctx.g, mpath, ctx.com.partScope.fileKeys.generateVirtual(mpath, ctx.com.partScope.compilationStep),
-					types, pos);
+				var mnew = ModuleTyping.typeModule(ctx.com, ctx.g, mpath,
+					ctx.com.partScope.fileKeys.generateVirtual(mpath, ctx.com.partScope.compilationStep), types, pos);
 				mnew.mExtra.mKind = MFake;
 				addDependency(mnew, ctx.m.curmod, MDepFromMacro);
 				addDependency(ctx.m.curmod, mnew, MDepFromMacroDefine);
@@ -607,8 +627,10 @@ class MacroContext {
 					return true;
 				} catch (err:TypingError) {
 					switch err.error.errMessage {
-						case Unify(_): return false;
-						case _: throw err;
+						case Unify(_):
+							return false;
+						case _:
+							throw err;
 					}
 				}
 			});
@@ -708,7 +730,7 @@ class MacroContext {
 			/*
 				some filters here might cause side effects that would break compilation server.
 				let's save the minimal amount of information we need
-			*/
+			 */
 			inline function minimalRestore(t:ModuleType):Void {
 				if (tModule(t).mExtra.mProcessed == 0)
 					tModule(t).mExtra.mProcessed = mctx.com.partScope.compilationStep;
@@ -753,12 +775,17 @@ class MacroContext {
 				{name: "handle_abstract_casts", run: context.AbstractCast.handleAbstractCasts},
 				{name: "local_statics", run: filters.safe.LocalStatic.run},
 				{name: "Exceptions", run: function(scom, e) return filters.exception.Exceptions.filter(ectx, scom)(e)},
-				{name: "captured_vars", run: function(scom, e) return filters.safe.CapturedVars.capturedVars(scom, mctx.com.localWrapper, false, e)},
+				{
+					name: "captured_vars",
+					run: function(scom, e) return filters.safe.CapturedVars.capturedVars(scom, mctx.com.localWrapper, false, e)
+				},
 			];
 			var typeFilters:Array<context.SafeCom.SafeContext->ModuleType->Void> = [
 				function(_, mt) filters.FiltersCommon.removeGenericBase(mt),
 				function(scom, mt) filters.exception.SaveStacks.patchConstructors(ectx, scom)(mt),
-				function(_, mt) filters.safe.AddFieldInits.addFieldInits(mctx.c.curclass.clPath, filters.RenameVars.init(mctx.com.config, mctx.com.types), scom, mt),
+				function(_,
+						mt) filters.safe.AddFieldInits.addFieldInits(mctx.c.curclass.clPath,
+						filters.RenameVars.init(mctx.com.config, mctx.com.types), scom, mt),
 				function(_, mt) filters.Filters.updateCacheDependencies(false, scom, mt),
 				function(_, mt) minimalRestore(mt),
 				function(_, mt) maybeApplyNativePaths(mt),
@@ -866,7 +893,8 @@ class MacroContext {
 		}
 	}
 
-	public static function loadMacroModule(mctx:TyperContext, com:CommonContext, cpath:GlobalTypePath, display:Bool, p:Pos):{module:ModuleDef, restore:Void->Void} {
+	public static function loadMacroModule(mctx:TyperContext, com:CommonContext, cpath:GlobalTypePath, display:Bool,
+			p:Pos):{module:ModuleDef, restore:Void->Void} {
 		var m = try com.moduleLut.getTypeLut().find(cpath) catch (_:NotFound) cpath;
 		// Temporarily enter display mode while typing the macro.
 		var old = mctx.com.display;
@@ -876,7 +904,8 @@ class MacroContext {
 		return {module: mloaded, restore: function() mctx.com.display = old};
 	}
 
-	public static function loadMacroPrimePrime(com:CommonContext, mctx:TyperContext, display:Bool, cpath:GlobalTypePath, fname:String, p:Pos):LoadedMacro {
+	public static function loadMacroPrimePrime(com:CommonContext, mctx:TyperContext, display:Bool, cpath:GlobalTypePath, fname:String,
+			p:Pos):LoadedMacro {
 		var mint = macros.eval.EvalContext.getCtx();
 		var timerLevel = Timer.levelFromDefine(com.defines, Define.MacroTimes);
 		try {
@@ -924,14 +953,22 @@ class MacroContext {
 						case TClassDecl(c):
 							Finalization.finalize(mctx);
 							cl = c;
-							meth = c.clStatics.exists(fname) ? c.clStatics.get(fname) : Error.raiseTypingError("Method " + fname + " not found on class "
-								+ Globals.sTypePath(cpath), p);
+							meth = c.clStatics.exists(fname) ? c.clStatics.get(fname) : Error.raiseTypingError("Method " + fname
+								+ " not found on class " + Globals.sTypePath(cpath), p);
 						case _:
 							Error.raiseTypingError("Macro should be called on a class", p);
 					}
 				}
 				var meth:LoadedMacro = switch follow(meth.cfType) {
-					case TFun(sig): {meth: {args: sig.args, ret: sig.ret, cls: cl, field: meth}, module: mloaded};
+					case TFun(sig): {
+							meth: {
+								args: sig.args,
+								ret: sig.ret,
+								cls: cl,
+								field: meth
+							},
+							module: mloaded
+						};
 					case _: Error.raiseTypingError("Macro call should be a method", p);
 				};
 				restore();
@@ -951,9 +988,19 @@ class MacroContext {
 		return loadMacroPrimePrime(ctx.com, getMacroContext(ctx), display, cpath, f, p).meth;
 	}
 
-	public static function doCallMacro(com:CommonContext, api:CompilerApi, cpath:GlobalTypePath, name:String, args:Array<Value>, p:Pos):Null<Value> {
+	public static function doCallMacro(com:CommonContext, api:CompilerApi, cpath:GlobalTypePath, name:String, args:Array<Value>,
+			p:Pos):Null<Value> {
 		if (com.verbose)
-			Common.log(com, "Calling macro " + Globals.sTypePath(cpath) + "." + name + " (" + p.pfile + ":" + syntax.Lexer.getErrorLine(p) + ")");
+			Common.log(com,
+				"Calling macro "
+				+ Globals.sTypePath(cpath)
+				+ "."
+				+ name
+				+ " ("
+				+ p.pfile
+				+ ":"
+				+ syntax.Lexer.getErrorLine(p)
+				+ ")");
 		com.requestScope.stats.sMacrosCalled++;
 		var timerLevel = Timer.levelFromDefine(com.defines, Define.MacroTimes);
 		var ictx = macros.eval.EvalContext.getCtx();
@@ -965,8 +1012,12 @@ class MacroContext {
 		return r;
 	}
 
-	public static function loadMacro(ctx:TyperContext, com:CommonContext, mctx:TyperContext, api:CompilerApi, display:Bool, cpath:GlobalTypePath, f:String,
-			p:Pos):{mctx:TyperContext, meth:MacroMethod, call:Array<Value>->Null<Value>} {
+	public static function loadMacro(ctx:TyperContext, com:CommonContext, mctx:TyperContext, api:CompilerApi, display:Bool,
+			cpath:GlobalTypePath, f:String, p:Pos):{
+		mctx:TyperContext,
+		meth:MacroMethod,
+		call:Array<Value>->Null<Value>
+	} {
 		var loaded = loadMacroPrimePrime(com, mctx, display, cpath, f, p);
 		var meth = loaded.meth, mloaded = loaded.module;
 		var cpath = meth.cls.clPath;
@@ -981,13 +1032,16 @@ class MacroContext {
 		var mctx = getMacroContext(ctx);
 		var api = makeMacroApi(ctx, mctx, p);
 		var loaded = loadMacro(ctx, ctx.com, mctx, api, mode == MDisplay, cpath, f, p);
-		var mctx = loaded.mctx, mret = loaded.meth.ret, mfield = loaded.meth.field, callMacro = loaded.call;
+		var mctx = loaded.mctx,
+			mret = loaded.meth.ret,
+			mfield = loaded.meth.field,
+			callMacro = loaded.call;
 		var margs = loaded.meth.args;
 		var margs = {
 			/*
 				Replace "rest:haxe.Rest<Expr>" in macro signatures with "rest:Array<Expr>".
 				This allows to avoid handling special cases for rest args in macros during typing.
-			*/
+			 */
 			if (margs.length > 0) {
 				var last = margs[margs.length - 1];
 				switch follow(last.type) {
@@ -1007,7 +1061,9 @@ class MacroContext {
 			case MExpr:
 				Typecore.unify(mctx, mret, expr, mpos);
 			case MBuild:
-				var params = [TPType(makePtpTh(AstTools.mkTypePath(["haxe", "macro"], "Expr", null, "Field"), Globals.nullPos))];
+				var params = [
+					TPType(makePtpTh(AstTools.mkTypePath(["haxe", "macro"], "Expr", null, "Field"), Globals.nullPos))
+				];
 				var ctfields = AstTools.mkTypePath([], "Array", params);
 				var tfields = Typeload.loadInstance(mctx, makePtp(ctfields, p), ParamNormal, LoadNormal);
 				Typecore.unify(mctx, mret, tfields, mpos);
@@ -1031,7 +1087,7 @@ class MacroContext {
 		}
 		/*
 			if the function's last argument is of Array<Expr>, split the argument list and use [] for unify_call_args
-		*/
+		 */
 		var split = {
 			var lastIsExprArray = margs.length > 0 && switch margs[margs.length - 1].type {
 				case TInst({clPath: {pack: [], name: "Array"}}, [e]):
@@ -1074,7 +1130,7 @@ class MacroContext {
 		var args = {
 			/*
 				force default parameter types to haxe.macro.Expr, and if success allow to pass any value type since it will be encoded
-			*/
+			 */
 			var eargs:Array<{arg:{name:String, optional:Bool, type:T}, kind:MacroArgType}> = margs.map(function(a):{arg:{name:String, optional:Bool, type:T}, kind:MacroArgType} {
 				try {
 					Typecore.unifyRaise(a.type, expr, p);
@@ -1097,7 +1153,7 @@ class MacroContext {
 			/*
 				this is quite tricky here : we want to use unify_call_args which will type our AST expr
 				but we want to be able to get it back after it's been padded with nulls
-			*/
+			 */
 			var index = -1;
 			var constants = el.map(function(e:Expr):Expr {
 				var p = e.pos;
@@ -1179,16 +1235,21 @@ class MacroContext {
 						} else {
 							var ct = makePtpTh(AstTools.mkTypePath(["haxe", "macro"], "Expr", null, "Field"), Globals.nullPos);
 							var t = Typeload.loadComplexType(mctx, false, LoadNormal, ct);
-							macros.eval.EvalDecode.decodeArray(v).map(function(f) return safeDecode(ctx.com, f, "Field", t, p, function() return MacroApiImpl.decodeField(f)));
+							macros.eval.EvalDecode.decodeArray(v)
+								.map(function(f) return safeDecode(ctx.com, f, "Field", t, p,
+									function() return MacroApiImpl.decodeField(f)));
 						};
-						return MSuccess({expr: EVars([mkEvar({name: "fields", pos: Globals.nullPos}, {type: CTAnonymous(fields), pos: p})]), pos: p});
+						return MSuccess({
+							expr: EVars([
+								mkEvar({name: "fields", pos: Globals.nullPos}, {type: CTAnonymous(fields), pos: p})
+							]),
+							pos: p
+						});
 					};
 				case MMacroType:
 					expected = "ComplexType";
 					process = function() {
-						var t = if (isVNull(v))
-							Typecore.spawnMonomorph(ctx, p)
-						else try {
+						var t = if (isVNull(v)) Typecore.spawnMonomorph(ctx, p) else try {
 							var ct = MacroApiImpl.decodeCtype(v);
 							Typeload.loadComplexType(ctx, false, LoadNormal, ct);
 						} catch (_:InvalidExpr) {
@@ -1206,13 +1267,19 @@ class MacroContext {
 		return e;
 	}
 
-	public static function callMacro(mctx:TyperContext, args:Array<Expr>, margs:Array<{name:String, optional:Bool, type:T}>, call:Array<Value>->Null<Value>,
-			p:Pos):Null<Value> {
+	public static function callMacro(mctx:TyperContext, args:Array<Expr>, margs:Array<{name:String, optional:Bool, type:T}>,
+			call:Array<Value>->Null<Value>, p:Pos):Null<Value> {
 		var el = CallUnification.unifyCallArgs(mctx, args, margs, tDynamic, p, false, false, false);
-		return call(el.map(function(e) return try MacroApiImpl.makeConst(e) catch (_:Exit) Error.raiseTypingError("Argument should be a constant", e.epos)));
+		return call(el.map(function(e) return try MacroApiImpl.makeConst(e) catch (_:Exit)
+			Error.raiseTypingError("Argument should be a constant", e.epos)));
 	}
 
-	public static function resolveInitMacro(com:CommonContext, e:String):{path:GlobalTypePath, meth:String, args:Array<Expr>, pos:Pos} {
+	public static function resolveInitMacro(com:CommonContext, e:String):{
+		path:GlobalTypePath,
+		meth:String,
+		args:Array<Expr>,
+		pos:Pos
+	} {
 		var p = Globals.fakePos("--macro " + e);
 		var e = try {
 			if (e.length == 0)
@@ -1250,7 +1317,12 @@ class MacroContext {
 					meth = l[0];
 				} else
 					return Error.raiseTypingError("Invalid macro call", p);
-				return {path: path, meth: meth, args: args, pos: p};
+				return {
+					path: path,
+					meth: meth,
+					args: args,
+					pos: p
+				};
 			case _:
 				return Error.raiseTypingError("Invalid macro call", p);
 		}

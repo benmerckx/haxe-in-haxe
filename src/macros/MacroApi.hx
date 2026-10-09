@@ -268,7 +268,6 @@ class MacroApi {
 class MacroApiImpl {
 	// ---------------------------------------------------------------------- //
 	// InterpImpl (Eval)
-
 	static final vnull:Value = VNull;
 
 	static inline function vint(i:Int):Value return VInt32(i);
@@ -302,7 +301,8 @@ class MacroApiImpl {
 
 	static inline function encodePos(p:Pos):Value return macros.eval.EvalEncode.encodePos(p);
 
-	static inline function encodeStringMap<A>(convert:A->Value, m:StringMap<A>):Value return macros.eval.EvalEncode.encodeStringMap(convert, m);
+	static inline function encodeStringMap<A>(convert:A->Value,
+			m:StringMap<A>):Value return macros.eval.EvalEncode.encodeStringMap(convert, m);
 
 	static inline function encodeTdecl(t:ModuleType):Value return macros.eval.EvalEncode.encodeTdecl(t);
 
@@ -335,7 +335,8 @@ class MacroApiImpl {
 
 	static inline function decodeEnumWithPos(v:Value):DecodedEnumWithPos return macros.eval.EvalDecode.decodeEnumWithPos(v);
 
-	static inline function encodeRef<A>(v:A, convert:A->Value, tostr:Void->String):Value return macros.eval.EvalEncode.encodeRef(v, convert, tostr);
+	static inline function encodeRef<A>(v:A, convert:A->Value,
+			tostr:Void->String):Value return macros.eval.EvalEncode.encodeRef(v, convert, tostr);
 
 	static inline function decodeRef(v:Value):Dynamic return macros.eval.EvalDecode.decodeRef(v);
 
@@ -373,7 +374,8 @@ class MacroApiImpl {
 	/** OCaml structural equality on positions. **/
 	static function posEq(a:Pos, b:Pos):Bool return a.pfile == b.pfile && a.pmin == b.pmin && a.pmax == b.pmax;
 
-	static function isNotFound(e:Dynamic):Bool return Std.isOfType(e, NotFound) || (Std.isOfType(e, String) && (e : String) == "Not_found");
+	static function isNotFound(e:Dynamic):Bool return Std.isOfType(e, NotFound)
+		|| (Std.isOfType(e, String) && (e : String) == "Not_found");
 
 	static function notSupported(what:String):Dynamic throw new core.ds.Failure(what + " is not supported by haxe-in-haxe");
 
@@ -382,7 +384,8 @@ class MacroApiImpl {
 
 	static function vnullOr<A>(f:A->Value, v:Null<A>):Value return v == null ? vnull : f(v);
 
-	static function encodeEnum(k:EnumType, tag:Int, vl:Array<Value>, ?pos:Pos):Value return macros.eval.EvalEncode.encodeEnum(k, pos, tag, vl);
+	static function encodeEnum(k:EnumType, tag:Int, vl:Array<Value>,
+			?pos:Pos):Value return macros.eval.EvalEncode.encodeEnum(k, pos, tag, vl);
 
 	public static function encodeStringLiteralKind(qs:StringLiteralKind):Value {
 		var tag = switch qs {
@@ -460,7 +463,10 @@ class MacroApiImpl {
 
 	/** Globals.path **/
 	public static function encodePath(p:GlobalTypePath):Value {
-		return encodeObj([fld("pack", encodeArray(p.pack.map(encodeString))), fld("name", encodeString(p.name)),]);
+		return encodeObj([
+			fld("pack", encodeArray(p.pack.map(encodeString))),
+			fld("name", encodeString(p.name)),
+		]);
 	}
 
 	/** Ast.placed_type_path **/
@@ -518,7 +524,12 @@ class MacroApiImpl {
 		var kind = switch f.cffKind {
 			case FVar(t, e): encodeEnum(IField, 0, [vnullOr(encodeCtype, t), vnullOr(encodeExpr, e)]);
 			case FFun(f): encodeEnum(IField, 1, [encodeFun(f)]);
-			case FProp(get, set, t, e): encodeEnum(IField, 2, [encodePlacedName(get), encodePlacedName(set), vnullOr(encodeCtype, t), vnullOr(encodeExpr, e)]);
+			case FProp(get, set, t, e): encodeEnum(IField, 2, [
+					encodePlacedName(get),
+					encodePlacedName(set),
+					vnullOr(encodeCtype, t),
+					vnullOr(encodeExpr, e)
+				]);
 		}
 		return encodeObj([
 			fld("name", encodePlacedName(f.cffName)),
@@ -590,7 +601,8 @@ class MacroApiImpl {
 			case DMImplementation: encodeEnum(IDisplayMode, 4, []);
 			case DMPackage: encodeEnum(IDisplayMode, 5, []);
 			case DMHover: encodeEnum(IDisplayMode, 6, []);
-			case DMUsage(withDefinition, findDescendants, findBase): encodeEnum(IDisplayMode, 7, [vbool(withDefinition), vbool(findDescendants), vbool(findBase)]);
+			case DMUsage(withDefinition, findDescendants,
+				findBase): encodeEnum(IDisplayMode, 7, [vbool(withDefinition), vbool(findDescendants), vbool(findBase)]);
 			case DMModuleSymbols(null): encodeEnum(IDisplayMode, 8, []);
 			case DMModuleSymbols(s): encodeEnum(IDisplayMode, 9, [encodeString(s)]);
 			case DMSignature: encodeEnum(IDisplayMode, 10, []);
@@ -721,15 +733,20 @@ class MacroApiImpl {
 				case EParenthesis(e):
 					{tag: 4, pl: [loop(e)]};
 				case EObjectDecl(fl):
-					{tag: 5, pl: [encodeArray(fl.map(of -> encodeObj([
-						fld("field", encodeString(of.key.name)),
-						fld("name_pos", encodePos(of.key.pos)),
-						fld("quotes", encodeEnum(IQuoteStatus, switch of.key.quote {
-							case NoQuotes: 0;
-							case DoubleQuotes: 1;
-						}, [])),
-						fld("expr", loop(of.expr)),
-					])))]};
+					{
+						tag: 5,
+						pl: [
+							encodeArray(fl.map(of -> encodeObj([
+								fld("field", encodeString(of.key.name)),
+								fld("name_pos", encodePos(of.key.pos)),
+								fld("quotes", encodeEnum(IQuoteStatus, switch of.key.quote {
+									case NoQuotes: 0;
+									case DoubleQuotes: 1;
+								}, [])),
+								fld("expr", loop(of.expr)),
+							])))
+						]
+					};
 				case EArrayDecl(el):
 					{tag: 6, pl: [encodeArray(el.map(loop))]};
 				case ECall(e, el):
@@ -737,20 +754,32 @@ class MacroApiImpl {
 				case ENew(p, el):
 					{tag: 8, pl: [encodeAstPath(p), encodeArray(el.map(loop))]};
 				case EUnop(op, flag, e):
-					{tag: 9, pl: [encodeUnop(op), vbool(switch flag {
-						case Prefix: false;
-						case Postfix: true;
-					}), loop(e)]};
+					{
+						tag: 9,
+						pl: [
+							encodeUnop(op),
+							vbool(switch flag {
+								case Prefix: false;
+								case Postfix: true;
+							}),
+							loop(e)
+						]
+					};
 				case EVars(vl):
-					{tag: 10, pl: [encodeArray(vl.map(v -> encodeObj([
-						fld("name", encodePlacedName(v.evName)),
-						fld("namePos", encodePos(v.evName.pos)),
-						fld("isFinal", vbool(v.evFinal)),
-						fld("isStatic", vbool(v.evStatic)),
-						fld("type", vnullOr(encodeCtype, v.evType)),
-						fld("expr", vnullOr(loop, v.evExpr)),
-						fld("meta", encodeMetaContent(v.evMeta)),
-					])))]};
+					{
+						tag: 10,
+						pl: [
+							encodeArray(vl.map(v -> encodeObj([
+								fld("name", encodePlacedName(v.evName)),
+								fld("namePos", encodePos(v.evName.pos)),
+								fld("isFinal", vbool(v.evFinal)),
+								fld("isStatic", vbool(v.evStatic)),
+								fld("type", vnullOr(encodeCtype, v.evType)),
+								fld("expr", vnullOr(loop, v.evExpr)),
+								fld("meta", encodeMetaContent(v.evMeta)),
+							])))
+						]
+					};
 				case EFunction(kind, f):
 					{tag: 11, pl: [encodeFunctionKind(kind), encodeFun(f)]};
 				case EBlock(el):
@@ -760,25 +789,45 @@ class MacroApiImpl {
 				case EIf(econd, e, eelse):
 					{tag: 14, pl: [loop(econd), loop(e), vnullOr(loop, eelse)]};
 				case EWhile(econd, e, flag):
-					{tag: 15, pl: [loop(econd), loop(e), vbool(switch flag {
-						case NormalWhile: true;
-						case DoWhile: false;
-					})]};
+					{
+						tag: 15,
+						pl: [
+							loop(econd),
+							loop(e),
+							vbool(switch flag {
+								case NormalWhile: true;
+								case DoWhile: false;
+							})
+						]
+					};
 				case ESwitch(e, cases, eopt):
-					{tag: 16, pl: [loop(e), encodeArray(cases.map(c -> encodeObj([
-						fld("values", encodeArray(c.values.map(loop))),
-						fld("guard", vnullOr(loop, c.guard)),
-						fld("expr", vnullOr(loop, c.expr)),
-						fld("pos", encodePos(c.pos)),
-					]))), vnullOr((d:SwitchDefault) -> encodeNullExpr(d.expr), eopt)]};
+					{
+						tag: 16,
+						pl: [
+							loop(e),
+							encodeArray(cases.map(c -> encodeObj([
+								fld("values", encodeArray(c.values.map(loop))),
+								fld("guard", vnullOr(loop, c.guard)),
+								fld("expr", vnullOr(loop, c.expr)),
+								fld("pos", encodePos(c.pos)),
+							]))),
+							vnullOr((d:SwitchDefault) -> encodeNullExpr(d.expr), eopt)
+						]
+					};
 				case ETry(e, catches):
-					{tag: 17, pl: [loop(e), encodeArray(catches.map(c -> encodeObj([
-						fld("name", encodePlacedName(c.name)),
-						fld("name_pos", encodePos(c.name.pos)),
-						fld("type", vnullOr(encodeCtype, c.type)),
-						fld("expr", loop(c.expr)),
-						fld("pos", encodePos(c.pos))
-					])))]};
+					{
+						tag: 17,
+						pl: [
+							loop(e),
+							encodeArray(catches.map(c -> encodeObj([
+								fld("name", encodePlacedName(c.name)),
+								fld("name_pos", encodePos(c.name.pos)),
+								fld("type", vnullOr(encodeCtype, c.type)),
+								fld("expr", loop(c.expr)),
+								fld("pos", encodePos(c.pos))
+							])))
+						]
+					};
 				case EReturn(eo):
 					{tag: 18, pl: [vnullOr(loop, eo)]};
 				case EBreak:
@@ -910,14 +959,18 @@ class MacroApiImpl {
 	public static function decodeImportMode(t:Value):ImportMode {
 		return switch decodeEnum(t) {
 			case {index: 0, args: []}: ImportMode.INormal;
-			case {index: 1, args: [alias]}: ImportMode.IAsName({name: decodeString(alias), pos: Globals.nullPos}); // TODO: is it okay to lose the pos here?
+			case {index: 1, args: [alias]}: ImportMode.IAsName({
+					name: decodeString(alias),
+					pos: Globals.nullPos
+				}); // TODO: is it okay to lose the pos here?
 			case {index: 2, args: []}: ImportMode.IAll;
 			case _: throw InvalidExpr.raise();
 		}
 	}
 
 	public static function decodeImport(t:Value):Import {
-		var path:Array<PlacedName> = decodeArray(field(t, "path")).map(o -> ({name: decodeString(field(o, "name")), pos: decodePos(field(o, "pos"))} : PlacedName));
+		var path:Array<PlacedName> = decodeArray(field(t,
+			"path")).map(o -> ({name: decodeString(field(o, "name")), pos: decodePos(field(o, "pos"))} : PlacedName));
 		return {path: path, mode: decodeImportMode(field(t, "mode"))};
 	}
 
@@ -1029,7 +1082,11 @@ class MacroApiImpl {
 	}
 
 	public static function decodeMetaEntry(v:Value):MetadataEntry {
-		return {meta: Meta.fromString(decodeString(field(v, "name"))), exprs: decodeOptArray(decodeExpr, field(v, "params")), pos: decodePos(field(v, "pos"))};
+		return {
+			meta: Meta.fromString(decodeString(field(v, "name"))),
+			exprs: decodeOptArray(decodeExpr, field(v, "params")),
+			pos: decodePos(field(v, "pos"))
+		};
 	}
 
 	public static function decodeMetaContent(m:Value):Metadata return decodeOptArray(decodeMetaEntry, m);
@@ -1147,7 +1204,7 @@ class MacroApiImpl {
 						case {index: 1, args: []}: DoubleQuotes;
 						case _: throw InvalidExpr.raise();
 					}
-					({key: {name: pn.name, pos: pn.pos, quote: quotes}, expr: loop(field(o, "expr"))} : ObjectField);
+						({key: {name: pn.name, pos: pn.pos, quote: quotes}, expr: loop(field(o, "expr"))} : ObjectField);
 				}));
 			case {index: 6, args: [a]}:
 				EArrayDecl(decodeArray(a).map(loop));
@@ -1189,7 +1246,8 @@ class MacroApiImpl {
 					expr: opt(loop, field(c, "expr")),
 					pos: maybeDecodePos(field(c, "pos"))
 				} : SwitchCase));
-				ESwitch(loop(e), cases, opt(v -> ({expr: if (isNull(field(v, "expr"))) null else decodeExpr(v), pos: p} : SwitchDefault), eo));
+				ESwitch(loop(e), cases,
+					opt(v -> ({expr: if (isNull(field(v, "expr"))) null else decodeExpr(v), pos: p} : SwitchDefault), eo));
 			case {index: 17, args: [e, catches]}:
 				var catches = decodeArray(catches).map(c -> ({
 					name: decodePlacedName(field(c, "name_pos"), field(c, "name")),
@@ -1273,10 +1331,14 @@ class MacroApiImpl {
 	**/
 	static function setMtMeta(t:ModuleType, m:Metadata):Void {
 		switch t {
-			case TClassDecl(c): c.clMeta = m;
-			case TEnumDecl(e): e.eMeta = m;
-			case TTypeDecl(t): t.tMeta = m;
-			case TAbstractDecl(a): a.aMeta = m;
+			case TClassDecl(c):
+				c.clMeta = m;
+			case TEnumDecl(e):
+				e.eMeta = m;
+			case TTypeDecl(t):
+				t.tMeta = m;
+			case TAbstractDecl(a):
+				a.aMeta = m;
 		}
 	}
 
@@ -1567,7 +1629,12 @@ class MacroApiImpl {
 			return switch t {
 				case TMono(r):
 					if (r.tmType == null) {
-						{tag: 0, pl: [encodeRef(r, (r:TMono) -> r.tmType == null ? vnull : encodeType(r.tmType), () -> "<mono>")]};
+						{
+							tag: 0,
+							pl: [
+								encodeRef(r, (r:TMono) -> r.tmType == null ? vnull : encodeType(r.tmType), () -> "<mono>")
+							]
+						};
 					} else {
 						loop(r.tmType);
 					}
@@ -1643,7 +1710,11 @@ class MacroApiImpl {
 			case {index: 2, args: [c, pl]}: T.TInst(decodeRef(c), decodeArray(pl).map(decodeType));
 			case {index: 3, args: [t, pl]}: T.TType(decodeRef(t), decodeArray(pl).map(decodeType));
 			case {index: 4, args: [pl, r]}:
-				var args = decodeArray(pl).map(p -> {name: decodeString(field(p, "name")), optional: decodeBool(field(p, "opt")), type: decodeType(field(p, "t"))});
+				var args = decodeArray(pl).map(p -> {
+					name: decodeString(field(p, "name")),
+					optional: decodeBool(field(p, "opt")),
+					type: decodeType(field(p, "t"))
+				});
 				T.TFun({args: args, ret: decodeType(r)});
 			case {index: 5, args: [a]}: T.TAnon(decodeRef(a));
 			case {index: 6, args: [t]}: if (isNull(t)) tDynamic else T.TDynamic(decodeType(t));
@@ -1765,10 +1836,15 @@ class MacroApiImpl {
 				case TParenthesis(e1):
 					{tag: 6, pl: [loop(e1)]};
 				case TObjectDecl(fl):
-					{tag: 7, pl: [encodeArray(fl.map(f -> {
-						var expr = loop(f.expr);
-						encodeObj([fld("name", encodeString(f.key.name)), fld("expr", expr),]);
-					}))]};
+					{
+						tag: 7,
+						pl: [
+							encodeArray(fl.map(f -> {
+								var expr = loop(f.expr);
+								encodeObj([fld("name", encodeString(f.key.name)), fld("expr", expr),]);
+							}))
+						]
+					};
 				case TArrayDecl(el):
 					{tag: 8, pl: [encodeTexprList(el)]};
 				case TCall(e1, el):
@@ -1922,7 +1998,10 @@ class MacroApiImpl {
 			case {index: 2, args: [cf]}: FAnon(decodeRef(cf));
 			case {index: 3, args: [s]}: FDynamic(decodeString(s));
 			case {index: 4, args: [co, cf]}:
-				var co = if (isNull(co)) null else {cls: (decodeRef(field(co, "c")) : TClass), params: decodeArray(field(co, "params")).map(decodeType)};
+				var co = if (isNull(co)) null else {
+					cls: (decodeRef(field(co, "c")) : TClass),
+					params: decodeArray(field(co, "params")).map(decodeType)
+				};
 				FClosure(co, decodeRef(cf));
 			case {index: 5, args: [e, ef]}: FEnum(decodeRef(e), decodeEfield(ef));
 			case _: throw InvalidExpr.raise();
@@ -1940,7 +2019,8 @@ class MacroApiImpl {
 	}
 
 	public static function decodeTfunc(v:Value):TFunc {
-		var tfArgs = decodeArray(field(v, "args")).map(v -> {variable: decodeTvar(field(v, "v")), defaultValue: opt(decodeTexpr, field(v, "value"))});
+		var tfArgs = decodeArray(field(v,
+			"args")).map(v -> {variable: decodeTvar(field(v, "v")), defaultValue: opt(decodeTexpr, field(v, "value"))});
 		var tfType = decodeType(field(v, "t"));
 		var tfExpr = decodeTexpr(field(v, "expr"));
 		return {
@@ -1970,7 +2050,14 @@ class MacroApiImpl {
 			case {index: 4, args: [v1, fa]}: TField(loop(v1), decodeFieldAccess(fa));
 			case {index: 5, args: [mt]}: TTypeExpr(decodeModuleType(mt));
 			case {index: 6, args: [v1]}: TParenthesis(loop(v1));
-			case {index: 7, args: [v]}: TObjectDecl(decodeArray(v).map(v -> {key: {name: decodeString(field(v, "name")), pos: p, quote: NoQuotes}, expr: loop(field(v, "expr"))}));
+			case {index: 7, args: [v]}: TObjectDecl(decodeArray(v).map(v -> {
+					key: {
+						name: decodeString(field(v, "name")),
+						pos: p,
+						quote: NoQuotes
+					},
+					expr: loop(field(v, "expr"))
+				}));
 			case {index: 8, args: [vl]}: TArrayDecl(decodeArray(vl).map(loop));
 			case {index: 9, args: [v1, vl]}: TCall(loop(v1), decodeArray(vl).map(loop));
 			case {index: 10, args: [c, tl, vl]}: TNew(decodeRef(c), decodeArray(tl).map(decodeType), decodeArray(vl).map(loop));
@@ -2000,7 +2087,8 @@ class MacroApiImpl {
 				var def = opt(loop, vdef);
 				var sw = core.Texpr.mkSwitch(subject, cases, def, isExhaustive(subject, def));
 				TExprDef.TSwitch(sw);
-			case {index: 19, args: [v1, cl]}: TTry(loop(v1), decodeArray(cl).map(v -> {variable: decodeTvar(field(v, "v")), expr: loop(field(v, "expr"))}));
+			case {index: 19, args: [v1, cl]}: TTry(loop(v1),
+					decodeArray(cl).map(v -> {variable: decodeTvar(field(v, "v")), expr: loop(field(v, "expr"))}));
 			case {index: 20, args: [vo]}: TReturn(opt(loop, vo));
 			case {index: 21, args: []}: TBreak;
 			case {index: 22, args: []}: TContinue;
@@ -2055,11 +2143,25 @@ class MacroApiImpl {
 				}
 				var data = fields.map(conv);
 				var flags:Array<EnumFlag> = if (isExtern) [EExtern] else [];
-				EEnum({name: name, doc: doc, params: params(), meta: meta, flags: flags, data: data});
+				EEnum({
+					name: name,
+					doc: doc,
+					params: params(),
+					meta: meta,
+					flags: flags,
+					data: data
+				});
 			case {index: 1, args: []}:
 				var data:TypeHint = {type: CTAnonymous(fields), pos: pos};
 				var flags:Array<TypedefFlag> = if (isExtern) [TDExtern] else [];
-				ETypedef({name: name, doc: doc, params: params(), meta: meta, flags: flags, data: data});
+				ETypedef({
+					name: name,
+					doc: doc,
+					params: params(),
+					meta: meta,
+					flags: flags,
+					data: data
+				});
 			case {index: 2, args: [ext, impl, interf, isFinal, isAbstract]}:
 				var flags:Array<ClassFlag> = if (isExtern) [HExtern] else [];
 				var isInterface = decodeOptBool(interf);
@@ -2081,20 +2183,34 @@ class MacroApiImpl {
 				}
 				var flags = if (isFinal) [HFinal].concat(flags) else flags;
 				var flags = if (isAbstract) [HAbstract].concat(flags) else flags;
-				EClass({name: name, doc: doc, params: params(), meta: meta, flags: flags, data: fields});
+				EClass({
+					name: name,
+					doc: doc,
+					params: params(),
+					meta: meta,
+					flags: flags,
+					data: fields
+				});
 			case {index: 3, args: [t]}:
 				var data = decodeCtype(t);
 				var flags:Array<TypedefFlag> = if (isExtern) [TDExtern] else [];
-				ETypedef({name: name, doc: doc, params: params(), meta: meta, flags: flags, data: data});
+				ETypedef({
+					name: name,
+					doc: doc,
+					params: params(),
+					meta: meta,
+					flags: flags,
+					data: data
+				});
 			case {index: 4, args: [tthis, tflags, tfrom, tto]}:
 				var flags:Array<AbstractFlag> = switch opt(decodeArray, tflags) {
 					case null: [];
 					case ta: ta.map(f -> switch decodeEnum(f) {
-						case {index: 0, args: []}: AbEnum;
-						case {index: 1, args: [ct]}: AbFrom(decodeCtype(ct));
-						case {index: 2, args: [ct]}: AbTo(decodeCtype(ct));
-						case _: throw InvalidExpr.raise();
-					});
+							case {index: 0, args: []}: AbEnum;
+							case {index: 1, args: [ct]}: AbFrom(decodeCtype(ct));
+							case {index: 2, args: [ct]}: AbTo(decodeCtype(ct));
+							case _: throw InvalidExpr.raise();
+						});
 				}
 				var flags = switch opt(decodeArray, tfrom) {
 					case null: flags;
@@ -2109,17 +2225,33 @@ class MacroApiImpl {
 					case t: [AbOver(t)].concat(flags);
 				}
 				var flags = if (isExtern) [AbExtern].concat(flags) else flags;
-				EAbstract({name: name, doc: doc, params: params(), meta: meta, flags: flags, data: fields});
+				EAbstract({
+					name: name,
+					doc: doc,
+					params: params(),
+					meta: meta,
+					flags: flags,
+					data: fields
+				});
 			case {index: 5, args: [fk, al]}:
 				var fk = decodeClassFieldKind(fk);
 				var al = optList(decodeArray, al).map(decodeAccess);
 				// let al = if isExtern then (AExtern,pos) :: al else al in
-				EStatic({name: name, doc: doc, params: params(), meta: meta, flags: al, data: fk});
+				EStatic({
+					name: name,
+					doc: doc,
+					params: params(),
+					meta: meta,
+					flags: al,
+					data: fk
+				});
 			case _:
 				throw InvalidExpr.raise();
 		}
 		// if our package ends with an uppercase letter, then it's the module name
-		var path:GlobalTypePath = if (pack.length > 0 && pack[pack.length - 1].length > 0 && core.StringHelper.startsUppercaseIdentifier(pack[pack.length - 1])) {
+		var path:GlobalTypePath = if (pack.length > 0
+			&& pack[pack.length - 1].length > 0
+			&& core.StringHelper.startsUppercaseIdentifier(pack[pack.length - 1])) {
 			{pack: pack.slice(0, pack.length - 1), name: pack[pack.length - 1]};
 		} else {
 			{pack: pack, name: name.name};
@@ -2254,647 +2386,960 @@ class MacroApiImpl {
 		}
 		var failwith = function(s:String):Dynamic return getApi().excString(s);
 		return [
-			{name: "contains_display_position", value: vfun1(vp -> {
-				var p = decodePos(vp);
-				var displayPos = core.display.DisplayPosition.displayPosition;
-				inline function sameFile():Bool {
-					var dfile = displayPos.get().pfile;
-					return dfile == p.pfile || {
-						var com = ccom();
-						(!haxe.io.Path.isAbsolute(p.pfile) || !haxe.io.Path.isAbsolute(dfile))
-						&& (com.partScope.fileKeys.get(dfile) == com.partScope.fileKeys.get(p.pfile));
+			{
+				name: "contains_display_position",
+				value: vfun1(vp -> {
+					var p = decodePos(vp);
+					var displayPos = core.display.DisplayPosition.displayPosition;
+					inline function sameFile():Bool {
+						var dfile = displayPos.get().pfile;
+						return dfile == p.pfile || {
+							var com = ccom();
+							(!haxe.io.Path.isAbsolute(p.pfile) || !haxe.io.Path.isAbsolute(dfile)) && (com.partScope.fileKeys.get(dfile) == com.partScope.fileKeys.get(p.pfile));
+						};
+					}
+					vbool(displayPos.enclosedIn(p) && sameFile());
+				})
+			},
+			{
+				name: "current_pos",
+				value: vfun0(() -> {
+					encodePos(getApi().pos);
+				})
+			},
+			{
+				name: "get_macro_stack",
+				value: vfun0(() -> {
+					var stack = getApi().getMacroStack();
+					encodeArray(stack.map(encodePos));
+				})
+			},
+			{
+				name: "init_macros_done",
+				value: vfun0(() -> {
+					vbool(getApi().initMacrosDone());
+				})
+			},
+			{
+				name: "error",
+				value: vfun3((msg, p, sub) -> {
+					var msg = decodeString(msg);
+					var p = decodePos(p);
+					var sub = decodeSubErrors(sub);
+					getApi().displayError(msg, p, sub);
+					throw new Abort();
+				})
+			},
+			{
+				name: "fatal_error",
+				value: vfun3((msg, p, sub) -> {
+					var msg = decodeString(msg);
+					var pos = decodePos(p);
+					var sub = decodeSubErrors(sub);
+					throw new core.Error.FatalError(core.Error.convertError({msg: msg, pos: pos, sub: sub}));
+				})
+			},
+			{
+				name: "report_error",
+				value: vfun3((msg, p, sub) -> {
+					var msg = decodeString(msg);
+					var p = decodePos(p);
+					var sub = decodeSubErrors(sub);
+					getApi().displayError(msg, p, sub);
+					vnull;
+				})
+			},
+			{
+				name: "warning",
+				value: vfun3((msg, p, depth) -> {
+					var msg = decodeString(msg);
+					var p = decodePos(p);
+					var depth = decodeInt(depth);
+					getApi().warning(WUser, msg, p, depth);
+					vnull;
+				})
+			},
+			{
+				name: "info",
+				value: vfun3((msg, p, depth) -> {
+					var msg = decodeString(msg);
+					var p = decodePos(p);
+					var depth = decodeInt(depth);
+					getApi().info(msg, p, depth);
+					vnull;
+				})
+			},
+			{
+				name: "get_messages",
+				value: vfun0(() -> {
+					encodeArray(ccom().getMessages().map(msg -> encodeMessage(msg)));
+				})
+			},
+			{
+				name: "filter_messages",
+				value: vfun1(predicate -> {
+					var predicate = prepareCallback(predicate, 2);
+					ccom().filterMessages(msg -> decodeBool(predicate([encodeMessage(msg)])));
+					vnull;
+				})
+			},
+			{
+				name: "class_path",
+				value: vfun0(() -> {
+					encodeArray((ccom().classPaths.asStringList() : Array<String>).map(encodeString));
+				})
+			},
+			{
+				name: "resolve_path",
+				value: vfun1(file -> {
+					var file = decodeString(file);
+					encodeString(try Common.findFile(ccom(),
+						file) catch (e:Dynamic) if (isNotFound(e)) failwith("File not found '" + file + "'")
+					else throw e);
+				})
+			},
+			{
+				name: "define",
+				value: vfun2((s, v) -> {
+					var s = decodeString(s);
+					var com = ccom();
+					if (isNull(v))
+						Common.externalDefine(com, s)
+					else
+						Common.externalDefineValue(com, s, decodeString(v));
+					vnull;
+				})
+			},
+			{
+				name: "defined",
+				value: vfun1(s -> {
+					vbool(Common.externalDefined(ccom(), decodeString(s)));
+				})
+			},
+			{
+				name: "defined_value",
+				value: vfun1(s -> {
+					try encodeString(Common.externalDefinedValue(ccom(), decodeString(s)))
+					catch (e:Dynamic) if (isNotFound(e)) vnull
+					else throw e;
+				})
+			},
+			{
+				name: "get_defines",
+				value: vfun0(() -> {
+					encodeStringMap(encodeString, Common.definesForExternal(ccom()));
+				})
+			},
+			{
+				name: "get_type",
+				value: vfun1(s -> {
+					var tname = decodeString(s);
+					switch getApi().getType(tname) {
+						case null: failwith("Type not found '" + tname + "'");
+						case t: encodeType(t);
+					}
+				})
+			},
+			{
+				name: "get_module",
+				value: vfun1(s -> {
+					encodeArray(getApi().getModule(decodeString(s)).map(encodeType));
+				})
+			},
+			{
+				name: "include_module",
+				value: vfun1(s -> {
+					getApi().includeModule(decodeString(s));
+					vnull;
+				})
+			},
+			{
+				name: "on_after_init_macros",
+				value: vfun1(f -> {
+					var f = prepareCallback(f, 1);
+					getApi().afterInitMacros(() -> {
+						f([]);
+					});
+					vnull;
+				})
+			},
+			{
+				name: "on_after_typing",
+				value: vfun1(f -> {
+					var f = prepareCallback(f, 1);
+					getApi().afterTyping(tl -> {
+						f([encodeArray(tl.map(encodeModuleType))]);
+					});
+					vnull;
+				})
+			},
+			{
+				name: "on_generate",
+				value: vfun2((f, b) -> {
+					var f = prepareCallback(f, 1);
+					getApi().onGenerate(tl -> {
+						f([encodeArray(tl.map(encodeType))]);
+					}, decodeBool(b));
+					vnull;
+				})
+			},
+			{
+				name: "on_after_generate",
+				value: vfun1(f -> {
+					var f = prepareCallback(f, 0);
+					getApi().afterGenerate(() -> {
+						f([]);
+					});
+					vnull;
+				})
+			},
+			{
+				name: "on_type_not_found",
+				value: vfun1(f -> {
+					var f = prepareCallback(f, 1);
+					getApi().onTypeNotFound(path -> f([encodeString(path)]));
+					vnull;
+				})
+			},
+			{
+				name: "do_parse",
+				value: vfun3((s, p, b) -> {
+					var s = decodeString(s);
+					if (s == "")
+						getApi().excString("Invalid expression");
+					encodeExpr(getApi().parseString(s, decodePos(p), decodeBool(b)));
+				})
+			},
+			{
+				name: "register_file_contents",
+				value: vfun2((f, c) -> {
+					var f = decodeString(f);
+					var content = decodeString(c);
+					getApi().registerFileContents(f, content);
+					vnull;
+				})
+			},
+			{
+				name: "make_expr",
+				value: vfun2((v, p) -> {
+					encodeExpr(valueToExpr(v, decodePos(p)));
+				})
+			},
+			{
+				name: "signature",
+				value: vfun1(v -> {
+					try {
+						encodeString(valueSignature(v));
+					} catch (e:core.ds.InvalidArgument) {
+						getApi().excString(e.message);
+					}
+				})
+			},
+			{
+				name: "to_complex_type",
+				value: vfun1(v -> {
+					try {
+						encodeCtype(core.TOther.TExprToExpr.convertTypeHint(decodeType(v)));
+					} catch (_:core.ds.Exit) {
+						vnull;
+					} catch (_:TypeExit) {
+						// the port's TExprToExpr raises TypeExit where upstream raises Exit
+						vnull;
+					}
+				})
+			},
+			{
+				name: "unify",
+				value: vfun2((t1, t2) -> {
+					var e1 = mk(TObjectDecl([]), decodeType(t1), Globals.nullPos);
+					vbool(getApi().castOrUnify(decodeType(t2), e1, Globals.nullPos));
+				})
+			},
+			{
+				name: "typeof",
+				value: vfun1(v -> {
+					encodeType(getApi().typeExpr(decodeExpr(v)).etype);
+				})
+			},
+			{
+				name: "type_expr",
+				value: vfun1(v -> {
+					encodeTexpr(getApi().typeExpr(decodeExpr(v)));
+				})
+			},
+			{
+				name: "resolve_type",
+				value: vfun2((t, p) -> {
+					encodeType(getApi().resolveType(decodeCtype(t).type, decodePos(p)));
+				})
+			},
+			{
+				name: "resolve_complex_type",
+				value: vfun2((ct, p) -> {
+					encodeCtype(getApi().resolveComplexType({type: decodeCtype(ct).type, pos: decodePos(p)}));
+				})
+			},
+			{
+				name: "s_type",
+				value: vfun1(v -> {
+					encodeString(core.TPrinting.sType(core.TPrinting.printContext(), decodeType(v)));
+				})
+			},
+			{
+				name: "s_expr",
+				value: vfun2((v, b) -> {
+					var f:(T->String) -> TExpr -> String = if (decodeOptBool(b)) core.TPrinting.sExprPretty.bind(false, "",
+						false) else core.TPrinting.sExprAst.bind(true, "");
+					encodeString(f(core.TPrinting.sType.bind(core.TPrinting.printContext()), decodeTexpr(v)));
+				})
+			},
+			{
+				name: "format_string",
+				value: vfun2((s, p) -> {
+					encodeExpr(getApi().formatString(decodeString(s), decodePos(p)));
+				})
+			},
+			{
+				name: "allow_package",
+				value: vfun1(s -> {
+					getApi().allowPackage(decodeString(s));
+					vnull;
+				})
+			},
+			{
+				name: "add_global_metadata_impl",
+				value: vfun5((s1, s2, b1, b2, b3) -> {
+					getApi().addGlobalMetadata(decodeString(s1), decodeString(s2),
+						{a: decodeBool(b1), b: decodeBool(b2), c: decodeBool(b3)}, getApiCallPos());
+					vnull;
+				})
+			},
+			{
+				name: "register_define_impl",
+				value: vfun2((d, src) -> {
+					var flags:Array<DefineParameter> = [];
+
+					var platforms = decodeOptArray(decodePlatform, field(d, "platforms"));
+					var flags = switch platforms {
+						case []: flags;
+						case _: [DefineParameter.Platforms(platforms)].concat(flags);
+					}
+
+					var params = decodeOptArray(decodeString, field(d, "params"));
+					var flags = flags.concat(params.map(p -> DefineParameter.HasParam(p)));
+
+					var links = decodeOptArray(decodeString, field(d, "links"));
+					var flags = flags.concat(links.map(l -> DefineParameter.Link(l)));
+
+					getApi().registerDefine(decodeString(field(d, "define")), {
+						doc: decodeString(field(d, "doc")),
+						flags: flags,
+						source: opt(decodeString, src),
+					});
+					vnull;
+				})
+			},
+			{
+				name: "register_metadata_impl",
+				value: vfun2((m, src) -> {
+					var flags:Array<MetaParameter> = [];
+
+					var platforms = decodeOptArray(decodePlatform, field(m, "platforms"));
+					var flags = if (platforms.length == 0) flags else [MetaParameter.Platforms(platforms)].concat(flags);
+
+					var targets = decodeOptArray(decodeString, field(m, "targets"));
+					var flags = if (targets.length == 0) flags else
+						[MetaParameter.UsedOn(targets.map(core.MetaList.MetaList.parseMetaUsage))].concat(flags);
+
+					var params = decodeOptArray(decodeString, field(m, "params"));
+					var flags = flags.concat(params.map(p -> MetaParameter.HasParam(p)));
+
+					var links = decodeOptArray(decodeString, field(m, "links"));
+					var flags = flags.concat(links.map(l -> MetaParameter.Link(l)));
+
+					getApi().registerMetadata(decodeString(field(m, "metadata")), {
+						doc: decodeString(field(m, "doc")),
+						flags: flags,
+						source: opt(decodeString, src),
+					});
+					vnull;
+				})
+			},
+			{
+				name: "set_custom_js_generator",
+				value: vfun1(f -> {
+					var f = prepareCallback(f, 1);
+					// The JS generator (Genjs) is not part of the port: the generator is
+					// registered as upstream does, but running it fails explicitly.
+					var com = ccom();
+					com.jsGen = () -> {
+						notSupported("Custom JS generators (Compiler.setCustomJSGenerator)");
 					};
-				}
-				vbool(displayPos.enclosedIn(p) && sameFile());
-			})},
-			{name: "current_pos", value: vfun0(() -> {
-				encodePos(getApi().pos);
-			})},
-			{name: "get_macro_stack", value: vfun0(() -> {
-				var stack = getApi().getMacroStack();
-				encodeArray(stack.map(encodePos));
-			})},
-			{name: "init_macros_done", value: vfun0(() -> {
-				vbool(getApi().initMacrosDone());
-			})},
-			{name: "error", value: vfun3((msg, p, sub) -> {
-				var msg = decodeString(msg);
-				var p = decodePos(p);
-				var sub = decodeSubErrors(sub);
-				getApi().displayError(msg, p, sub);
-				throw new Abort();
-			})},
-			{name: "fatal_error", value: vfun3((msg, p, sub) -> {
-				var msg = decodeString(msg);
-				var pos = decodePos(p);
-				var sub = decodeSubErrors(sub);
-				throw new core.Error.FatalError(core.Error.convertError({msg: msg, pos: pos, sub: sub}));
-			})},
-			{name: "report_error", value: vfun3((msg, p, sub) -> {
-				var msg = decodeString(msg);
-				var p = decodePos(p);
-				var sub = decodeSubErrors(sub);
-				getApi().displayError(msg, p, sub);
-				vnull;
-			})},
-			{name: "warning", value: vfun3((msg, p, depth) -> {
-				var msg = decodeString(msg);
-				var p = decodePos(p);
-				var depth = decodeInt(depth);
-				getApi().warning(WUser, msg, p, depth);
-				vnull;
-			})},
-			{name: "info", value: vfun3((msg, p, depth) -> {
-				var msg = decodeString(msg);
-				var p = decodePos(p);
-				var depth = decodeInt(depth);
-				getApi().info(msg, p, depth);
-				vnull;
-			})},
-			{name: "get_messages", value: vfun0(() -> {
-				encodeArray(ccom().getMessages().map(msg -> encodeMessage(msg)));
-			})},
-			{name: "filter_messages", value: vfun1(predicate -> {
-				var predicate = prepareCallback(predicate, 2);
-				ccom().filterMessages(msg -> decodeBool(predicate([encodeMessage(msg)])));
-				vnull;
-			})},
-			{name: "class_path", value: vfun0(() -> {
-				encodeArray((ccom().classPaths.asStringList() : Array<String>).map(encodeString));
-			})},
-			{name: "resolve_path", value: vfun1(file -> {
-				var file = decodeString(file);
-				encodeString(try Common.findFile(ccom(), file) catch (e:Dynamic) if (isNotFound(e)) failwith("File not found '" + file + "'") else throw e);
-			})},
-			{name: "define", value: vfun2((s, v) -> {
-				var s = decodeString(s);
-				var com = ccom();
-				if (isNull(v))
-					Common.externalDefine(com, s)
-				else
-					Common.externalDefineValue(com, s, decodeString(v));
-				vnull;
-			})},
-			{name: "defined", value: vfun1(s -> {
-				vbool(Common.externalDefined(ccom(), decodeString(s)));
-			})},
-			{name: "defined_value", value: vfun1(s -> {
-				try encodeString(Common.externalDefinedValue(ccom(), decodeString(s))) catch (e:Dynamic) if (isNotFound(e)) vnull else throw e;
-			})},
-			{name: "get_defines", value: vfun0(() -> {
-				encodeStringMap(encodeString, Common.definesForExternal(ccom()));
-			})},
-			{name: "get_type", value: vfun1(s -> {
-				var tname = decodeString(s);
-				switch getApi().getType(tname) {
-					case null: failwith("Type not found '" + tname + "'");
-					case t: encodeType(t);
-				}
-			})},
-			{name: "get_module", value: vfun1(s -> {
-				encodeArray(getApi().getModule(decodeString(s)).map(encodeType));
-			})},
-			{name: "include_module", value: vfun1(s -> {
-				getApi().includeModule(decodeString(s));
-				vnull;
-			})},
-			{name: "on_after_init_macros", value: vfun1(f -> {
-				var f = prepareCallback(f, 1);
-				getApi().afterInitMacros(() -> {
-					f([]);
-				});
-				vnull;
-			})},
-			{name: "on_after_typing", value: vfun1(f -> {
-				var f = prepareCallback(f, 1);
-				getApi().afterTyping(tl -> {
-					f([encodeArray(tl.map(encodeModuleType))]);
-				});
-				vnull;
-			})},
-			{name: "on_generate", value: vfun2((f, b) -> {
-				var f = prepareCallback(f, 1);
-				getApi().onGenerate(tl -> {
-					f([encodeArray(tl.map(encodeType))]);
-				}, decodeBool(b));
-				vnull;
-			})},
-			{name: "on_after_generate", value: vfun1(f -> {
-				var f = prepareCallback(f, 0);
-				getApi().afterGenerate(() -> {
-					f([]);
-				});
-				vnull;
-			})},
-			{name: "on_type_not_found", value: vfun1(f -> {
-				var f = prepareCallback(f, 1);
-				getApi().onTypeNotFound(path -> f([encodeString(path)]));
-				vnull;
-			})},
-			{name: "do_parse", value: vfun3((s, p, b) -> {
-				var s = decodeString(s);
-				if (s == "")
-					getApi().excString("Invalid expression");
-				encodeExpr(getApi().parseString(s, decodePos(p), decodeBool(b)));
-			})},
-			{name: "register_file_contents", value: vfun2((f, c) -> {
-				var f = decodeString(f);
-				var content = decodeString(c);
-				getApi().registerFileContents(f, content);
-				vnull;
-			})},
-			{name: "make_expr", value: vfun2((v, p) -> {
-				encodeExpr(valueToExpr(v, decodePos(p)));
-			})},
-			{name: "signature", value: vfun1(v -> {
-				try {
-					encodeString(valueSignature(v));
-				} catch (e:core.ds.InvalidArgument) {
-					getApi().excString(e.message);
-				}
-			})},
-			{name: "to_complex_type", value: vfun1(v -> {
-				try {
-					encodeCtype(core.TOther.TExprToExpr.convertTypeHint(decodeType(v)));
-				} catch (_:core.ds.Exit) {
 					vnull;
-				} catch (_:TypeExit) {
-					// the port's TExprToExpr raises TypeExit where upstream raises Exit
+				})
+			},
+			{
+				name: "flush_disk_cache",
+				value: vfun0(() -> {
+					var com = getApi().getCom();
+					com.classPaths.clearCache();
 					vnull;
-				}
-			})},
-			{name: "unify", value: vfun2((t1, t2) -> {
-				var e1 = mk(TObjectDecl([]), decodeType(t1), Globals.nullPos);
-				vbool(getApi().castOrUnify(decodeType(t2), e1, Globals.nullPos));
-			})},
-			{name: "typeof", value: vfun1(v -> {
-				encodeType(getApi().typeExpr(decodeExpr(v)).etype);
-			})},
-			{name: "type_expr", value: vfun1(v -> {
-				encodeTexpr(getApi().typeExpr(decodeExpr(v)));
-			})},
-			{name: "resolve_type", value: vfun2((t, p) -> {
-				encodeType(getApi().resolveType(decodeCtype(t).type, decodePos(p)));
-			})},
-			{name: "resolve_complex_type", value: vfun2((ct, p) -> {
-				encodeCtype(getApi().resolveComplexType({type: decodeCtype(ct).type, pos: decodePos(p)}));
-			})},
-			{name: "s_type", value: vfun1(v -> {
-				encodeString(core.TPrinting.sType(core.TPrinting.printContext(), decodeType(v)));
-			})},
-			{name: "s_expr", value: vfun2((v, b) -> {
-				var f:(T->String)->TExpr->String = if (decodeOptBool(b)) core.TPrinting.sExprPretty.bind(false, "", false) else core.TPrinting.sExprAst.bind(true, "");
-				encodeString(f(core.TPrinting.sType.bind(core.TPrinting.printContext()), decodeTexpr(v)));
-			})},
-			{name: "format_string", value: vfun2((s, p) -> {
-				encodeExpr(getApi().formatString(decodeString(s), decodePos(p)));
-			})},
-			{name: "allow_package", value: vfun1(s -> {
-				getApi().allowPackage(decodeString(s));
-				vnull;
-			})},
-			{name: "add_global_metadata_impl", value: vfun5((s1, s2, b1, b2, b3) -> {
-				getApi().addGlobalMetadata(decodeString(s1), decodeString(s2), {a: decodeBool(b1), b: decodeBool(b2), c: decodeBool(b3)}, getApiCallPos());
-				vnull;
-			})},
-			{name: "register_define_impl", value: vfun2((d, src) -> {
-				var flags:Array<DefineParameter> = [];
-
-				var platforms = decodeOptArray(decodePlatform, field(d, "platforms"));
-				var flags = switch platforms {
-					case []: flags;
-					case _: [DefineParameter.Platforms(platforms)].concat(flags);
-				}
-
-				var params = decodeOptArray(decodeString, field(d, "params"));
-				var flags = flags.concat(params.map(p -> DefineParameter.HasParam(p)));
-
-				var links = decodeOptArray(decodeString, field(d, "links"));
-				var flags = flags.concat(links.map(l -> DefineParameter.Link(l)));
-
-				getApi().registerDefine(decodeString(field(d, "define")), {
-					doc: decodeString(field(d, "doc")),
-					flags: flags,
-					source: opt(decodeString, src),
-				});
-				vnull;
-			})},
-			{name: "register_metadata_impl", value: vfun2((m, src) -> {
-				var flags:Array<MetaParameter> = [];
-
-				var platforms = decodeOptArray(decodePlatform, field(m, "platforms"));
-				var flags = if (platforms.length == 0) flags else [MetaParameter.Platforms(platforms)].concat(flags);
-
-				var targets = decodeOptArray(decodeString, field(m, "targets"));
-				var flags = if (targets.length == 0) flags else [MetaParameter.UsedOn(targets.map(core.MetaList.MetaList.parseMetaUsage))].concat(flags);
-
-				var params = decodeOptArray(decodeString, field(m, "params"));
-				var flags = flags.concat(params.map(p -> MetaParameter.HasParam(p)));
-
-				var links = decodeOptArray(decodeString, field(m, "links"));
-				var flags = flags.concat(links.map(l -> MetaParameter.Link(l)));
-
-				getApi().registerMetadata(decodeString(field(m, "metadata")), {
-					doc: decodeString(field(m, "doc")),
-					flags: flags,
-					source: opt(decodeString, src),
-				});
-				vnull;
-			})},
-			{name: "set_custom_js_generator", value: vfun1(f -> {
-				var f = prepareCallback(f, 1);
-				// The JS generator (Genjs) is not part of the port: the generator is
-				// registered as upstream does, but running it fails explicitly.
-				var com = ccom();
-				com.jsGen = () -> {
-					notSupported("Custom JS generators (Compiler.setCustomJSGenerator)");
-				};
-				vnull;
-			})},
-			{name: "flush_disk_cache", value: vfun0(() -> {
-				var com = getApi().getCom();
-				com.classPaths.clearCache();
-				vnull;
-			})},
-			{name: "get_pos_infos", value: vfun1(p -> {
-				var p = decodePos(p);
-				encodeObj([fld("min", vint(p.pmin)), fld("max", vint(p.pmax)), fld("file", encodeString(p.pfile))]);
-			})},
-			{name: "make_position", value: vfun3((min, max, file) -> {
-				encodePos({pmin: decodeInt(min), pmax: decodeInt(max), pfile: decodeString(file)});
-			})},
-			{name: "add_resource", value: vfun2((name, data) -> {
-				var name = decodeString(name);
-				var data = decodeBytes(data);
-				if (name == "")
-					failwith("Empty resource name");
-				ccom().resources.set(name, data);
-				var m = getApi().currentModule();
-				m.mExtra.mCacheBoundObjects.push(Resource(name, data));
-				vnull;
-			})},
-			{name: "get_resources", value: vfun0(() -> {
-				var pmapResources = new StringMap<haxe.io.Bytes>();
-				for (k => v in ccom().resources)
-					pmapResources.set(k, v);
-				encodeStringMap(encodeBytes, pmapResources);
-			})},
-			{name: "get_local_module", value: vfun0(() -> {
-				var m = getApi().currentModule();
-				encodeString(MacroApi.sTypePath(m.mPath));
-			})},
-			{name: "get_local_type", value: vfun0(() -> {
-				switch getApi().getLocalType() {
-					case null: vnull;
-					case t: encodeType(t);
-				}
-			})},
-			{name: "get_expected_type", value: vfun0(() -> {
-				switch getApi().getExpectedType() {
-					case null: vnull;
-					case t: encodeType(t);
-				}
-			})},
-			{name: "get_call_arguments", value: vfun0(() -> {
-				switch getApi().getCallArguments() {
-					case null: vnull;
-					case el: encodeArray(el.map(encodeExpr));
-				}
-			})},
-			{name: "get_local_method", value: vfun0(() -> {
-				encodeString(getApi().getLocalMethod());
-			})},
-			{name: "get_local_using", value: vfun0(() -> {
-				encodeArray(getApi().getLocalUsing().map(encodeClref));
-			})},
-			{name: "get_local_imports", value: vfun0(() -> {
-				encodeArray(getApi().getLocalImports().map(encodeImport));
-			})},
-			{name: "local_vars", value: vfun1(asVar -> {
-				var asVar = decodeOptBool(asVar);
-				var vars = getApi().getLocalVars();
-				encodeStringMap(if (asVar) encodeTvar else (v:TVar) -> encodeType(v.vType), vars);
-			})},
-			{name: "follow_with_abstracts", value: vfun2((v, once) -> {
-				var t = decodeType(v);
-				inline function followOnce(t:T):T {
-					return switch t {
-						case TMono(r):
-							switch r.tmType {
-								case null: t;
-								case t: t;
-							}
-						case TAbstract(a, tl) if (!Meta.has(core.MetaList.StrictMeta.CoreType, a.aMeta)):
-							core.Abstract.getUnderlyingType(a, tl);
-						case TAbstract(_) | TEnum(_) | TInst(_) | TFun(_) | TAnon(_) | TDynamic(_):
-							t;
-						case TType(t, tl):
-							applyTypedef(t, tl);
-						case TLazy(f):
-							lazyType(f);
-					}
-				}
-				encodeType(if (decodeOptBool(once)) followOnce(t) else core.Abstract.followWithAbstracts(t));
-			})},
-			{name: "follow", value: vfun2((v, once) -> {
-				var t = decodeType(v);
-				encodeType(if (decodeOptBool(once)) TFunctions.followOnce(t) else follow(t));
-			})},
-			{name: "get_build_fields", value: vfun0(() -> {
-				getApi().getBuildFields();
-			})},
-			{name: "define_type", value: vfun2((v, m) -> {
-				getApi().defineType(v, opt(decodeString, m));
-				vnull;
-			})},
-			{name: "make_monomorph", value: vfun0(() -> {
-				var t = T.TMono(core.TUnification.Monomorph.create());
-				encodeType(t);
-			})},
-			{name: "define_module", value: vfun4((path, vl, ui, ul) -> {
-				getApi().defineModule(decodeString(path), decodeArray(vl), decodeArray(ui).map(v -> {
-					var imp = decodeImport(v);
-					{path: imp.path, mode: imp.mode};
-				}), decodeArray(ul).map(decodeAstPath).map(ptp -> ptp.path));
-				vnull;
-			})},
-			{name: "add_class_path", value: vfun1(cp -> {
-				var com = ccom();
-				var cp = decodeString(cp);
-				var path = core.Path.addTrailingSlash(cp);
-				var cp = new core.ClassPath.DirectoryClassPath(path, User);
-				com.classPaths.add(cp);
-				switch com.getMacros() {
-					case null:
-					case mcom:
-						mcom.classPaths.add(cp.clone());
-				}
-				com.classPaths.clearCache();
-				vnull;
-			})},
-			{name: "add_native_lib", value: vfun1(file -> {
-				var file = decodeString(file);
-				var com = ccom();
-				var kind:compiler.ParsedArg.NativeLibKind = switch com.platform {
-					case Jvm: JavaLib;
-					case Flash: SwfLib;
-					case _: failwith("Unsupported platform");
-				}
-				// create_native_lib / NativeLibraryHandler.add_native_lib: Java and SWF
-				// libraries are not part of the port
-				notSupported("Adding native libraries (" + Std.string(kind) + " " + file + ")");
-			})},
-			{name: "register_module_dependency", value: vfun2((m, file) -> {
-				getApi().moduleDependency(decodeString(m), decodeString(file));
-				vnull;
-			})},
-			{name: "get_typed_expr", value: vfun1(e -> {
-				var e = decodeTexpr(e);
-				encodeExpr(core.TOther.TExprToExpr.convertExpr(e));
-			})},
-			{name: "store_expr", value: vfun1(e -> {
-				var api = getApi();
-				var te = api.typeExpr(decodeExpr(e));
-				encodeExpr(api.storeTypedExpr(te));
-			})},
-			{name: "store_typed_expr", value: vfun1(e -> {
-				var e = decodeTexpr(e);
-				encodeExpr(getApi().storeTypedExpr(e));
-			})},
-			{name: "type_and_store_expr", value: vfun1(e -> {
-				var api = getApi();
-				var te = api.typeExpr(decodeExpr(e));
-				var vE = encodeExpr(api.storeTypedExpr(te));
-				function vToString():String return core.TPrinting.sType(core.TPrinting.printContext(), te.etype);
-				encodeObj([fld("expr", vE), fld("type", encodeRef(te.etype, encodeType, vToString))]);
-			})},
-			{name: "get_output", value: vfun0(() -> {
-				encodeString(ccom().file);
-			})},
-			{name: "set_output", value: vfun1(s -> {
-				ccom().file = decodeString(s);
-				vnull;
-			})},
-			{name: "get_display_pos", value: vfun0(() -> {
-				var p = core.display.DisplayPosition.displayPosition.get();
-				if (posEq(p, Globals.nullPos))
+				})
+			},
+			{
+				name: "get_pos_infos",
+				value: vfun1(p -> {
+					var p = decodePos(p);
+					encodeObj([
+						fld("min", vint(p.pmin)),
+						fld("max", vint(p.pmax)),
+						fld("file", encodeString(p.pfile))
+					]);
+				})
+			},
+			{
+				name: "make_position",
+				value: vfun3((min, max, file) -> {
+					encodePos({pmin: decodeInt(min), pmax: decodeInt(max), pfile: decodeString(file)});
+				})
+			},
+			{
+				name: "add_resource",
+				value: vfun2((name, data) -> {
+					var name = decodeString(name);
+					var data = decodeBytes(data);
+					if (name == "")
+						failwith("Empty resource name");
+					ccom().resources.set(name, data);
+					var m = getApi().currentModule();
+					m.mExtra.mCacheBoundObjects.push(Resource(name, data));
 					vnull;
-				else
-					encodeObj([fld("file", encodeString(p.pfile)), fld("pos", vint(p.pmin))]);
-			})},
-			{name: "get_display_mode", value: vfun0(() -> {
-				encodeDisplayMode(ccom().display.dmsKind);
-			})},
-			{name: "get_configuration", value: vfun0(() -> {
-				var com = ccom();
-				encodeObj([
-					fld("version", vint(com.sctx.version.version)),
-					fld("args", encodeArray(compiler.Args.toRawArgs(com.parsedArgs).map(encodeString))),
-					fld("debug", vbool(com.debug)),
-					fld("verbose", vbool(com.verbose)),
-					fld("foptimize", vbool(com.foptimize)),
-					fld("platform", encodePlatform(com.platform)),
-					fld("platformConfig", encodePlatformConfig(com.config)),
-					fld("stdPath", encodeArray((com.classPaths.getStdPaths() : Array<core.ClassPath.IClassPath>).map(path -> encodeString(path.path)))),
-					fld("mainClass", switch com.main.mainPath {
+				})
+			},
+			{
+				name: "get_resources",
+				value: vfun0(() -> {
+					var pmapResources = new StringMap<haxe.io.Bytes>();
+					for (k => v in ccom().resources)
+						pmapResources.set(k, v);
+					encodeStringMap(encodeBytes, pmapResources);
+				})
+			},
+			{
+				name: "get_local_module",
+				value: vfun0(() -> {
+					var m = getApi().currentModule();
+					encodeString(MacroApi.sTypePath(m.mPath));
+				})
+			},
+			{
+				name: "get_local_type",
+				value: vfun0(() -> {
+					switch getApi().getLocalType() {
 						case null: vnull;
-						case path: encodePath(path);
-					}),
-					fld("packageRules", encodeStringMap(encodePackageRule, com.packageRules)),
-				]);
-			})},
-			{name: "set_platform_configuration", value: vfun1(v -> {
-				ccom().config = decodePlatformConfig(v);
-				vnull;
-			})},
-			{name: "get_main_expr", value: vfun0(() -> {
-				switch ccom().main.mainExpr {
-					case null: vnull;
-					case e: encodeTexpr(e);
-				}
-			})},
-			{name: "get_module_types", value: vfun0(() -> {
-				encodeArray(ccom().types.map(encodeModuleType));
-			})},
-			{name: "type_to_module_type", value: vfun1(t -> {
-				encodeModuleType(moduleTypeOfType(decodeType(t)));
-			})},
-			{name: "module_type_to_type", value: vfun1(t -> {
-				encodeType(typeOfModuleType(decodeModuleType(t)));
-			})},
-			{name: "apply_params", value: vfun3((tpl, tl, t) -> {
-				var tl = decodeArray(tl).map(decodeType);
-				var tpl = decodeArray(tpl).map(v -> {
-					var t = decodeType(field(v, "t"));
-					var defaultType:Null<T> = null; // we don't care here
-					var c = switch t {
-						case TInst(c = {clKind: KTypeParameter(_)}, _):
-							c;
-						case _:
-							(getApi().excString("Unexpected type where type parameter was expected: " + core.TPrinting.sTypeKind(t)) : TClass);
+						case t: encodeType(t);
 					}
-					mkTypeParam(c, TPHType, defaultType, null);
-				});
-				function map(t:T):T {
-					return switch t {
-						case TInst({clKind: KTypeParameter(_)}, _):
-							// use non-physical equality check here to make apply_params work
-							var found = Lambda.find(tpl, tp2 -> core.TUnification.TUnification.typeIseq(t, tp2.ttpType));
-							if (found != null) extractParamType(found) else TFunctions.map(map, t);
-						case _:
-							TFunctions.map(map, t);
+				})
+			},
+			{
+				name: "get_expected_type",
+				value: vfun0(() -> {
+					switch getApi().getExpectedType() {
+						case null: vnull;
+						case t: encodeType(t);
 					}
-				}
-				var t = map(decodeType(t));
-				var t = try {
-					applyParams(tpl, tl, t);
-				} catch (_:ApplyParamsMismatch) {
-					var msg = "Could not apply type parameters to " + core.TPrinting.sTypeKind(t) + ":\n\tparams: "
-						+ tpl.map(tp -> core.TPrinting.sTypeParam(core.TPrinting.sTypeKind, tp)).join(", ") + "\n\ttypes: "
-						+ tl.map(core.TPrinting.sTypeKind).join(", ");
-					(getApi().excString(msg) : T);
-				}
-				encodeType(t);
-			})},
-			{name: "include_file", value: vfun2((file, position) -> {
-				var file = decodeString(file);
-				var position = decodeString(position);
-				var file = if (sys.FileSystem.exists(file)) {
-					file;
-				} else {
-					try Common.findFile(ccom(), file) catch (e:Dynamic) if (isNotFound(e)) failwith("unable to find file for inclusion: " + file) else throw e;
-				}
-				ccom().includeFiles = [({file: file, position: position} : context.Common.IncludeFile)].concat(ccom().includeFiles);
-				var m = getApi().currentModule();
-				m.mExtra.mCacheBoundObjects.push(IncludeFile(file, position));
-				vnull;
-			})},
-			// Compilation server
-			{name: "server_add_module_check_policy", value: vfun3((filter, policy, recursive) -> {
-				var filter = decodeArray(filter).map(decodeString);
-				var policy = decodeArray(policy).map(decodeInt);
-				getApi().addModuleCheckPolicy(filter, policy, decodeBool(recursive));
-				vnull;
-			})},
-			{name: "server_invalidate_module", value: vfun1(p -> {
-				var mpath = Ast.parsePath(decodeString(p));
-				var com = ccom();
-				try {
-					com.moduleLut.find(mpath);
-					var msg = "Cannot invalidate loaded module " + MacroApi.sTypePath(mpath);
-					var pos = getApiCallPos();
-					compilerError(core.Error.makeError(core.Error.ErrorMsg.Custom(msg), pos));
-				} catch (e:NotFound) {
-					com.cs.taintModule(mpath, ServerInvalidateModule);
-				}
-				vnull;
-			})},
-			{name: "server_invalidate_files", value: vfun1(a -> {
-				var com = ccom();
-				var cs = com.cs;
-				for (v in decodeArray(a)) {
-					var s = decodeString(v);
-					var s = com.partScope.fileKeys.get(s);
-					cs.taintModules(s, ServerInvalidateFiles);
-					cs.removeFiles(s);
-				}
-				vnull;
-			})},
-			{name: "server_stats", value: vfun0(() -> {
-				var com = ccom();
-				var stats = com.requestScope.stats;
-				encodeObj([
-					fld("filesParsed", vint(stats.sFilesParsed)),
-					fld("modulesTyped", vint(stats.sModulesTyped)),
-					fld("modulesRestoredFromHxb", vint(stats.sModulesRestored)),
-					fld("classesBuilt", vint(stats.sClassesBuilt)),
-					fld("methodsTyped", vint(stats.sMethodsTyped)),
-					fld("macrosCalled", vint(stats.sMacrosCalled)),
-				]);
-			})},
-			{name: "position_to_range", value: vfun1(p -> {
-				var p = decodePos(p);
-				var c = syntax.Lexer.getPosCoords(p);
-				inline function makePos(line:Int, character:Int):Value {
-					return encodeObj([fld("line", vint(line)), fld("character", vint(character)),]);
-				}
-				var posStart = makePos(c.lineStart, c.columnStart);
-				var posEnd = makePos(c.lineEnd, c.columnEnd);
-				var range = encodeObj([fld("start", posStart), fld("end", posEnd),]);
-				var location = encodeObj([fld("file", encodeString(p.pfile)), fld("range", range)]);
-				location;
-			})},
-			{name: "position_to_zero_range", value: vfun1(p -> {
-				var p = decodePos(p);
-				encodePos(Globals.mkZeroRangePos(p));
-			})},
-			{name: "on_null_safety_report", value: vfun1(f -> {
-				var f = prepareCallback(f, 1);
-				ccom().callbacks.addNullSafetyReport(function(errors:Array<{msg:String, pos:Pos}>, warnings:Array<{warning:core.Message.WarningCode, msg:String, pos:Pos}>):Void {
-					inline function encodeItem(kind:String, msg:String, pos:Pos):Value {
-						return encodeObj([fld("type", encodeString(kind)), fld("msg", encodeString(msg)), fld("pos", encodePos(pos))]);
+				})
+			},
+			{
+				name: "get_call_arguments",
+				value: vfun0(() -> {
+					switch getApi().getCallArguments() {
+						case null: vnull;
+						case el: encodeArray(el.map(encodeExpr));
 					}
-					function encodeWarning(w:{warning:core.Message.WarningCode, msg:String, pos:Pos}):Value {
-						return encodeItem("warning", w.msg, w.pos);
+				})
+			},
+			{
+				name: "get_local_method",
+				value: vfun0(() -> {
+					encodeString(getApi().getLocalMethod());
+				})
+			},
+			{
+				name: "get_local_using",
+				value: vfun0(() -> {
+					encodeArray(getApi().getLocalUsing().map(encodeClref));
+				})
+			},
+			{
+				name: "get_local_imports",
+				value: vfun0(() -> {
+					encodeArray(getApi().getLocalImports().map(encodeImport));
+				})
+			},
+			{
+				name: "local_vars",
+				value: vfun1(asVar -> {
+					var asVar = decodeOptBool(asVar);
+					var vars = getApi().getLocalVars();
+					encodeStringMap(if (asVar) encodeTvar else(v:TVar) -> encodeType(v.vType), vars);
+				})
+			},
+			{
+				name: "follow_with_abstracts",
+				value: vfun2((v, once) -> {
+					var t = decodeType(v);
+					inline function followOnce(t:T):T {
+						return switch t {
+							case TMono(r):
+								switch r.tmType {
+									case null: t;
+									case t: t;
+								}
+							case TAbstract(a, tl) if (!Meta.has(core.MetaList.StrictMeta.CoreType, a.aMeta)):
+								core.Abstract.getUnderlyingType(a, tl);
+							case TAbstract(_) | TEnum(_) | TInst(_) | TFun(_) | TAnon(_) | TDynamic(_):
+								t;
+							case TType(t, tl):
+								applyTypedef(t, tl);
+							case TLazy(f):
+								lazyType(f);
+						}
 					}
-					var errors = errors.map(e -> encodeItem("error", e.msg, e.pos));
-					var warnings = warnings.map(encodeWarning);
-					f([encodeArray(errors.concat(warnings))]);
-				});
-				vnull;
-			})},
-			{name: "timer", value: vfun1(id -> {
-				var com = ccom();
-				var fullId = (com.timerCtx.current.id : Array<String>).concat([decodeString(id)]);
-				// TIMERTODO: Exposing this seems potentially dangerous... Have to at least document.
-				var stop = core.Timer.startTimer(com.timerCtx, fullId);
-				vfun0(() -> {
-					stop();
+					encodeType(if (decodeOptBool(once)) followOnce(t) else core.Abstract.followWithAbstracts(t));
+				})
+			},
+			{
+				name: "follow",
+				value: vfun2((v, once) -> {
+					var t = decodeType(v);
+					encodeType(if (decodeOptBool(once)) TFunctions.followOnce(t) else follow(t));
+				})
+			},
+			{
+				name: "get_build_fields",
+				value: vfun0(() -> {
+					getApi().getBuildFields();
+				})
+			},
+			{
+				name: "define_type",
+				value: vfun2((v, m) -> {
+					getApi().defineType(v, opt(decodeString, m));
 					vnull;
-				});
-			})},
-			{name: "map_anon_ref", value: vfun2((aRef, fn) -> {
-				var a:TAnon = decodeRef(aRef);
-				var fn = prepareCallback(fn, 1);
-				switch TFunctions.map(t -> decodeType(fn([encodeType(t)])), T.TAnon(a)) {
-					case TAnon(a): encodeRef(a, encodeTanon, () -> "<anonymous>");
-					case _: Globals.die("", "macroApi.ml map_anon_ref");
-				}
-			})},
-			{name: "with_imports", value: vfun3((imports, usings, f) -> {
-				var imports = decodeArray(imports).map(decodeString);
-				var imports:Array<Import> = imports.map(s -> (getApi().parse((pctx, s) -> @:privateAccess syntax.Grammar.parseImport2(pctx, s, Globals.nullPos), s) : Import));
-				var usings = decodeArray(usings).map(decodeString);
-				var usings:Array<Array<PlacedName>> = usings.map(s -> (getApi().parse((pctx, s) -> @:privateAccess syntax.Grammar.parseUsing2(pctx, s, Globals.nullPos), s) : Array<PlacedName>));
-				var f = prepareCallback(f, 0);
-				(getApi().withImports(imports, usings, () -> f([])) : Value);
-			})},
-			{name: "with_options", value: vfun2((opts, f) -> {
-				var o:CompilerOptions = {
-					optInlining: opt(decodeBool, field(opts, "allowInlining")),
-					optTransform: opt(decodeBool, field(opts, "allowTransform")),
-				};
-				var f = prepareCallback(f, 0);
-				(getApi().withOptions(o, () -> f([])) : Value);
-			})},
-			{name: "set_var_name", value: vfun2((v, name) -> {
-				var v = decodeTvar(v);
-				var name = decodeString(name);
-				v.vName = name;
-				vnull;
-			})},
-			{name: "get_hxb_writer_config", value: vfun0(() -> {
-				getApi().getHxbWriterConfig();
-			})},
-			{name: "set_hxb_writer_config", value: vfun1(v -> {
-				getApi().setHxbWriterConfig(v);
-				vnull;
-			})},
-			{name: "associate_enum_value_pos", value: vfun2((ve, vp) -> {
-				var p = decodePos(vp);
-				associateEnumValuePos(ve, p);
-				vnull;
-			})},
+				})
+			},
+			{
+				name: "make_monomorph",
+				value: vfun0(() -> {
+					var t = T.TMono(core.TUnification.Monomorph.create());
+					encodeType(t);
+				})
+			},
+			{
+				name: "define_module",
+				value: vfun4((path, vl, ui, ul) -> {
+					getApi().defineModule(decodeString(path), decodeArray(vl), decodeArray(ui).map(v -> {
+						var imp = decodeImport(v);
+						{path: imp.path, mode: imp.mode};
+					}), decodeArray(ul).map(decodeAstPath).map(ptp -> ptp.path));
+					vnull;
+				})
+			},
+			{
+				name: "add_class_path",
+				value: vfun1(cp -> {
+					var com = ccom();
+					var cp = decodeString(cp);
+					var path = core.Path.addTrailingSlash(cp);
+					var cp = new core.ClassPath.DirectoryClassPath(path, User);
+					com.classPaths.add(cp);
+					switch com.getMacros() {
+						case null:
+						case mcom:
+							mcom.classPaths.add(cp.clone());
+					}
+					com.classPaths.clearCache();
+					vnull;
+				})
+			},
+			{
+				name: "add_native_lib",
+				value: vfun1(file -> {
+					var file = decodeString(file);
+					var com = ccom();
+					var kind:compiler.ParsedArg.NativeLibKind = switch com.platform {
+						case Jvm: JavaLib;
+						case Flash: SwfLib;
+						case _: failwith("Unsupported platform");
+					}
+					// create_native_lib / NativeLibraryHandler.add_native_lib: Java and SWF
+					// libraries are not part of the port
+					notSupported("Adding native libraries (" + Std.string(kind) + " " + file + ")");
+				})
+			},
+			{
+				name: "register_module_dependency",
+				value: vfun2((m, file) -> {
+					getApi().moduleDependency(decodeString(m), decodeString(file));
+					vnull;
+				})
+			},
+			{
+				name: "get_typed_expr",
+				value: vfun1(e -> {
+					var e = decodeTexpr(e);
+					encodeExpr(core.TOther.TExprToExpr.convertExpr(e));
+				})
+			},
+			{
+				name: "store_expr",
+				value: vfun1(e -> {
+					var api = getApi();
+					var te = api.typeExpr(decodeExpr(e));
+					encodeExpr(api.storeTypedExpr(te));
+				})
+			},
+			{
+				name: "store_typed_expr",
+				value: vfun1(e -> {
+					var e = decodeTexpr(e);
+					encodeExpr(getApi().storeTypedExpr(e));
+				})
+			},
+			{
+				name: "type_and_store_expr",
+				value: vfun1(e -> {
+					var api = getApi();
+					var te = api.typeExpr(decodeExpr(e));
+					var vE = encodeExpr(api.storeTypedExpr(te));
+					function vToString():String return core.TPrinting.sType(core.TPrinting.printContext(), te.etype);
+					encodeObj([fld("expr", vE), fld("type", encodeRef(te.etype, encodeType, vToString))]);
+				})
+			},
+			{
+				name: "get_output",
+				value: vfun0(() -> {
+					encodeString(ccom().file);
+				})
+			},
+			{
+				name: "set_output",
+				value: vfun1(s -> {
+					ccom().file = decodeString(s);
+					vnull;
+				})
+			},
+			{
+				name: "get_display_pos",
+				value: vfun0(() -> {
+					var p = core.display.DisplayPosition.displayPosition.get();
+					if (posEq(p, Globals.nullPos))
+						vnull;
+					else
+						encodeObj([fld("file", encodeString(p.pfile)), fld("pos", vint(p.pmin))]);
+				})
+			},
+			{
+				name: "get_display_mode",
+				value: vfun0(() -> {
+					encodeDisplayMode(ccom().display.dmsKind);
+				})
+			},
+			{
+				name: "get_configuration",
+				value: vfun0(() -> {
+					var com = ccom();
+					encodeObj([
+						fld("version", vint(com.sctx.version.version)),
+						fld("args", encodeArray(compiler.Args.toRawArgs(com.parsedArgs).map(encodeString))),
+						fld("debug", vbool(com.debug)),
+						fld("verbose", vbool(com.verbose)),
+						fld("foptimize", vbool(com.foptimize)),
+						fld("platform", encodePlatform(com.platform)),
+						fld("platformConfig", encodePlatformConfig(com.config)),
+						fld("stdPath",
+							encodeArray((com.classPaths.getStdPaths() : Array<core.ClassPath.IClassPath>).map(path ->
+								encodeString(path.path)))),
+						fld("mainClass", switch com.main.mainPath {
+							case null: vnull;
+							case path: encodePath(path);
+						}),
+						fld("packageRules", encodeStringMap(encodePackageRule, com.packageRules)),
+					]);
+				})
+			},
+			{
+				name: "set_platform_configuration",
+				value: vfun1(v -> {
+					ccom().config = decodePlatformConfig(v);
+					vnull;
+				})
+			},
+			{
+				name: "get_main_expr",
+				value: vfun0(() -> {
+					switch ccom().main.mainExpr {
+						case null: vnull;
+						case e: encodeTexpr(e);
+					}
+				})
+			},
+			{
+				name: "get_module_types",
+				value: vfun0(() -> {
+					encodeArray(ccom().types.map(encodeModuleType));
+				})
+			},
+			{
+				name: "type_to_module_type",
+				value: vfun1(t -> {
+					encodeModuleType(moduleTypeOfType(decodeType(t)));
+				})
+			},
+			{
+				name: "module_type_to_type",
+				value: vfun1(t -> {
+					encodeType(typeOfModuleType(decodeModuleType(t)));
+				})
+			},
+			{
+				name: "apply_params",
+				value: vfun3((tpl, tl, t) -> {
+					var tl = decodeArray(tl).map(decodeType);
+					var tpl = decodeArray(tpl).map(v -> {
+						var t = decodeType(field(v, "t"));
+						var defaultType:Null<T> = null; // we don't care here
+						var c = switch t {
+							case TInst(c = {clKind: KTypeParameter(_)}, _):
+								c;
+							case _:
+								(getApi().excString("Unexpected type where type parameter was expected: "
+									+ core.TPrinting.sTypeKind(t)) : TClass);
+						}
+						mkTypeParam(c, TPHType, defaultType, null);
+					});
+					function map(t:T):T {
+						return switch t {
+							case TInst({clKind: KTypeParameter(_)}, _):
+								// use non-physical equality check here to make apply_params work
+								var found = Lambda.find(tpl, tp2 -> core.TUnification.TUnification.typeIseq(t, tp2.ttpType));
+								if (found != null) extractParamType(found) else TFunctions.map(map, t);
+							case _:
+								TFunctions.map(map, t);
+						}
+					}
+					var t = map(decodeType(t));
+					var t = try {
+						applyParams(tpl, tl, t);
+					} catch (_:ApplyParamsMismatch) {
+						var msg = "Could not apply type parameters to "
+							+ core.TPrinting.sTypeKind(t)
+							+ ":\n\tparams: "
+							+ tpl.map(tp -> core.TPrinting.sTypeParam(core.TPrinting.sTypeKind, tp)).join(", ")
+							+ "\n\ttypes: "
+							+ tl.map(core.TPrinting.sTypeKind).join(", ");
+						(getApi().excString(msg) : T);
+					}
+					encodeType(t);
+				})
+			},
+			{
+				name: "include_file",
+				value: vfun2((file, position) -> {
+					var file = decodeString(file);
+					var position = decodeString(position);
+					var file = if (sys.FileSystem.exists(file)) {
+						file;
+					} else {
+						try Common.findFile(ccom(), file)
+						catch (e:Dynamic) if (isNotFound(e)) failwith("unable to find file for inclusion: " + file)
+						else throw e;
+					}
+					ccom().includeFiles = [({file: file, position: position} : context.Common.IncludeFile)].concat(ccom().includeFiles);
+					var m = getApi().currentModule();
+					m.mExtra.mCacheBoundObjects.push(IncludeFile(file, position));
+					vnull;
+				})
+			},
+			// Compilation server
+			{
+				name: "server_add_module_check_policy",
+				value: vfun3((filter, policy, recursive) -> {
+					var filter = decodeArray(filter).map(decodeString);
+					var policy = decodeArray(policy).map(decodeInt);
+					getApi().addModuleCheckPolicy(filter, policy, decodeBool(recursive));
+					vnull;
+				})
+			},
+			{
+				name: "server_invalidate_module",
+				value: vfun1(p -> {
+					var mpath = Ast.parsePath(decodeString(p));
+					var com = ccom();
+					try {
+						com.moduleLut.find(mpath);
+						var msg = "Cannot invalidate loaded module " + MacroApi.sTypePath(mpath);
+						var pos = getApiCallPos();
+						compilerError(core.Error.makeError(core.Error.ErrorMsg.Custom(msg), pos));
+					} catch (e:NotFound) {
+						com.cs.taintModule(mpath, ServerInvalidateModule);
+					}
+					vnull;
+				})
+			},
+			{
+				name: "server_invalidate_files",
+				value: vfun1(a -> {
+					var com = ccom();
+					var cs = com.cs;
+					for (v in decodeArray(a)) {
+						var s = decodeString(v);
+						var s = com.partScope.fileKeys.get(s);
+						cs.taintModules(s, ServerInvalidateFiles);
+						cs.removeFiles(s);
+					}
+					vnull;
+				})
+			},
+			{
+				name: "server_stats",
+				value: vfun0(() -> {
+					var com = ccom();
+					var stats = com.requestScope.stats;
+					encodeObj([
+						fld("filesParsed", vint(stats.sFilesParsed)),
+						fld("modulesTyped", vint(stats.sModulesTyped)),
+						fld("modulesRestoredFromHxb", vint(stats.sModulesRestored)),
+						fld("classesBuilt", vint(stats.sClassesBuilt)),
+						fld("methodsTyped", vint(stats.sMethodsTyped)),
+						fld("macrosCalled", vint(stats.sMacrosCalled)),
+					]);
+				})
+			},
+			{
+				name: "position_to_range",
+				value: vfun1(p -> {
+					var p = decodePos(p);
+					var c = syntax.Lexer.getPosCoords(p);
+					inline function makePos(line:Int, character:Int):Value {
+						return encodeObj([fld("line", vint(line)), fld("character", vint(character)),]);
+					}
+					var posStart = makePos(c.lineStart, c.columnStart);
+					var posEnd = makePos(c.lineEnd, c.columnEnd);
+					var range = encodeObj([fld("start", posStart), fld("end", posEnd),]);
+					var location = encodeObj([fld("file", encodeString(p.pfile)), fld("range", range)]);
+					location;
+				})
+			},
+			{
+				name: "position_to_zero_range",
+				value: vfun1(p -> {
+					var p = decodePos(p);
+					encodePos(Globals.mkZeroRangePos(p));
+				})
+			},
+			{
+				name: "on_null_safety_report",
+				value: vfun1(f -> {
+					var f = prepareCallback(f, 1);
+					ccom().callbacks.addNullSafetyReport(function(errors:Array<{msg:String, pos:Pos}>,
+							warnings:Array<{warning:core.Message.WarningCode, msg:String, pos:Pos}>):Void {
+						inline function encodeItem(kind:String, msg:String, pos:Pos):Value {
+							return encodeObj([
+								fld("type", encodeString(kind)),
+								fld("msg", encodeString(msg)),
+								fld("pos", encodePos(pos))
+							]);
+						}
+						function encodeWarning(w:{warning:core.Message.WarningCode, msg:String, pos:Pos}):Value {
+							return encodeItem("warning", w.msg, w.pos);
+						}
+						var errors = errors.map(e -> encodeItem("error", e.msg, e.pos));
+						var warnings = warnings.map(encodeWarning);
+						f([encodeArray(errors.concat(warnings))]);
+					});
+					vnull;
+				})
+			},
+			{
+				name: "timer",
+				value: vfun1(id -> {
+					var com = ccom();
+					var fullId = (com.timerCtx.current.id : Array<String>).concat([decodeString(id)]);
+					// TIMERTODO: Exposing this seems potentially dangerous... Have to at least document.
+					var stop = core.Timer.startTimer(com.timerCtx, fullId);
+					vfun0(() -> {
+						stop();
+						vnull;
+					});
+				})
+			},
+			{
+				name: "map_anon_ref",
+				value: vfun2((aRef, fn) -> {
+					var a:TAnon = decodeRef(aRef);
+					var fn = prepareCallback(fn, 1);
+					switch TFunctions.map(t -> decodeType(fn([encodeType(t)])), T.TAnon(a)) {
+						case TAnon(a): encodeRef(a, encodeTanon, () -> "<anonymous>");
+						case _: Globals.die("", "macroApi.ml map_anon_ref");
+					}
+				})
+			},
+			{
+				name: "with_imports",
+				value: vfun3((imports, usings, f) -> {
+					var imports = decodeArray(imports).map(decodeString);
+					var imports:Array<Import> = imports.map(s -> (getApi().parse((pctx,
+							s) -> @:privateAccess syntax.Grammar.parseImport2(pctx, s, Globals.nullPos), s) : Import));
+					var usings = decodeArray(usings).map(decodeString);
+					var usings:Array<Array<PlacedName>> = usings.map(s -> (getApi().parse((pctx,
+							s) -> @:privateAccess syntax.Grammar.parseUsing2(pctx, s, Globals.nullPos), s) : Array<PlacedName>));
+					var f = prepareCallback(f, 0);
+					(getApi().withImports(imports, usings, () -> f([])) : Value);
+				})
+			},
+			{
+				name: "with_options",
+				value: vfun2((opts, f) -> {
+					var o:CompilerOptions = {
+						optInlining: opt(decodeBool, field(opts, "allowInlining")),
+						optTransform: opt(decodeBool, field(opts, "allowTransform")),
+					};
+					var f = prepareCallback(f, 0);
+					(getApi().withOptions(o, () -> f([])) : Value);
+				})
+			},
+			{
+				name: "set_var_name",
+				value: vfun2((v, name) -> {
+					var v = decodeTvar(v);
+					var name = decodeString(name);
+					v.vName = name;
+					vnull;
+				})
+			},
+			{
+				name: "get_hxb_writer_config",
+				value: vfun0(() -> {
+					getApi().getHxbWriterConfig();
+				})
+			},
+			{
+				name: "set_hxb_writer_config",
+				value: vfun1(v -> {
+					getApi().setHxbWriterConfig(v);
+					vnull;
+				})
+			},
+			{
+				name: "associate_enum_value_pos",
+				value: vfun2((ve, vp) -> {
+					var p = decodePos(vp);
+					associateEnumValuePos(ve, p);
+					vnull;
+				})
+			},
 		];
 	}
 }

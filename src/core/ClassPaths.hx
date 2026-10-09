@@ -9,9 +9,15 @@ import core.StringHelper;
 @:structInit class ResolvedFile {
 	public var file:String;
 	public var classPath:IClassPath;
-	public inline function new(file:String, classPath:IClassPath) { this.file = file; this.classPath = classPath; }
+
+	public inline function new(file:String, classPath:IClassPath) {
+		this.file = file;
+		this.classPath = classPath;
+	}
+
 	public inline function clone():ResolvedFile return new ResolvedFile(file, classPath);
 }
+
 enum FileResolutionSpecificity {
 	SpecificityNormal;
 	SpecificityPlatformSpecific;
@@ -23,9 +29,15 @@ enum FileResolutionSpecificity {
 @:structInit class FileLookup {
 	public var resolvedFile:ResolvedFile;
 	public var specificity:FileResolutionSpecificity;
-	public inline function new(resolvedFile:ResolvedFile, specificity:FileResolutionSpecificity) { this.resolvedFile = resolvedFile; this.specificity = specificity; }
+
+	public inline function new(resolvedFile:ResolvedFile, specificity:FileResolutionSpecificity) {
+		this.resolvedFile = resolvedFile;
+		this.specificity = specificity;
+	}
+
 	public inline function clone():FileLookup return new FileLookup(resolvedFile, specificity);
 }
+
 class ClassPaths {
 	public static final absoluteClassPath:IClassPath = new DirectoryClassPath("", User);
 
@@ -105,7 +117,10 @@ class ClassPaths {
 		if (fileLookupCache.exists(file)) return fileLookupCache.get(file);
 		var result:Null<FileLookup> = null;
 		if (isAbsolutePath(file)) {
-			if (sys.FileSystem.exists(file)) result = {resolvedFile: {file: file, classPath: absoluteClassPath}, specificity: SpecificityNormal};
+			if (sys.FileSystem.exists(file)) result = {
+				resolvedFile: {file: file, classPath: absoluteClassPath},
+				specificity: SpecificityNormal
+			};
 		} else {
 			for (path in paths) {
 				var listing = path.getUncachedDirListing(file);
@@ -130,7 +145,9 @@ class ClassPaths {
 		var lowerFullPath = fullPath.toLowerCase();
 		for (path in paths) {
 			var classPath = normalize(path.path).toLowerCase();
-			if (classPath.length > 0 && classPath.length < lowerFullPath.length && lowerFullPath.substr(0, classPath.length) == classPath) return fullPath.substr(classPath.length);
+			if (classPath.length > 0
+				&& classPath.length < lowerFullPath.length
+				&& lowerFullPath.substr(0, classPath.length) == classPath) return fullPath.substr(classPath.length);
 		}
 		return file;
 	}
@@ -171,8 +188,11 @@ class ClassPaths {
 			var fullPath = directory == "." ? ownName : directory + "/" + ownName;
 			var resolved:FileLookup = {resolvedFile: {file: fullPath, classPath: classPath}, specificity: specificity};
 			var previous = fileLookupCache.get(representation);
-			if (!fileLookupCache.exists(representation) || previous == null || specificityRank(previous.specificity) < specificityRank(specificity)) fileLookupCache.set(representation, resolved);
-			if (representation == search && (found == null || specificityRank(found.specificity) < specificityRank(specificity))) found = resolved;
+			if (!fileLookupCache.exists(representation)
+				|| previous == null
+				|| specificityRank(previous.specificity) < specificityRank(specificity)) fileLookupCache.set(representation, resolved);
+			if (representation == search
+				&& (found == null || specificityRank(found.specificity) < specificityRank(specificity))) found = resolved;
 		}
 		return found;
 	}

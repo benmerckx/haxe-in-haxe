@@ -19,9 +19,8 @@ class PriorityQueues {
 		return switch (queue) {
 			case Empty: Node(priority, element, Empty, Empty);
 			case Node(currentPriority, currentElement, left, right):
-				priority <= currentPriority
-					? Node(priority, element, insert(right, currentPriority, currentElement), left)
-					: Node(currentPriority, currentElement, insert(right, priority, element), left);
+				priority <= currentPriority ? Node(priority, element, insert(right, currentPriority, currentElement),
+					left) : Node(currentPriority, currentElement, insert(right, priority, element), left);
 		};
 	}
 
@@ -31,9 +30,8 @@ class PriorityQueues {
 			case Node(_, _, left, Empty): left;
 			case Node(_, _, Empty, right): right;
 			case Node(_, _, (left = Node(leftPriority, leftElement, _, _)), (right = Node(rightPriority, rightElement, _, _))):
-				leftPriority <= rightPriority
-					? Node(leftPriority, leftElement, removeTop(left), right)
-					: Node(rightPriority, rightElement, left, removeTop(right));
+				leftPriority <= rightPriority ? Node(leftPriority, leftElement, removeTop(left),
+					right) : Node(rightPriority, rightElement, left, removeTop(right));
 		};
 	}
 
@@ -58,7 +56,8 @@ class PriorityQueues {
 			case Node(priority, element, Empty, right): fold(right, callback, callback(initial, priority, element));
 			case Node(priority, element, (left = Node(leftPriority, _, _, _)), (right = Node(rightPriority, _, _, _))):
 				var result = callback(initial, priority, element);
-				leftPriority <= rightPriority ? fold(right, callback, fold(left, callback, result)) : fold(left, callback, fold(right, callback, result));
+				leftPriority <= rightPriority ? fold(right, callback,
+					fold(left, callback, result)) : fold(left, callback, fold(right, callback, result));
 		};
 	}
 

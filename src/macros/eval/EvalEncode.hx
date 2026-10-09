@@ -19,7 +19,6 @@ using macros.eval.EvalValue.EvalValueTools;
 **/
 class EvalEncode {
 	// Functions
-
 	public static function vifun0(f:Value->Value):Value return VFunction(vl -> switch vl {
 		case []: f(VNull);
 		case [v0]: f(v0);
@@ -138,7 +137,8 @@ class EvalEncode {
 	}
 
 	/** `ctx.get_object_prototype ctx l`: the prototype and the sorted fields. **/
-	public static function getObjectPrototype(ctx:Context, l:Array<{name:Int, value:Value}>):{proto:Vprototype, sorted:Array<{name:Int, value:Value}>} {
+	public static function getObjectPrototype(ctx:Context,
+			l:Array<{name:Int, value:Value}>):{proto:Vprototype, sorted:Array<{name:Int, value:Value}>} {
 		var sorted = sortObjectFields(l);
 		var proto = ctx.getObjectPrototype(ctx, [for (f in sorted) f.name]);
 		return {proto: proto, sorted: sorted};
@@ -200,7 +200,8 @@ class EvalEncode {
 	// Instances
 
 	public static function createInstanceDirect(proto:Vprototype, kind:VinstanceKind):Value {
-		return VInstance(new Vinstance(proto.pinstanceFields.length == 0 ? proto.pinstanceFields : proto.pinstanceFields.copy(), proto, kind));
+		return VInstance(new Vinstance(proto.pinstanceFields.length == 0 ? proto.pinstanceFields : proto.pinstanceFields.copy(), proto,
+			kind));
 	}
 
 	public static function createInstance(path:Int, ?kind:VinstanceKind):Vinstance {
@@ -231,15 +232,17 @@ class EvalEncode {
 
 	public static final encodeBytes:haxe.io.Bytes->Value = createCachedInstance(EvalHash.key_haxe_io_Bytes, s -> IBytes(s));
 
-	public static final encodeIntMapDirect:RuntimeIntHashtbl<Value>->Value = createCachedInstance(EvalHash.key_haxe_ds_IntMap, s -> IIntMap(s));
+	public static final encodeIntMapDirect:RuntimeIntHashtbl<Value>->Value = createCachedInstance(EvalHash.key_haxe_ds_IntMap,
+		s -> IIntMap(s));
 
-	public static final encodeInt64MapDirect:RuntimeInt64Hashtbl<Value>->Value = createCachedInstance(EvalHash.key_haxe_ds_Int64Map, s -> IInt64Map(s));
+	public static final encodeInt64MapDirect:RuntimeInt64Hashtbl<Value>->Value = createCachedInstance(EvalHash.key_haxe_ds_Int64Map,
+		s -> IInt64Map(s));
 
 	public static final encodeStringMapDirect:RuntimeStringHashtbl<Value>->Value = createCachedInstance(EvalHash.key_haxe_ds_StringMap,
 		s -> IStringMap(s));
 
-	public static final encodeObjectMapDirect:core.ds.OcamlHashtbl<Value, Value>->Value = createCachedInstance(EvalHash.key_haxe_ds_ObjectMap,
-		s -> IObjectMap(s));
+	public static final encodeObjectMapDirect:core.ds.OcamlHashtbl<Value, Value>->
+		Value = createCachedInstance(EvalHash.key_haxe_ds_ObjectMap, s -> IObjectMap(s));
 
 	/** `m` is upstream's string PMap; the resulting map is ordered by key either way. **/
 	public static function encodeStringMap<T>(convert:T->Value, m:Map<String, T>):Value {
@@ -268,7 +271,8 @@ class EvalEncode {
 	}
 
 	public static function encodeLazytype(t:core.TType.TLazy, f:Void->Value):Value {
-		return VInstance(new Vinstance([], fakeProto(EvalContext.getCtx().fakeProtoCache, EvalHash.key_haxe_macro_LazyType), ILazyType(t, f)));
+		return VInstance(new Vinstance([], fakeProto(EvalContext.getCtx().fakeProtoCache, EvalHash.key_haxe_macro_LazyType),
+			ILazyType(t, f)));
 	}
 
 	public static function encodeTdecl(t:core.TType.ModuleType):Value {

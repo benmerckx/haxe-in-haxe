@@ -407,22 +407,44 @@ int32_t hxc_NativeSsl_sslHandshake(void *ssl) {
 	return mbedtls_ssl_handshake(&s->ssl);
 }
 
+// OS threads: the BIO callbacks wait in safe regions (a collection may move
+// `buf` meanwhile), so mbedtls reads and writes a malloc'ed copy
 int32_t hxc_NativeSsl_sslRead(void *ssl, void *buf, int32_t pos, int32_t len) {
 	hx_ssl *s = PTR(ssl);
 	s->bio_errno = 0;
+#if RT_MT
+	unsigned char *tmp = (unsigned char *)malloc(len > 0 ? (size_t)len : 1);
+	RT_ROOT(buf);
+	int r = mbedtls_ssl_read(&s->ssl, tmp, (size_t)len);
+	RT_RELOAD(buf);
+	RT_UNROOT(1);
+	if (r > 0) memcpy(BYTES_DATA(buf) + pos, tmp, (size_t)r);
+	free(tmp);
+	return r;
+#else
 	return mbedtls_ssl_read(&s->ssl, BYTES_DATA(buf) + pos, (size_t)len);
+#endif
 }
 
 int32_t hxc_NativeSsl_sslWrite(void *ssl, void *buf, int32_t pos, int32_t len) {
 	hx_ssl *s = PTR(ssl);
 	s->bio_errno = 0;
+#if RT_MT
+	unsigned char *tmp = (unsigned char *)malloc(len > 0 ? (size_t)len : 1);
+	if (len > 0) memcpy(tmp, BYTES_DATA(buf) + pos, (size_t)len);
+	int r = mbedtls_ssl_write(&s->ssl, tmp, (size_t)len);
+	free(tmp);
+	return r;
+#else
 	return mbedtls_ssl_write(&s->ssl, BYTES_DATA(buf) + pos, (size_t)len);
+#endif
 }
 
 // Unix.send socket bytes 0 (Bytes.length bytes) []
 static int bio_write_cb(void *ctx, const unsigned char *buf, size_t len) {
 	hx_ssl *s = ctx;
-	ssize_t r = send(s->fd, buf, len, 0);
+	ssize_t r;
+	RT_BLOCKING(r = send(s->fd, buf, len, 0));
 	if (r < 0) {
 		s->bio_errno = errno;
 		s->bio_send = 1;
@@ -434,7 +456,8 @@ static int bio_write_cb(void *ctx, const unsigned char *buf, size_t len) {
 // Unix.recv socket bytes 0 (Bytes.length bytes) []
 static int bio_read_cb(void *ctx, unsigned char *buf, size_t len) {
 	hx_ssl *s = ctx;
-	ssize_t r = recv(s->fd, buf, len, 0);
+	ssize_t r;
+	RT_BLOCKING(r = recv(s->fd, buf, len, 0));
 	if (r < 0) {
 		s->bio_errno = errno;
 		s->bio_send = 0;

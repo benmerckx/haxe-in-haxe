@@ -34,7 +34,6 @@ using macros.eval.EvalValue.EvalValueTools;
 **/
 class EvalJit {
 	// Helper
-
 	public static function ropePath(t:T):String {
 		return switch follow(t) {
 			case TInst({clPath: path}, _) | TEnum({ePath: path}, _) | TAbstract({aPath: path}, _): Globals.sTypePath(path);
@@ -79,7 +78,8 @@ class EvalJit {
 		for (e in c.casePatterns) {
 			switch e.eexpr {
 				case TConst(TInt(_)):
-				case _: return false;
+				case _:
+					return false;
 			}
 		}
 		return true;
@@ -154,7 +154,8 @@ class EvalJit {
 		switch e1.eexpr {
 			case TLocal(v):
 				var exec = jitExprRec(jit, false, e2);
-				if (hasVarFlag(v, VCaptured)) return EvalEmitter.emitCaptureReadWrite(EvalJitContext.getCaptureSlot(jit, v), exec, op, prefix);
+				if (hasVarFlag(v,
+					VCaptured)) return EvalEmitter.emitCaptureReadWrite(EvalJitContext.getCaptureSlot(jit, v), exec, op, prefix);
 				else return EvalEmitter.emitLocalReadWrite(EvalJitContext.getSlot(jit, v.vId, e1.epos), exec, op, prefix);
 			case TField(ef, fa):
 				var name = EvalHash.hash(fieldName(fa));
@@ -212,8 +213,8 @@ class EvalJit {
 				switch Texpr.skip(e1) {
 					case {eexpr: TLocal(v)} if (!hasVarFlag(v, VCaptured)):
 						var slot = EvalJitContext.getSlot(jit, v.vId, e1.epos);
-						if (flag == Prefix) return EvalEmitter.emitLocalIncrPrefix(slot, e1.epos);
-						else return EvalEmitter.emitLocalIncrPostfix(slot, e1.epos);
+						if (flag == Prefix) return EvalEmitter.emitLocalIncrPrefix(slot,
+							e1.epos); else return EvalEmitter.emitLocalIncrPostfix(slot, e1.epos);
 					case _:
 						return opIncr(jit, e1, flag == Prefix, p);
 				}
@@ -269,9 +270,13 @@ class EvalJit {
 				case TConst(ct):
 					return EvalEmitter.emitConst(evalConst(ct));
 				case TObjectDecl(fl):
-					var fl2 = [for (f in fl) {key: EvalHash.hash(f.key.name), exec: jitExprRec(jit, false, f.expr)}];
+					var fl2 = [
+						for (f in fl) {key: EvalHash.hash(f.key.name), exec: jitExprRec(jit, false, f.expr)}
+					];
 					var proto = ctx.getObjectPrototype(ctx, [for (f in fl2) f.key]);
-					var fa = [for (f in fl2) {i: EvalContext.getInstanceFieldIndex(proto, f.key, e.epos), exec: f.exec}];
+					var fa = [
+						for (f in fl2) {i: EvalContext.getInstanceFieldIndex(proto, f.key, e.epos), exec: f.exec}
+					];
 					return EvalEmitter.emitObjectDeclaration(proto, fa);
 				case TArrayDecl(el):
 					var execs = [for (e in el) jitExprRec(jit, false, e)];
@@ -376,8 +381,8 @@ class EvalJit {
 					var execBody = jitExprRec(jit, false, e2);
 					switch flag {
 						case NormalWhile:
-							if (hasContinue(e2)) return EvalEmitter.emitWhileBreakContinue(execCond, execBody);
-							else return EvalEmitter.emitWhileBreak(execCond, execBody);
+							if (hasContinue(e2)) return EvalEmitter.emitWhileBreakContinue(execCond,
+								execBody); else return EvalEmitter.emitWhileBreak(execCond, execBody);
 						case DoWhile:
 							return EvalEmitter.emitDoWhileBreakContinue(execCond, execBody);
 					}
@@ -479,7 +484,8 @@ class EvalJit {
 							return EvalEmitter.emitVectorLengthRead(jitExprRec(jit, false, e1), e1.epos);
 						case FInstance({clPath: {pack: ["haxe", "io"], name: "Bytes"}}, _, {cfName: "length"}):
 							return EvalEmitter.emitBytesLengthRead(jitExprRec(jit, false, e1), e1.epos);
-						case FStatic({clPath: path}, _) | FEnum({ePath: path}, _) | FInstance({clPath: path}, _, {cfKind: Method(MethNormal | MethInline)}):
+						case FStatic({clPath: path}, _) | FEnum({ePath: path}, _) |
+							FInstance({clPath: path}, _, {cfKind: Method(MethNormal | MethInline)}):
 							var proto = EvalContext.getStaticPrototype(ctx, EvalHash.pathHash(path), e1.epos);
 							return EvalEmitter.emitProtoFieldRead(proto, EvalContext.getProtoFieldIndex(proto, name));
 						case FInstance(c, _, _) if (!hasClassFlag(c, CInterface)):
@@ -634,11 +640,12 @@ class EvalJit {
 				var name = EvalHash.hash(fieldName(fa));
 				var execs = [for (e in el) jitExprRec(jit, false, e)];
 				inline function isFinal(c:TClass, cf:TClassField):Bool {
-					return hasClassFlag(c, CFinal) || (hasClassFieldFlag(cf, CfFinal)) ||
-						/* In interp mode we can assume that a field is final if it is not overridden.
+					return hasClassFlag(c, CFinal)
+						|| (hasClassFieldFlag(cf, CfFinal))
+						|| /* In interp mode we can assume that a field is final if it is not overridden.
 							We cannot do that in macro mode because overriding fields might be added
-							after jitting this call. */
-						(!ctx.isMacro && !ctx.overrides.exists(Globals.sTypePath(c.clPath) + "." + cf.cfName));
+							after jitting this call. */ (!ctx.isMacro
+							&& !ctx.overrides.exists(Globals.sTypePath(c.clPath) + "." + cf.cfName));
 				}
 				inline function isProperMethod(cf:TClassField):Bool {
 					return switch cf.cfKind {
@@ -671,11 +678,11 @@ class EvalJit {
 				}
 				switch fa {
 					case FStatic({clPath: {pack: [], name: "StringTools"}}, {cfName: "fastCodeAt"}):
-						if (execs.length == 2) return EvalEmitter.emitStringCca(execs[0], execs[1], e.epos);
-						else return Globals.die("", "evalJit.ml:fastCodeAt");
+						if (execs.length == 2) return EvalEmitter.emitStringCca(execs[0], execs[1],
+							e.epos); else return Globals.die("", "evalJit.ml:fastCodeAt");
 					case FStatic({clPath: {pack: [], name: "StringTools"}}, {cfName: "unsafeCodeAt"}):
-						if (execs.length == 2) return EvalEmitter.emitStringCcaUnsafe(execs[0], execs[1], e.epos);
-						else return Globals.die("", "evalJit.ml:unsafeCodeAt");
+						if (execs.length == 2) return EvalEmitter.emitStringCcaUnsafe(execs[0], execs[1],
+							e.epos); else return Globals.die("", "evalJit.ml:unsafeCodeAt");
 					case FEnum({ePath: path}, ef):
 						var key = EvalHash.pathHash(path);
 						var pos:Null<Pos> = e.epos;
@@ -685,18 +692,16 @@ class EvalJit {
 						var v = lazyProtoField(proto);
 						return EvalEmitter.emitProtoFieldCall(v, execs, e.epos);
 					case FInstance(c, _, cf) if (isProperMethod(cf)):
-						if (!isFinal(c, cf))
-							return defaultCall();
-						else if (!hasClassFlag(c, CInterface))
-							return instanceCall(c);
+						if (!isFinal(c, cf)) return defaultCall(); else if (!hasClassFlag(c, CInterface)) return instanceCall(c);
 						// If we have exactly one implementer, use it instead of the super class/interface.
 						else if (!ctx.isMacro && c.clImplements.length == 0 && c.clSuper == null) {
-							if (c.clDescendants.length == 1 && !hasClassFlag(c.clDescendants[0], CInterface) && isFinal(c.clDescendants[0], cf))
+							if (c.clDescendants.length == 1
+								&& !hasClassFlag(c.clDescendants[0], CInterface)
+								&& isFinal(c.clDescendants[0], cf))
 								return instanceCall(c.clDescendants[0]);
 							else
 								return defaultCall();
-						} else
-							return defaultCall();
+						} else return defaultCall();
 					case _:
 						var exec = jitWithNullCheck(ef);
 						return EvalEmitter.emitFieldCall(exec, name, execs, e.epos);
@@ -737,8 +742,10 @@ class EvalJit {
 			for (a in tf.tfArgs) {
 				var varacc = EvalJitContext.declareLocal(jit, a.variable);
 				switch varacc {
-					case Env(slot): EvalEmitter.executeSetCapture(slot);
-					case Local(slot): EvalEmitter.executeSetLocal(slot);
+					case Env(slot):
+						EvalEmitter.executeSetCapture(slot);
+					case Local(slot):
+						EvalEmitter.executeSetLocal(slot);
 				}
 			}
 		];
@@ -768,7 +775,8 @@ class EvalJit {
 	}
 
 	public static function getEnvCreation(jit:JitContext, isStatic:Bool, file:String, info:EnvKind):EnvInfo {
-		return EvalContext.createEnvInfo(isStatic, file, jit.ctx.fileKeys.get(file), info, jit.captureInfos, jit.maxNumLocals, jit.captures.length());
+		return EvalContext.createEnvInfo(isStatic, file, jit.ctx.fileKeys.get(file), info, jit.captureInfos, jit.maxNumLocals,
+			jit.captures.length());
 	}
 
 	public static function jitTimer<R>(ctx:Context, f:Void->R):R {
@@ -784,7 +792,8 @@ class EvalJit {
 			// Create the [vfunc] instance depending on the number of arguments.
 			var hasret = jit.hasNonfinalReturn;
 			var eci = getEnvCreation(jit, isStatic, tf.tfExpr.epos.pfile, EKMethod(keyType, keyField));
-			return if (hasret) EvalEmitter.createFunction(ctx, eci, r.exec, r.fl) else EvalEmitter.createFunctionNoret(ctx, eci, r.exec, r.fl);
+			return if (hasret) EvalEmitter.createFunction(ctx, eci, r.exec,
+				r.fl) else EvalEmitter.createFunctionNoret(ctx, eci, r.exec, r.fl);
 		}
 		return jitTimer(ctx, f);
 	}

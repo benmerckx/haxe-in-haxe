@@ -10,7 +10,8 @@ using macros.eval.EvalValue.EvalValueTools;
 class EvalField {
 	public static final noField:Value = VNull;
 
-	public static function protoFieldDirect(proto:Vprototype, name:Int):Value return proto.pfields[EvalContext.getProtoFieldIndexRaise(proto, name)];
+	public static function protoFieldDirect(proto:Vprototype,
+			name:Int):Value return proto.pfields[EvalContext.getProtoFieldIndexRaise(proto, name)];
 
 	public static function protoFieldRaise(proto:Vprototype, name:Int):Value {
 		try
@@ -23,7 +24,8 @@ class EvalField {
 		}
 	}
 
-	public static function instanceField(vi:Vinstance, name:Int):Value return vi.ifields[EvalContext.getInstanceFieldIndexRaise(vi.iproto, name)];
+	public static function instanceField(vi:Vinstance,
+			name:Int):Value return vi.ifields[EvalContext.getInstanceFieldIndexRaise(vi.iproto, name)];
 
 	public static function objectFieldRaise(o:Vobject, name:Int):Value {
 		return switch o.oproto {
@@ -53,10 +55,7 @@ class EvalField {
 			case VString(s):
 				if (f == EvalHash.key_length) VInt32(s.slength) else protoFieldDirect(EvalContext.getCtx().stringPrototype, f);
 			case VInstance(vi):
-				try
-					instanceField(vi, f)
-				catch (_:NotFound)
-					protoFieldRaise(vi.iproto, f);
+				try instanceField(vi, f) catch (_:NotFound) protoFieldRaise(vi.iproto, f);
 			case _: throw NotFound.raise();
 		}
 	}

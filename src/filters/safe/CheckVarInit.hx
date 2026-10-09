@@ -35,14 +35,22 @@ class CheckVarInit {
 					var init = vars.exists(v.vId) ? vars.get(v.vId) : true;
 					if (!init) {
 						if (outsideVars.exists(v.vId)) {
-							SafeCom.addWarning(scom, WVarInit, v.vName == "this" ? "this might be used before assigning a value to it" : "Local variable " + v.vName + " might be used before being initialized", e.epos);
-						} else Error.raiseTypingError(v.vName == "this" ? "Missing this = value" : "Local variable " + v.vName + " used without being initialized", e.epos);
+							SafeCom.addWarning(scom, WVarInit,
+								v.vName == "this" ? "this might be used before assigning a value to it" : "Local variable " + v.vName +
+									" might be used before being initialized",
+								e.epos);
+						} else Error.raiseTypingError(v.vName == "this" ? "Missing this = value" : "Local variable "
+							+ v.vName
+							+ " used without being initialized",
+							e.epos);
 					}
 				case TVar(v, eo):
 					if (eo != null) loop(eo);
 					else switch v.vKind {
 						case VInlinedConstructorVariable(_):
-						case _: declared.unshift(v.vId); vars.set(v.vId, false);
+						case _:
+							declared.unshift(v.vId);
+							vars.set(v.vId, false);
 					}
 				case TBlock(el):
 					var old = declared;
@@ -50,12 +58,17 @@ class CheckVarInit {
 					declared = [];
 					for (e in el) loop(e);
 					declared.reverse();
-					for (v in declared) if (oldVars.exists(v)) vars.set(v, oldVars.get(v)); else vars.remove(v);
+					for (v in declared) if (oldVars.exists(v)) vars.set(v, oldVars.get(v));
+					else vars.remove(v);
 					declared = old;
-				case TBinop(OpAssign, {eexpr:TLocal(v)}, rhs) if (vars.exists(v.vId)):
+				case TBinop(OpAssign, {eexpr: TLocal(v)}, rhs) if (vars.exists(v.vId)):
 					switch Texpr.skip(rhs).eexpr {
-						case TFunction(_): vars.set(v.vId, true); loop(rhs);
-						case _: loop(rhs); vars.set(v.vId, true);
+						case TFunction(_):
+							vars.set(v.vId, true);
+							loop(rhs);
+						case _:
+							loop(rhs);
+							vars.set(v.vId, true);
 					}
 				case TIf(e1, e2, eo):
 					loop(e1);
@@ -71,22 +84,39 @@ class CheckVarInit {
 							vars = intersect(vars, v1);
 					}
 				case TWhile(cond, body, flag):
-					var ordinary = switch cond.eexpr { case TParenthesis({eexpr:TConst(TBool(true))}): false; case _: true; };
+					var ordinary = switch cond.eexpr {
+						case TParenthesis({eexpr: TConst(TBool(true))}): false;
+						case _: true;
+					};
 					if (flag == NormalWhile && ordinary) {
-						loop(cond); var old = vars.copy(); loop(body); vars = old;
-					} else { loop(body); loop(cond); }
+						loop(cond);
+						var old = vars.copy();
+						loop(body);
+						vars = old;
+					} else {
+						loop(body);
+						loop(cond);
+					}
 				case TTry(body, catches):
 					var cvars = [];
-					for (c in catches) { var old = vars.copy(); loop(c.expr); cvars.push(vars); vars = old; }
-					loop(body); join(cvars);
+					for (c in catches) {
+						var old = vars.copy();
+						loop(c.expr);
+						cvars.push(vars);
+						vars = old;
+					}
+					loop(body);
+					join(cvars);
 				case TSwitch(sw):
 					loop(sw.switchSubject);
 					var cvars = [];
 					for (c in sw.switchCases) {
 						var old = vars.copy();
 						for (ec in c.casePatterns) loop(ec);
-						vars = old.copy(); loop(c.caseExpr);
-						cvars.push(vars); vars = old;
+						vars = old.copy();
+						loop(c.caseExpr);
+						cvars.push(vars);
+						vars = old;
 					}
 					if (sw.switchDefault == null) {
 						if (sw.switchExhaustive && cvars.length > 0) {
@@ -94,14 +124,22 @@ class CheckVarInit {
 							for (i => b in cv) if (b) vars.set(i, b);
 							join(cvars);
 						}
-					} else { loop(sw.switchDefault); join(cvars); }
-				case TBreak | TContinue | TReturn(null): setAllVars();
-				case TThrow(value) | TReturn(value): loop(value); setAllVars();
+					} else {
+						loop(sw.switchDefault);
+						join(cvars);
+					}
+				case TBreak | TContinue | TReturn(null):
+					setAllVars();
+				case TThrow(value) | TReturn(value):
+					loop(value);
+					setAllVars();
 				case TFunction(tf):
 					var old = outsideVars.copy();
 					for (i in vars.keys()) outsideVars.set(i, true);
-					loop(tf.tfExpr); outsideVars = old;
-				case _: core.Texpr.iter(loop, e);
+					loop(tf.tfExpr);
+					outsideVars = old;
+				case _:
+					core.Texpr.iter(loop, e);
 			}
 		}
 		loop(e);

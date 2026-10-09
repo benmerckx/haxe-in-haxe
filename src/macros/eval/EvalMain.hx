@@ -89,8 +89,9 @@ class EvalMain {
 			case "1": "  ";
 			case indent: indent;
 		}
-		var ctx = new Context(GlobalState.sid, isMacro, detailTimes, builtins, debug, api, com.timerCtx, arrayPrototype, stringPrototype, vectorPrototype,
-			com.partScope.fileKeys, EvalPrototype.getObjectPrototype, toplevel, maxStackDepth, maxPrintDepth, printIndentation);
+		var ctx = new Context(GlobalState.sid, isMacro, detailTimes, builtins, debug, api, com.timerCtx, arrayPrototype, stringPrototype,
+			vectorPrototype, com.partScope.fileKeys, EvalPrototype.getObjectPrototype, toplevel, maxStackDepth, maxPrintDepth,
+			printIndentation);
 		ctx.args = args;
 		for (k => v in fakeProtoCache)
 			ctx.fakeProtoCache.set(k, v);
@@ -110,11 +111,11 @@ class EvalMain {
 				var msg = if (Std.isOfType(ex, core.Error.TypingError)) {
 					var messages = [];
 					core.Error.recurseError((depth, err) -> {
-						messages.unshift(core.Message.makeMessage(isMacro, core.Error.errorMsg(err.errMessage), err.errPos, depth, MKError));
+						messages.unshift(core.Message.makeMessage(isMacro, core.Error.errorMsg(err.errMessage), err.errPos, depth,
+							MKError));
 					}, (ex : core.Error.TypingError).error);
 					compiler.MessageReporting.formatMessages(EvalContext.getCtx().curapi.getCom().defines, messages);
-				} else
-					Std.string(ex);
+				} else Std.string(ex);
 				Sys.stderr().writeString(msg + "\n");
 				Sys.exit(2);
 			}
@@ -123,7 +124,8 @@ class EvalMain {
 	}
 
 	public static function create(com:context.Common.CommonContext, api:CompilerApi, isMacro:Bool, args:Array<String>):Context {
-		return core.Timer.time(com.timerCtx, [(if (isMacro) "macro" else "interp"), "create"], (args:Array<String>) -> createImpl(com, api, isMacro, args), args);
+		return core.Timer.time(com.timerCtx, [(if (isMacro) "macro" else "interp"), "create"],
+			(args:Array<String>) -> createImpl(com, api, isMacro, args), args);
 	}
 
 	// API for macroContext.ml
@@ -142,7 +144,8 @@ class EvalMain {
 				var vtype = EvalContext.getStaticPrototypeAsValue(ctx, EvalHash.pathHash(path), api.pos);
 				var vfield = EvalField.field(vtype, EvalHash.hash(f));
 				var p = api.pos;
-				var info = EvalContext.createEnvInfo(true, p.pfile, ctx.fileKeys.get(p.pfile), EKMacro(EvalHash.pathHash(path), EvalHash.hash(f)), new Map(), 0, 0);
+				var info = EvalContext.createEnvInfo(true, p.pfile, ctx.fileKeys.get(p.pfile),
+					EKMacro(EvalHash.pathHash(path), EvalHash.hash(f)), new Map(), 0, 0);
 				var env = EvalContext.pushEnvironment(ctx, info);
 				env.envLeavePmin = p.pmin;
 				env.envLeavePmax = p.pmax;
@@ -232,7 +235,10 @@ class EvalMain {
 					add("u64");
 					add(uint64ToString(u));
 				case VFloat(f):
-					if (f == Math.NEGATIVE_INFINITY) addc('m') else if (f == Math.POSITIVE_INFINITY) addc('p') else if (f != f) addc('k') else {
+					if (f == Math.NEGATIVE_INFINITY) addc('m')
+					else if (f == Math.POSITIVE_INFINITY) addc('p')
+					else if (f != f) addc('k')
+					else {
 						addc('d');
 						add(core.Numeric.validFloatLexeme(core.ds.OcamlPrintf.formatG(12, f)));
 					}
@@ -453,14 +459,16 @@ class EvalMain {
 	static function haxeFloat(f:Float, p:Pos):Expr {
 		var std:Expr = {expr: EConst(Ident("std")), pos: p};
 		var math:Expr = {expr: efield(std, "Math"), pos: p};
-		return if (f == Math.POSITIVE_INFINITY)
-			{expr: efield(math, "POSITIVE_INFINITY"), pos: p}
-		else if (f == Math.NEGATIVE_INFINITY)
-			{expr: efield(math, "NEGATIVE_INFINITY"), pos: p}
-		else if (f != f)
-			{expr: efield(math, "NaN"), pos: p}
-		else
-			{expr: EConst(Float(core.Numeric.floatRepres(f), null)), pos: p};
+		return if (f == Math.POSITIVE_INFINITY) {
+			expr: efield(math, "POSITIVE_INFINITY"),
+			pos: p
+		} else if (f == Math.NEGATIVE_INFINITY) {
+			expr: efield(math, "NEGATIVE_INFINITY"),
+			pos: p
+		} else if (f != f) {
+			expr: efield(math, "NaN"),
+			pos: p
+		} else {expr: EConst(Float(core.Numeric.floatRepres(f), null)), pos: p};
 	}
 
 	static function pathEquals(a:GlobalTypePath, b:GlobalTypePath):Bool {
@@ -480,10 +488,9 @@ class EvalMain {
 					}
 				}
 				var t = TFunctions.tInfos(t);
-				var l = if (pathEquals(t.mtModule.mPath, t.mtPath)) t.mtPath.pack.concat([t.mtPath.name]) else t.mtModule.mPath.pack.concat([
-					t.mtModule.mPath.name,
-					t.mtPath.name
-				]);
+				var l = if (pathEquals(t.mtModule.mPath,
+					t.mtPath)) t.mtPath.pack.concat([t.mtPath.name]) else
+					t.mtModule.mPath.pack.concat([t.mtModule.mPath.name, t.mtPath.name]);
 				l.reverse();
 				return loop(l, 0);
 			}
@@ -575,7 +582,8 @@ class EvalMain {
 
 	public static function excString(s:String):Dynamic return EvalContext.excString(s);
 
-	public static function evalExpr(ctx:Context, e:TExpr):Null<Value> return if (ctx.hadError) null else EvalPrototype.evalExpr(ctx, EKEntrypoint, e);
+	public static function evalExpr(ctx:Context,
+			e:TExpr):Null<Value> return if (ctx.hadError) null else EvalPrototype.evalExpr(ctx, EKEntrypoint, e);
 
 	/** Returns the errors as upstream's list: the most recent first. **/
 	public static function handleDecodingError(f:String->Void, v:Value, t:T):Array<{msg:String, line:Int}> {
@@ -602,7 +610,8 @@ class EvalMain {
 								case _: loop(tabs + "\t", cf.cfType, vf);
 							}
 						} catch (_:NotFound) {
-							if (!TFunctions.isExplicitNull(cf.cfType)) error("expected value", VNull) else f("null");
+							if (!TFunctions.isExplicitNull(cf.cfType)) error("expected value", VNull)
+							else f("null");
 						}
 					}
 					line++;
@@ -626,7 +635,8 @@ class EvalMain {
 						case _: error("expected String", v);
 					}
 				case TAbstract({aPath: {pack: [], name: "Null"}}, [t1]):
-					if (v.match(VNull)) f("null") else loop(tabs, t1, v);
+					if (v.match(VNull)) f("null")
+					else loop(tabs, t1, v);
 				case TAbstract({aPath: {pack: [], name: "Bool"}}, _):
 					switch v {
 						case VTrue: f("true");

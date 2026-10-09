@@ -1,24 +1,42 @@
-// EXPERIMENTAL runtime for the C output of backend/: green threads behind
+// EXPERIMENTAL runtime for the C output of backend/: threads behind
 // hxc.NativeThread (backend/std-hxc/hxc/NativeThread.hx), the base of the hxc
-// sys.thread package (backend/std-hxc/sys/thread).
+// sys.thread package (backend/std-hxc/sys/thread) and of haxe.atomic.
 //
-// M:1 cooperative threads: every Haxe thread runs on the one OS thread, and a
-// thread only gives way at a blocking point (park, sleep, yield, waiting for a
-// file descriptor). Only one thread runs at a time, so the GC and the runtime
-// tables need no locks. Each thread has its own C stack (ucontext), shadow
-// stack and exception handler chain; a switch saves the globals rt_sp,
-// rt_stack_base, rt_hcur and rt_exn into the thread record and loads the next
-// thread's, so the single-threaded hot paths are unchanged.
+// Three implementations (rt.h RT_MT / RT_GREEN):
 //
-// When no thread can run, the scheduler waits in poll() over the descriptors
-// threads wait for, up to the nearest timer deadline. If no thread can ever be
-// woken again (every thread parked without a deadline or descriptor), the
-// program reports the deadlock and exits.
+// - 1:1 (gcc, clang, cosmocc builds): every Haxe thread is an OS thread
+//   (pthreads) and threads run in parallel. The per-thread runtime state
+//   (shadow stack, allocation buffer, exception handlers, current exception)
+//   is thread-local (rt.h RT_TLS). The collector stops the world: a thread
+//   that needs a collection sets rt_gc_requested and waits until every other
+//   thread is stopped at a safepoint (an allocation slow path, rt_safepoint)
+//   or in a safe region (a blocking native between rt_blocking_enter and
+//   rt_blocking_leave, which holds no heap pointer outside its shadow
+//   stack); it then scans every thread's roots (rt_threads_scan) and
+//   remembered set (rt_mutators_foreach) and resumes them. The world lock
+//   `wl` guards the thread list and the collection handshake.
 //
-// Under __EMSCRIPTEN__ (the wasm playground) there are no threads: spawn
-// throws, and waiting forever throws instead of blocking.
+// - Green (tcc builds, -DRT_GREEN_THREADS; tcc has no thread-local storage):
+//   M:1 cooperative threads. Every Haxe thread runs on the one OS thread, and
+//   a thread only gives way at a blocking point (park, sleep, yield, waiting
+//   for a file descriptor) or at a minor collection. Each thread has its own
+//   C stack (ucontext), shadow stack and exception handler chain; a switch
+//   saves the globals rt_sp, rt_stack_base, rt_hcur and rt_exn into the
+//   thread record and loads the next thread's. When no thread can run, the
+//   scheduler waits in poll() over the descriptors threads wait for, up to
+//   the nearest timer deadline; if no thread can ever be woken again, the
+//   program reports the deadlock and exits.
+//
+// - None (__EMSCRIPTEN__, the wasm playground): spawn throws, and waiting
+//   forever throws instead of blocking.
+//
+// The synchronization primitives (re-entrant mutex, condition variable,
+// counting semaphore, thread-local values) are natives with the same
+// interface in the three: pthread mutexes and conditions in 1:1, queues of
+// parked threads otherwise. Their handles are T_NATIVE objects freed by the
+// collector (rt_native_new).
 #define _GNU_SOURCE
-#include "rt.h"
+#include "rt_gc.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,9 +59,393 @@ static void sleep_secs(double seconds) {
 	while (nanosleep(&t, &t) != 0 && errno == EINTR) {}
 }
 
+int32_t hxc_NativeThread_park(double timeout);
+void hxc_NativeThread_unpark(int32_t id);
+int32_t hxc_NativeThread_current(void);
+
+#if !RT_MT
+
+// ---- synchronization over park/unpark (green threads, or none): only one
+// thread runs at a time and these functions do not allocate between looking
+// at a primitive and parking, so they need no atomics; a park can return
+// early (see hxc_NativeThread_unpark), so waits look at their state again.
+
+typedef struct {
+	int32_t *ids; // FIFO of waiting thread ids
+	int n, cap;
+} waitq;
+
+static void wq_push(waitq *q, int32_t id) {
+	if (q->n == q->cap) {
+		q->cap = q->cap ? q->cap * 2 : 4;
+		q->ids = (int32_t *)realloc(q->ids, q->cap * sizeof(int32_t));
+	}
+	q->ids[q->n++] = id;
+}
+
+static int32_t wq_shift(waitq *q) {
+	int32_t id = q->ids[0];
+	memmove(q->ids, q->ids + 1, (q->n - 1) * sizeof(int32_t));
+	q->n--;
+	return id;
+}
+
+static int wq_remove(waitq *q, int32_t id) {
+	for (int i = 0; i < q->n; i++)
+		if (q->ids[i] == id) {
+			memmove(q->ids + i, q->ids + i + 1, (q->n - i - 1) * sizeof(int32_t));
+			q->n--;
+			return 1;
+		}
+	return 0;
+}
+
+static int wq_has(waitq *q, int32_t id) {
+	for (int i = 0; i < q->n; i++)
+		if (q->ids[i] == id) return 1;
+	return 0;
+}
+
+typedef struct {
+	int32_t owner; // thread id, 0: free
+	int depth;
+	waitq w;
+} hx_mutex;
+
+typedef struct {
+	waitq w;
+} hx_cond;
+
+typedef struct {
+	int32_t count;
+	waitq w;
+} hx_sem;
+
+static void free_mutex(void *p) {
+	free(((hx_mutex *)p)->w.ids);
+	free(p);
+}
+
+static void free_cond(void *p) {
+	free(((hx_cond *)p)->w.ids);
+	free(p);
+}
+
+static void free_sem(void *p) {
+	free(((hx_sem *)p)->w.ids);
+	free(p);
+}
+
+void *hxc_NativeThread_mutexNew(void) { return rt_native_new(calloc(1, sizeof(hx_mutex)), free_mutex); }
+
+static void mutex_take(hx_mutex *m, int depth) {
+	int32_t me = hxc_NativeThread_current();
+	if (m->owner == 0) {
+		m->owner = me;
+		m->depth = depth;
+		return;
+	}
+	wq_push(&m->w, me);
+	while (m->owner != me) hxc_NativeThread_park(-1); // a release hands it over
+	m->depth = depth;
+}
+
+void hxc_NativeThread_mutexAcquire(void *mo) {
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	if (m->owner == hxc_NativeThread_current()) {
+		m->depth++;
+		return;
+	}
+	RT_ROOT(mo); // the handle stays alive while this thread waits
+	mutex_take(m, 1);
+	RT_UNROOT(1);
+}
+
+int32_t hxc_NativeThread_mutexTryAcquire(void *mo) {
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	int32_t me = hxc_NativeThread_current();
+	if (m->owner == 0) {
+		m->owner = me;
+		m->depth = 1;
+		return 1;
+	}
+	if (m->owner == me) {
+		m->depth++;
+		return 1;
+	}
+	return 0;
+}
+
+static void mutex_give(hx_mutex *m) {
+	if (m->w.n > 0) {
+		m->owner = wq_shift(&m->w);
+		hxc_NativeThread_unpark(m->owner);
+	} else
+		m->owner = 0;
+}
+
+void hxc_NativeThread_mutexRelease(void *mo) {
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	if (m->owner != hxc_NativeThread_current()) return;
+	if (--m->depth > 0) return;
+	mutex_give(m);
+}
+
+void *hxc_NativeThread_condNew(void) { return rt_native_new(calloc(1, sizeof(hx_cond)), free_cond); }
+
+// waits for a signal (1) or until timeout seconds pass (0; < 0: no timeout);
+// the calling thread holds mutex m, which is released meanwhile (fully) and
+// taken back at the same depth
+int32_t hxc_NativeThread_condWait(void *co, void *mo, double timeout) {
+	hx_cond *c = (hx_cond *)FP(co, 0);
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	int32_t me = hxc_NativeThread_current();
+	if (m->owner != me) hx_throw_str("Condition.wait: the mutex is not held");
+	RT_ROOT(co);
+	RT_ROOT(mo);
+	int depth = m->depth;
+	wq_push(&c->w, me);
+	mutex_give(m);
+	double deadline = timeout < 0 ? -1 : now_secs() + timeout;
+	int signaled;
+	for (;;) {
+		if (!wq_has(&c->w, me)) {
+			signaled = 1;
+			break;
+		}
+		double left = deadline < 0 ? -1 : deadline - now_secs();
+		if (deadline >= 0 && left <= 0) {
+			signaled = !wq_remove(&c->w, me);
+			break;
+		}
+		hxc_NativeThread_park(left);
+	}
+	mutex_take(m, depth);
+	RT_UNROOT(2);
+	return signaled;
+}
+
+void hxc_NativeThread_condSignal(void *co) {
+	hx_cond *c = (hx_cond *)FP(co, 0);
+	if (c->w.n > 0) hxc_NativeThread_unpark(wq_shift(&c->w));
+}
+
+void hxc_NativeThread_condBroadcast(void *co) {
+	hx_cond *c = (hx_cond *)FP(co, 0);
+	while (c->w.n > 0) hxc_NativeThread_unpark(wq_shift(&c->w));
+}
+
+void *hxc_NativeThread_semNew(int32_t value) {
+	hx_sem *s = (hx_sem *)calloc(1, sizeof(hx_sem));
+	s->count = value;
+	return rt_native_new(s, free_sem);
+}
+
+// takes a unit (1), or times out (0) after timeout seconds (0: just try; < 0:
+// no timeout). A release with waiters hands its unit to the longest waiting.
+int32_t hxc_NativeThread_semAcquire(void *so, double timeout) {
+	hx_sem *s = (hx_sem *)FP(so, 0);
+	if (s->count > 0) {
+		s->count--;
+		return 1;
+	}
+	if (timeout == 0) return 0;
+	RT_ROOT(so);
+	int32_t me = hxc_NativeThread_current();
+	double deadline = timeout < 0 ? -1 : now_secs() + timeout;
+	wq_push(&s->w, me);
+	int r;
+	for (;;) {
+		if (!wq_has(&s->w, me)) {
+			r = 1;
+			break;
+		}
+		double left = deadline < 0 ? -1 : deadline - now_secs();
+		if (deadline >= 0 && left <= 0) {
+			r = !wq_remove(&s->w, me);
+			break;
+		}
+		hxc_NativeThread_park(left);
+	}
+	RT_UNROOT(1);
+	return r;
+}
+
+void hxc_NativeThread_semRelease(void *so) {
+	hx_sem *s = (hx_sem *)FP(so, 0);
+	if (s->w.n > 0) hxc_NativeThread_unpark(wq_shift(&s->w));
+	else s->count++;
+}
+
+#endif // !RT_MT
+
+// ---- thread-local values (sys.thread.Tls): per thread, a K_PARR object
+// indexed by Tls id (a root of the thread record)
+static int32_t tls_next;
+
+int32_t hxc_NativeThread_tlsNew(void) {
+#if RT_MT
+	return __atomic_fetch_add(&tls_next, 1, __ATOMIC_RELAXED);
+#else
+	return tls_next++;
+#endif
+}
+
+static void *tls_get(void **tls, int32_t id) {
+	void *a = *tls;
+	return a && (uint32_t)id < NSLOTS(a) ? FP(a, id) : NULL;
+}
+
+// `tls` is a GC root of the running thread's record (updated by a collection)
+static void tls_set(void **tls, int32_t id, void *v) {
+	if (id < 0) return;
+	void *a = *tls;
+	if (!a || (uint32_t)id >= NSLOTS(a)) {
+		RT_ROOT(v);
+		uint32_t n = a ? NSLOTS(a) * 2 : 8;
+		if (n <= (uint32_t)id) n = id + 1;
+		void *na = rt_alloc(n, T_ADATA_P, K_PARR);
+		a = *tls;
+		if (a)
+			for (uint32_t i = 0; i < NSLOTS(a); i++) rt_set_ptr(na, &FP(na, i), FP(a, i));
+		*tls = na;
+		a = na;
+		RT_RELOAD(v);
+		RT_UNROOT(1);
+	}
+	rt_set_ptr(a, &FP(a, id), v);
+}
+
+// ---- haxe.atomic cells (hxc.NativeAtomic): an Int cell is a K_RAW object
+// (slot 0, low 4 bytes), an object cell a one-slot K_PARR (scanned by the GC).
+// Sequentially consistent with OS threads; plain with green threads (they
+// never switch inside these, and tcc has no __atomic builtins).
+#define ACELL_I(a) ((int32_t *)(a))
+#define ACELL_P(a) ((void **)(a))
+
+void *hxc_NativeAtomic_intNew(int32_t v) {
+	void *a = rt_alloc(1, T_NATIVE, K_RAW);
+	*ACELL_I(a) = v;
+	return a;
+}
+
+#if RT_MT
+#define SC __ATOMIC_SEQ_CST
+int32_t hxc_NativeAtomic_intLoad(void *a) { return __atomic_load_n(ACELL_I(a), SC); }
+int32_t hxc_NativeAtomic_intStore(void *a, int32_t v) {
+	__atomic_store_n(ACELL_I(a), v, SC);
+	return v;
+}
+int32_t hxc_NativeAtomic_intExchange(void *a, int32_t v) { return __atomic_exchange_n(ACELL_I(a), v, SC); }
+int32_t hxc_NativeAtomic_intCompareExchange(void *a, int32_t e, int32_t r) {
+	__atomic_compare_exchange_n(ACELL_I(a), &e, r, 0, SC, SC);
+	return e; // the previous value either way
+}
+int32_t hxc_NativeAtomic_intAdd(void *a, int32_t v) { return (int32_t)__atomic_fetch_add((uint32_t *)a, (uint32_t)v, SC); }
+int32_t hxc_NativeAtomic_intSub(void *a, int32_t v) { return (int32_t)__atomic_fetch_sub((uint32_t *)a, (uint32_t)v, SC); }
+int32_t hxc_NativeAtomic_intAnd(void *a, int32_t v) { return __atomic_fetch_and(ACELL_I(a), v, SC); }
+int32_t hxc_NativeAtomic_intOr(void *a, int32_t v) { return __atomic_fetch_or(ACELL_I(a), v, SC); }
+int32_t hxc_NativeAtomic_intXor(void *a, int32_t v) { return __atomic_fetch_xor(ACELL_I(a), v, SC); }
+#else
+int32_t hxc_NativeAtomic_intLoad(void *a) { return *ACELL_I(a); }
+int32_t hxc_NativeAtomic_intStore(void *a, int32_t v) { return *ACELL_I(a) = v; }
+int32_t hxc_NativeAtomic_intExchange(void *a, int32_t v) {
+	int32_t o = *ACELL_I(a);
+	*ACELL_I(a) = v;
+	return o;
+}
+int32_t hxc_NativeAtomic_intCompareExchange(void *a, int32_t e, int32_t r) {
+	int32_t o = *ACELL_I(a);
+	if (o == e) *ACELL_I(a) = r;
+	return o;
+}
+int32_t hxc_NativeAtomic_intAdd(void *a, int32_t v) {
+	int32_t o = *ACELL_I(a);
+	*ACELL_I(a) = IADD(o, v);
+	return o;
+}
+int32_t hxc_NativeAtomic_intSub(void *a, int32_t v) {
+	int32_t o = *ACELL_I(a);
+	*ACELL_I(a) = ISUB(o, v);
+	return o;
+}
+int32_t hxc_NativeAtomic_intAnd(void *a, int32_t v) {
+	int32_t o = *ACELL_I(a);
+	*ACELL_I(a) = o & v;
+	return o;
+}
+int32_t hxc_NativeAtomic_intOr(void *a, int32_t v) {
+	int32_t o = *ACELL_I(a);
+	*ACELL_I(a) = o | v;
+	return o;
+}
+int32_t hxc_NativeAtomic_intXor(void *a, int32_t v) {
+	int32_t o = *ACELL_I(a);
+	*ACELL_I(a) = o ^ v;
+	return o;
+}
+#endif
+
+void *hxc_NativeAtomic_objNew(void *v) {
+	RT_ROOT(v);
+	void *a = rt_alloc(1, T_ADATA_P, K_PARR);
+	RT_RELOAD(v);
+	RT_UNROOT(1);
+	*ACELL_P(a) = v; // a is young
+	return a;
+}
+
+// after storing v into cell a: remember an old-to-young pointer
+static void cell_barrier(void *a, void *v) {
+	if (((char *)a < rt_young_start || (char *)a >= rt_young_end) && (char *)v >= rt_young_start && (char *)v < rt_young_end)
+		rt_write_barrier(a, ACELL_P(a), v);
+}
+
+#if RT_MT
+void *hxc_NativeAtomic_objLoad(void *a) { return __atomic_load_n(ACELL_P(a), SC); }
+void *hxc_NativeAtomic_objStore(void *a, void *v) {
+	__atomic_store_n(ACELL_P(a), v, SC);
+	cell_barrier(a, v);
+	return v;
+}
+void *hxc_NativeAtomic_objExchange(void *a, void *v) {
+	void *o = __atomic_exchange_n(ACELL_P(a), v, SC);
+	cell_barrier(a, v);
+	return o;
+}
+void *hxc_NativeAtomic_objCompareExchange(void *a, void *e, void *r) {
+	if (__atomic_compare_exchange_n(ACELL_P(a), &e, r, 0, SC, SC)) cell_barrier(a, r);
+	return e;
+}
+#else
+void *hxc_NativeAtomic_objLoad(void *a) { return *ACELL_P(a); }
+void *hxc_NativeAtomic_objStore(void *a, void *v) {
+	rt_set_ptr(a, ACELL_P(a), v);
+	return v;
+}
+void *hxc_NativeAtomic_objExchange(void *a, void *v) {
+	void *o = *ACELL_P(a);
+	rt_set_ptr(a, ACELL_P(a), v);
+	return o;
+}
+void *hxc_NativeAtomic_objCompareExchange(void *a, void *e, void *r) {
+	void *o = *ACELL_P(a);
+	if (o == e) rt_set_ptr(a, ACELL_P(a), r);
+	return o;
+}
+#endif
+
 #ifdef __EMSCRIPTEN__
 
-void rt_threads_scan(void *(*fwd)(void *)) { (void)fwd; }
+static rt_mutator main_mut;
+static void *main_tls;
+void rt_threads_init(void) { rt_mutator_bind(&main_mut); }
+void rt_mutators_foreach(void (*f)(rt_mutator *, void *), void *arg) { f(&main_mut, arg); }
+void rt_threads_scan(void *(*fwd)(void *)) {
+	if (main_tls) main_tls = fwd(main_tls);
+}
+void *hxc_NativeThread_tlsGet(int32_t id) { return tls_get(&main_tls, id); }
+void hxc_NativeThread_tlsSet(int32_t id, void *v) { tls_set(&main_tls, id, v); }
 int rt_wait_fd(int fd, int write, double timeout) { return 1; }
 int rt_wait_fds(void *pollfds, int n, double timeout) { return 1; }
 void rt_sleep(double seconds) { sleep_secs(seconds); }
@@ -59,6 +461,7 @@ int32_t hxc_NativeThread_park(double timeout) {
 }
 void hxc_NativeThread_unpark(int32_t id) { (void)id; }
 void hxc_NativeThread_yield(void) {}
+int32_t hxc_NativeThread_parallel(void) { return 0; }
 void rt_run_main(void (*body)(void)) { body(); }
 
 #else
@@ -70,6 +473,15 @@ void rt_run_main(void (*body)(void)) { body(); }
 
 #define CSTACK_BYTES ((size_t)64 << 20) // reserved, committed as touched
 #define SSTACK_BYTES ((size_t)64 << 20) // shadow stack (the main thread's is 1 GB, rt.c)
+
+static void *map_stack(size_t bytes) {
+	void *p = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+	return p == MAP_FAILED ? NULL : p;
+}
+
+#if RT_GREEN
+
+// ======== green threads (M:1)
 
 enum { TS_RUNNING, TS_RUNNABLE, TS_PARKED, TS_DONE };
 
@@ -85,6 +497,7 @@ typedef struct rt_thread {
 	rt_handler *hcur;
 	void *exn;
 	void *job; // the entry closure until the thread starts (a GC root)
+	void *tls; // Tls values (a GC root)
 	double deadline; // parked: wake at this time (now_secs), < 0: no deadline
 	struct pollfd *fds; // parked on descriptors (on the thread's C stack)
 	int nfds;
@@ -100,6 +513,11 @@ static rt_thread **by_id;
 static int32_t by_id_cap, next_id = 2;
 static rt_thread *zombies; // finished threads whose stacks are freed after switching away
 static size_t page_size;
+static rt_mutator main_mut; // the one mutator: green threads swap the globals it points at
+
+void rt_threads_init(void) { rt_mutator_bind(&main_mut); }
+void rt_mutators_foreach(void (*f)(rt_mutator *, void *), void *arg) { f(&main_mut, arg); }
+int32_t hxc_NativeThread_parallel(void) { return 0; }
 
 // per descriptor: incremented by rt_fd_closed, so a thread woken after its
 // descriptor was closed (and the number maybe reused) does not touch it
@@ -156,13 +574,25 @@ void rt_fd_closed(int fd) {
 }
 
 void rt_threads_scan(void *(*fwd)(void *)) {
+	if (!cur) {
+		if (main_thread.tls) main_thread.tls = fwd(main_thread.tls);
+		return;
+	}
 	for (rt_thread *t = all_threads; t; t = t->all_next) {
 		if (t->job) t->job = fwd(t->job);
+		if (t->tls) t->tls = fwd(t->tls);
 		if (t == cur) continue; // its stack and rt_exn are the globals rt.c scans
 		for (void **s = t->sbase; s < t->sp; s++)
 			if (*s) *s = fwd(*s);
 		if (t->exn) t->exn = fwd(t->exn);
 	}
+}
+
+static rt_thread *cur_or_main(void) { return cur ? cur : &main_thread; }
+void *hxc_NativeThread_tlsGet(int32_t id) { return tls_get(&cur_or_main()->tls, id); }
+void hxc_NativeThread_tlsSet(int32_t id, void *v) {
+	rt_thread *t = cur_or_main(); // the running thread: it cannot end while this runs
+	tls_set(&t->tls, id, v);
 }
 
 static void reap(void) {
@@ -283,6 +713,7 @@ static void thread_exit(void) {
 	if (t->all_next) t->all_next->all_prev = t->all_prev;
 	by_id[t->id] = NULL;
 	rt_nthreads--;
+	t->tls = NULL;
 	t->next = zombies;
 	zombies = t;
 	schedule();
@@ -307,11 +738,6 @@ static void thread_main(void) {
 		free(s);
 	RT_END_TRY(h)
 	thread_exit();
-}
-
-static void *map_stack(size_t bytes) {
-	void *p = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
-	return p == MAP_FAILED ? NULL : p;
 }
 
 int32_t hxc_NativeThread_spawn(void *job) {
@@ -378,8 +804,8 @@ int32_t hxc_NativeThread_park(double timeout) {
 
 // wakes thread id if it is parked in hxc_NativeThread_park; else its next park
 // returns at once (a thread can be switched out at an allocation between
-// queueing itself and parking). A park may thus return early: the sys.thread
-// primitives check their state again after each park.
+// queueing itself and parking). A park may thus return early: the waits check
+// their state again after each park.
 void hxc_NativeThread_unpark(int32_t id) {
 	if (!cur || id <= 0 || id >= by_id_cap) return;
 	rt_thread *t = by_id[id];
@@ -456,6 +882,599 @@ int rt_wait_fds(void *pollfds, int n, double timeout) {
 	return t->woken;
 }
 
+#else // RT_MT
+
+// ======== OS threads (1:1)
+
+#include <sched.h>
+
+enum { TS_RUNNING, TS_SAFE }; // TS_SAFE: in a safe region or stopped at a safepoint
+
+typedef struct rt_thread {
+	rt_mutator mut; // bound when the thread starts (refs to its TLS variables)
+	int32_t id;
+	int state; // atomic
+	int started; // the mutator is bound (under wl)
+	void *job; // the entry closure until the thread starts (a GC root)
+	void *tls; // Tls values (a GC root)
+	void **sbase; // shadow stack mapping (the main thread's is rt.c's)
+	struct parker *pk; // park/unpark (never freed: an unpark may find it after the thread ended)
+	struct rt_thread *next, *prev; // live threads
+} rt_thread;
+
+typedef struct parker {
+	pthread_mutex_t m;
+	pthread_cond_t c;
+	int permit;
+} parker;
+
+int rt_mt; // a second thread was started (rt.h rt_lock)
+volatile int rt_gc_requested;
+static pthread_mutex_t wl = PTHREAD_MUTEX_INITIALIZER; // the world lock
+static pthread_cond_t wl_stopped = PTHREAD_COND_INITIALIZER; // a thread became safe (the collector waits)
+static pthread_cond_t wl_resumed = PTHREAD_COND_INITIALIZER; // a collection ended
+static rt_thread main_thread;
+static rt_thread *all_threads; // under wl
+static rt_thread **by_id; // under wl
+static int32_t by_id_cap, next_id = 2;
+static rt_mutator dead_mut; // remembered sets of threads that ended (under wl)
+static RT_TLS rt_thread *self;
+// dead_mut's remembered set has no TLAB or stack: its refs point here
+static void **dead_sp, **dead_base;
+static void *dead_exn;
+static char *dead_yptr, *dead_ylim;
+
+static pthread_condattr_t mono_attr; // conditions waiting on CLOCK_MONOTONIC
+
+// RT_STATS: threads started, contended mutex acquisitions and their waits,
+// collections and the time from a request until every thread had stopped
+static int thr_stats;
+static unsigned long st_spawned, st_contended, st_stw, st_stw_max_us;
+static double st_contended_secs, st_stw_secs;
+static void thr_report(void) {
+	fprintf(stderr, "threads: %lu started; %lu contended mutex acquisitions (%.3fs waiting); %lu stops of the world, %.3fs until stopped (max %lu us)\n",
+		st_spawned, st_contended, st_contended_secs, st_stw, st_stw_secs, st_stw_max_us);
+}
+
+
+int32_t hxc_NativeThread_parallel(void) { return 1; }
+
+static void cond_init(pthread_cond_t *c) { pthread_cond_init(c, &mono_attr); }
+
+static parker *new_parker(void) {
+	parker *p = (parker *)calloc(1, sizeof(parker));
+	pthread_mutex_init(&p->m, NULL);
+	cond_init(&p->c);
+	return p;
+}
+
+void rt_threads_init(void) {
+	pthread_condattr_init(&mono_attr);
+	pthread_condattr_setclock(&mono_attr, CLOCK_MONOTONIC);
+	main_thread.id = 1;
+	main_thread.state = TS_RUNNING;
+	main_thread.started = 1;
+	main_thread.pk = new_parker();
+	dead_mut.sp_ref = &dead_sp;
+	dead_mut.base_ref = &dead_base;
+	dead_mut.exn_ref = &dead_exn;
+	dead_mut.yptr_ref = &dead_yptr;
+	dead_mut.ylim_ref = &dead_ylim;
+	rt_mutator_bind(&main_thread.mut);
+	all_threads = &main_thread;
+	by_id_cap = 64;
+	by_id = (rt_thread **)calloc(by_id_cap, sizeof(rt_thread *));
+	by_id[1] = &main_thread;
+	self = &main_thread;
+	thr_stats = getenv("RT_STATS") != NULL;
+	if (thr_stats) atexit(thr_report);
+}
+
+static int get_state(rt_thread *t) { return __atomic_load_n(&t->state, __ATOMIC_SEQ_CST); }
+static void set_state(rt_thread *t, int s) { __atomic_store_n(&t->state, s, __ATOMIC_SEQ_CST); }
+static int gc_requested(void) { return __atomic_load_n(&rt_gc_requested, __ATOMIC_SEQ_CST); }
+
+// under wl, while a collection is requested: stopped until it ends
+static void stop_here(void) {
+	set_state(self, TS_SAFE);
+	pthread_cond_broadcast(&wl_stopped);
+	while (gc_requested()) pthread_cond_wait(&wl_resumed, &wl);
+	set_state(self, TS_RUNNING);
+}
+
+int rt_world_stop(void) {
+	double t0 = thr_stats ? now_secs() : 0;
+	pthread_mutex_lock(&wl);
+	if (gc_requested()) { // another thread is collecting: wait for it as at a safepoint
+		stop_here();
+		pthread_mutex_unlock(&wl);
+		return 0;
+	}
+	__atomic_store_n(&rt_gc_requested, 1, __ATOMIC_SEQ_CST);
+	for (;;) {
+		int all = 1;
+		for (rt_thread *t = all_threads; t; t = t->next)
+			if (t != self && get_state(t) == TS_RUNNING) {
+				all = 0;
+				break;
+			}
+		if (all) break;
+		pthread_cond_wait(&wl_stopped, &wl);
+	}
+	if (thr_stats && all_threads->next) {
+		double d = now_secs() - t0;
+		st_stw++;
+		st_stw_secs += d;
+		if (d * 1e6 > st_stw_max_us) st_stw_max_us = (unsigned long)(d * 1e6);
+	}
+	return 1; // wl stays held during the collection
+}
+
+void rt_world_resume(void) {
+	__atomic_store_n(&rt_gc_requested, 0, __ATOMIC_SEQ_CST);
+	pthread_cond_broadcast(&wl_resumed);
+	pthread_mutex_unlock(&wl);
+}
+
+void rt_safepoint_slow(void) {
+	pthread_mutex_lock(&wl);
+	if (gc_requested()) stop_here();
+	pthread_mutex_unlock(&wl);
+}
+
+// Entering a safe region publishes the thread's state (seq_cst): a collector
+// that set rt_gc_requested before this thread looked sees TS_SAFE, else this
+// thread sees the request and wakes the collector.
+// Both keep errno (natives read it after their blocking call).
+void rt_blocking_enter(void) {
+	set_state(self, TS_SAFE);
+	if (gc_requested()) {
+		int e = errno;
+		pthread_mutex_lock(&wl);
+		pthread_cond_broadcast(&wl_stopped);
+		pthread_mutex_unlock(&wl);
+		errno = e;
+	}
+}
+
+void rt_blocking_leave(void) {
+	set_state(self, TS_RUNNING);
+	if (gc_requested()) {
+		int e = errno;
+		pthread_mutex_lock(&wl);
+		if (gc_requested()) stop_here();
+		pthread_mutex_unlock(&wl);
+		errno = e;
+	}
+}
+
+// Takes a mutex that a thread may hold while it leaves a safe region (and so
+// waits for a collection): a thread blocked on it must be in a safe region.
+static void lock_safe(pthread_mutex_t *m) {
+	if (pthread_mutex_trylock(m) == 0) return;
+	rt_blocking_enter();
+	pthread_mutex_lock(m);
+	rt_blocking_leave();
+}
+
+// under wl (a collection): every started thread, and the remembered sets of
+// the threads that ended
+void rt_mutators_foreach(void (*f)(rt_mutator *, void *), void *arg) {
+	for (rt_thread *t = all_threads; t; t = t->next)
+		if (t->started) f(&t->mut, arg);
+	f(&dead_mut, arg);
+}
+
+void rt_threads_scan(void *(*fwd)(void *)) {
+	for (rt_thread *t = all_threads; t; t = t->next) {
+		if (t->job) t->job = fwd(t->job);
+		if (t->tls) t->tls = fwd(t->tls);
+		if (t == self || !t->started) continue; // the collector's own stack and rt_exn: rt.c
+		void **sp = *t->mut.sp_ref;
+		for (void **s = *t->mut.base_ref; s < sp; s++)
+			if (*s) *s = fwd(*s);
+		if (*t->mut.exn_ref) *t->mut.exn_ref = fwd(*t->mut.exn_ref);
+	}
+}
+
+
+static void thread_exit(void) {
+	rt_thread *t = self;
+	rt_blocking_enter(); // touches no heap object from here on
+	pthread_mutex_lock(&wl);
+	if (t->prev) t->prev->next = t->next;
+	else all_threads = t->next;
+	if (t->next) t->next->prev = t->prev;
+	by_id[t->id] = NULL;
+	// its old-to-young slots stay remembered until the next minor collection
+	rt_mutator *m = &t->mut;
+	if (m->rem_len) {
+		if (dead_mut.rem_len + m->rem_len > dead_mut.rem_cap) {
+			dead_mut.rem_cap = (dead_mut.rem_len + m->rem_len) * 2;
+			dead_mut.rem = (void ***)realloc(dead_mut.rem, dead_mut.rem_cap * sizeof(void **));
+		}
+		memcpy(dead_mut.rem + dead_mut.rem_len, m->rem, m->rem_len * sizeof(void **));
+		dead_mut.rem_len += m->rem_len;
+	}
+	if (m->robjs_len) {
+		if (dead_mut.robjs_len + m->robjs_len > dead_mut.robjs_cap) {
+			dead_mut.robjs_cap = (dead_mut.robjs_len + m->robjs_len) * 2;
+			dead_mut.robjs = (void **)realloc(dead_mut.robjs, dead_mut.robjs_cap * sizeof(void *));
+		}
+		memcpy(dead_mut.robjs + dead_mut.robjs_len, m->robjs, m->robjs_len * sizeof(void *));
+		dead_mut.robjs_len += m->robjs_len;
+	}
+	__atomic_fetch_sub(&rt_nthreads, 1, __ATOMIC_SEQ_CST);
+	pthread_mutex_unlock(&wl);
+	free(m->rem);
+	free(m->robjs);
+	rt_dyn_thread_exit();
+	munmap(t->sbase, SSTACK_BYTES);
+	free(t);
+}
+
+static void *thread_start(void *arg) {
+	rt_thread *t = (rt_thread *)arg;
+	self = t;
+	rt_sp = rt_stack_base = t->sbase;
+	rt_young_ptr = rt_young_limit = NULL;
+	rt_hcur = NULL;
+	rt_exn = NULL;
+	pthread_mutex_lock(&wl); // no collection runs: bind the mutator (the thread is safe until it leaves)
+	rt_mutator_bind(&t->mut);
+	t->started = 1;
+	pthread_mutex_unlock(&wl);
+	rt_blocking_leave();
+	void **job = rt_sp++;
+	*job = t->job;
+	t->job = NULL;
+	RT_TRY(h)
+		hx_dyn_call(*job, NULL);
+	RT_CATCH(h)
+		// the hxc sys.thread.Thread catches everything: only a raw spawn gets here
+		void *e = rt_exn;
+		rt_exn = 0;
+		char *s = hx_str_to_utf8(hx_std_string(e));
+		fflush(stdout);
+		fprintf(stderr, "Uncaught exception in thread %d: %s\n", (int)t->id, s);
+		free(s);
+	RT_END_TRY(h)
+	thread_exit();
+	return NULL;
+}
+
+int32_t hxc_NativeThread_spawn(void *job) {
+	rt_thread *t = (rt_thread *)calloc(1, sizeof(rt_thread));
+	if (t) t->sbase = (void **)map_stack(SSTACK_BYTES);
+	if (!t || !t->sbase) {
+		free(t);
+		hx_throw_str("cannot allocate the stacks of a new thread");
+	}
+	t->state = TS_SAFE;
+	t->pk = new_parker();
+	// no safepoint from here to the insertion: `job` is not rooted
+	pthread_mutex_lock(&wl);
+	t->job = job;
+	t->id = next_id++;
+	if (t->id >= by_id_cap) {
+		int32_t n = by_id_cap * 2;
+		while (n <= t->id) n *= 2;
+		by_id = (rt_thread **)realloc(by_id, n * sizeof(rt_thread *));
+		memset(by_id + by_id_cap, 0, (n - by_id_cap) * sizeof(rt_thread *));
+		by_id_cap = n;
+	}
+	by_id[t->id] = t;
+	t->next = all_threads;
+	all_threads->prev = t;
+	all_threads = t;
+	__atomic_fetch_add(&rt_nthreads, 1, __ATOMIC_SEQ_CST);
+	st_spawned++;
+	rt_mt = 1;
+	int32_t id = t->id;
+	pthread_mutex_unlock(&wl);
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, CSTACK_BYTES);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_t pt;
+	int r = pthread_create(&pt, &attr, thread_start, t);
+	pthread_attr_destroy(&attr);
+	if (r != 0) {
+		// never started: take it out again (it is safe, its job a root until now)
+		pthread_mutex_lock(&wl);
+		if (t->prev) t->prev->next = t->next;
+		else all_threads = t->next;
+		if (t->next) t->next->prev = t->prev;
+		by_id[t->id] = NULL;
+		__atomic_fetch_sub(&rt_nthreads, 1, __ATOMIC_SEQ_CST);
+		pthread_mutex_unlock(&wl);
+		munmap(t->sbase, SSTACK_BYTES);
+		free(t);
+		hx_throw_str("cannot start a new thread");
+	}
+	if (rt_spawn_hook) rt_spawn_hook();
+	return id;
+}
+
+int32_t hxc_NativeThread_current(void) { return self->id; }
+
+int32_t hxc_NativeThread_count(void) { return __atomic_load_n(&rt_nthreads, __ATOMIC_RELAXED); }
+
+void *hxc_NativeThread_tlsGet(int32_t id) { return tls_get(&self->tls, id); }
+void hxc_NativeThread_tlsSet(int32_t id, void *v) { tls_set(&self->tls, id, v); }
+
+static void deadline_ts(struct timespec *ts, double timeout) {
+	clock_gettime(CLOCK_MONOTONIC, ts);
+	double s = (double)ts->tv_sec + (double)ts->tv_nsec * 1e-9 + timeout;
+	ts->tv_sec = (time_t)s;
+	ts->tv_nsec = (long)((s - (double)ts->tv_sec) * 1e9);
+	if (ts->tv_nsec >= 1000000000L) {
+		ts->tv_sec++;
+		ts->tv_nsec -= 1000000000L;
+	}
+}
+
+// waits on c (m held), in a safe region: 0 timed out
+static int cond_wait_safe(pthread_cond_t *c, pthread_mutex_t *m, int timed, const struct timespec *ts) {
+	rt_blocking_enter();
+	int r = timed ? pthread_cond_timedwait(c, m, ts) : pthread_cond_wait(c, m);
+	rt_blocking_leave();
+	return r != ETIMEDOUT;
+}
+
+// blocks until unparked (1) or timeout seconds pass (0); timeout < 0: no
+// timeout. An unpark of a thread that is not parked makes its next park
+// return at once.
+int32_t hxc_NativeThread_park(double timeout) {
+	parker *p = self->pk;
+	struct timespec ts;
+	if (timeout >= 0) deadline_ts(&ts, timeout);
+	lock_safe(&p->m);
+	int woken = 1;
+	while (!p->permit) {
+		if (!cond_wait_safe(&p->c, &p->m, timeout >= 0, &ts)) {
+			woken = p->permit;
+			break;
+		}
+	}
+	p->permit = 0;
+	pthread_mutex_unlock(&p->m);
+	return woken;
+}
+
+void hxc_NativeThread_unpark(int32_t id) {
+	pthread_mutex_lock(&wl);
+	rt_thread *t = id > 0 && id < by_id_cap ? by_id[id] : NULL;
+	parker *p = t ? t->pk : NULL;
+	pthread_mutex_unlock(&wl);
+	if (!p) return;
+	lock_safe(&p->m);
+	p->permit = 1;
+	pthread_cond_signal(&p->c);
+	pthread_mutex_unlock(&p->m);
+}
+
+void hxc_NativeThread_yield(void) {
+	rt_safepoint();
+	sched_yield();
+}
+
+void rt_preempt(void) { rt_safepoint(); }
+
+void rt_sleep(double seconds) {
+	if (seconds <= 0) {
+		hxc_NativeThread_yield();
+		return;
+	}
+	RT_BLOCKING(sleep_secs(seconds));
+}
+
+// per descriptor (below FD_GENS): incremented by rt_fd_closed; a thread
+// waiting for a descriptor looks at it every POLL_SLICE seconds, so a close
+// by another thread makes its wait fail (EBADF), as with green threads
+#define FD_GENS 4096
+#define POLL_SLICE 0.1
+static uint32_t fd_gens[FD_GENS];
+
+static uint32_t fd_gen(int fd) { return fd >= 0 && fd < FD_GENS ? __atomic_load_n(&fd_gens[fd], __ATOMIC_RELAXED) : 0; }
+
+void rt_fd_closed(int fd) {
+	if (fd >= 0 && fd < FD_GENS) __atomic_fetch_add(&fd_gens[fd], 1, __ATOMIC_RELAXED);
+}
+
+int rt_wait_fds(void *pollfds, int n, double timeout) {
+	struct pollfd *fds = (struct pollfd *)pollfds;
+	for (int i = 0; i < n; i++) fds[i].revents = 0;
+	int r = poll(fds, n, 0);
+	if (r != 0 || timeout == 0) return r != 0; // a poll failure: let the caller's own call report it
+	uint32_t gens_buf[8];
+	uint32_t *gens = n <= 8 ? gens_buf : (uint32_t *)malloc(n * sizeof(uint32_t));
+	for (int i = 0; i < n; i++) gens[i] = fd_gen(fds[i].fd);
+	double deadline = timeout < 0 ? -1 : now_secs() + timeout;
+	int result = 0, closed = 0;
+	rt_blocking_enter();
+	for (;;) {
+		double slice = POLL_SLICE;
+		if (deadline >= 0) {
+			double left = deadline - now_secs();
+			if (left <= 0) break;
+			if (left < slice) slice = left;
+		}
+		r = poll(fds, n, (int)(slice * 1000.0 + 0.999));
+		for (int i = 0; i < n; i++)
+			if (fd_gen(fds[i].fd) != gens[i]) closed = 1;
+		if (closed) break;
+		if (r != 0) {
+			if (r > 0 || errno != EINTR) {
+				result = 1;
+				break;
+			}
+		}
+	}
+	rt_blocking_leave();
+	if (gens != gens_buf) free(gens);
+	if (closed) {
+		errno = EBADF;
+		return -1;
+	}
+	return result;
+}
+
+// ---- synchronization: pthread mutexes and conditions. Their mutexes are
+// taken with lock_safe (a holder may wait for a collection when it leaves a
+// wait), waits are safe regions; handles are rooted while their thread waits.
+
+typedef struct {
+	pthread_mutex_t m;
+	rt_thread *owner; // atomic: compared with self without the lock
+	int depth;
+} hx_mutex;
+
+typedef struct {
+	pthread_cond_t c;
+} hx_cond;
+
+typedef struct {
+	pthread_mutex_t m;
+	pthread_cond_t c;
+	int32_t count;
+} hx_sem;
+
+static void free_mutex(void *p) {
+	pthread_mutex_destroy(&((hx_mutex *)p)->m);
+	free(p);
+}
+
+static void free_cond(void *p) {
+	pthread_cond_destroy(&((hx_cond *)p)->c);
+	free(p);
+}
+
+static void free_sem(void *p) {
+	pthread_mutex_destroy(&((hx_sem *)p)->m);
+	pthread_cond_destroy(&((hx_sem *)p)->c);
+	free(p);
+}
+
+static rt_thread *owner_of(hx_mutex *m) { return __atomic_load_n(&m->owner, __ATOMIC_RELAXED); }
+
+void *hxc_NativeThread_mutexNew(void) {
+	hx_mutex *m = (hx_mutex *)calloc(1, sizeof(hx_mutex));
+	pthread_mutex_init(&m->m, NULL);
+	return rt_native_new(m, free_mutex);
+}
+
+void hxc_NativeThread_mutexAcquire(void *mo) {
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	if (owner_of(m) == self) {
+		m->depth++;
+		return;
+	}
+	if (pthread_mutex_trylock(&m->m) != 0) {
+		RT_ROOT(mo); // the handle stays alive while this thread waits
+		double t0 = thr_stats ? now_secs() : 0;
+		rt_blocking_enter();
+		pthread_mutex_lock(&m->m);
+		rt_blocking_leave();
+		if (thr_stats) {
+			__atomic_fetch_add(&st_contended, 1, __ATOMIC_RELAXED);
+			st_contended_secs += now_secs() - t0; // under the mutex just taken: approximate across mutexes
+		}
+		RT_UNROOT(1);
+	}
+	__atomic_store_n(&m->owner, self, __ATOMIC_RELAXED);
+	m->depth = 1;
+}
+
+int32_t hxc_NativeThread_mutexTryAcquire(void *mo) {
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	if (owner_of(m) == self) {
+		m->depth++;
+		return 1;
+	}
+	if (pthread_mutex_trylock(&m->m) != 0) return 0;
+	__atomic_store_n(&m->owner, self, __ATOMIC_RELAXED);
+	m->depth = 1;
+	return 1;
+}
+
+void hxc_NativeThread_mutexRelease(void *mo) {
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	if (owner_of(m) != self) return;
+	if (--m->depth > 0) return;
+	__atomic_store_n(&m->owner, NULL, __ATOMIC_RELAXED);
+	pthread_mutex_unlock(&m->m);
+}
+
+void *hxc_NativeThread_condNew(void) {
+	hx_cond *c = (hx_cond *)calloc(1, sizeof(hx_cond));
+	cond_init(&c->c);
+	return rt_native_new(c, free_cond);
+}
+
+// waits for a signal (1) or until timeout seconds pass (0; < 0: no timeout);
+// the calling thread holds mutex m, which is released meanwhile (fully) and
+// taken back at the same depth. May wake spuriously (as pthread conditions).
+int32_t hxc_NativeThread_condWait(void *co, void *mo, double timeout) {
+	hx_cond *c = (hx_cond *)FP(co, 0);
+	hx_mutex *m = (hx_mutex *)FP(mo, 0);
+	if (owner_of(m) != self) hx_throw_str("Condition.wait: the mutex is not held");
+	struct timespec ts;
+	if (timeout >= 0) deadline_ts(&ts, timeout);
+	RT_ROOT(co);
+	RT_ROOT(mo);
+	int depth = m->depth;
+	__atomic_store_n(&m->owner, NULL, __ATOMIC_RELAXED);
+	int r = cond_wait_safe(&c->c, &m->m, timeout >= 0, &ts);
+	__atomic_store_n(&m->owner, self, __ATOMIC_RELAXED);
+	m->depth = depth;
+	RT_UNROOT(2);
+	return r;
+}
+
+void hxc_NativeThread_condSignal(void *co) { pthread_cond_signal(&((hx_cond *)FP(co, 0))->c); }
+void hxc_NativeThread_condBroadcast(void *co) { pthread_cond_broadcast(&((hx_cond *)FP(co, 0))->c); }
+
+void *hxc_NativeThread_semNew(int32_t value) {
+	hx_sem *s = (hx_sem *)calloc(1, sizeof(hx_sem));
+	pthread_mutex_init(&s->m, NULL);
+	cond_init(&s->c);
+	s->count = value;
+	return rt_native_new(s, free_sem);
+}
+
+// takes a unit (1), or times out (0) after timeout seconds (0: just try; < 0: no timeout)
+int32_t hxc_NativeThread_semAcquire(void *so, double timeout) {
+	hx_sem *s = (hx_sem *)FP(so, 0);
+	struct timespec ts;
+	if (timeout > 0) deadline_ts(&ts, timeout);
+	RT_ROOT(so);
+	lock_safe(&s->m);
+	int r = 1;
+	while (s->count == 0) {
+		if (timeout == 0 || !cond_wait_safe(&s->c, &s->m, timeout > 0, &ts)) {
+			r = s->count > 0;
+			break;
+		}
+	}
+	if (r) s->count--;
+	pthread_mutex_unlock(&s->m);
+	RT_UNROOT(1);
+	return r;
+}
+
+void hxc_NativeThread_semRelease(void *so) {
+	hx_sem *s = (hx_sem *)FP(so, 0);
+	RT_ROOT(so);
+	lock_safe(&s->m);
+	s->count++;
+	pthread_cond_signal(&s->c);
+	pthread_mutex_unlock(&s->m);
+	RT_UNROOT(1);
+}
+
+#endif // RT_MT
+
 int rt_wait_fd(int fd, int write, double timeout) {
 	struct pollfd p;
 	p.fd = fd;
@@ -463,7 +1482,6 @@ int rt_wait_fd(int fd, int write, double timeout) {
 	p.revents = 0;
 	return rt_wait_fds(&p, 1, timeout);
 }
-
 
 // The program's main runs on a reserved stack of RT_STACK_MB (default 1024)
 // MB, committed as touched, with a guard page: OCaml 5, which the reference

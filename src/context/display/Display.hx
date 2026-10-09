@@ -33,7 +33,8 @@ class Display {
 	}
 
 	public static function preprocessExpr(com:CommonContext, e:Expr):Expr return switch com.display.dmsKind {
-		case DMDefinition | DMTypeDefinition | DMUsage(_) | DMImplementation | DMHover | DMDefault: ExprPreprocessing.findBeforePos(com.partScope.parserState.wasAutoTriggered, com.display.dmsKind, e);
+		case DMDefinition | DMTypeDefinition | DMUsage(_) | DMImplementation | DMHover | DMDefault: ExprPreprocessing.findBeforePos(com.partScope.parserState.wasAutoTriggered,
+				com.display.dmsKind, e);
 		case DMSignature: ExprPreprocessing.findDisplayCall(com.partScope.parserState.wasAutoTriggered, e);
 		case _: e;
 	};
@@ -128,11 +129,13 @@ class ReferencePosition {
 	static var referencePosition:{name:String, pos:Pos, kind:Symbol} = {name: "", pos: Globals.nullPos, kind: SKOther};
 
 	public static function set(name:String, p:Pos, k:Symbol):Void {
-		var p:Pos = if (p.pfile == Globals.nullPos.pfile && p.pmin == Globals.nullPos.pmin && p.pmax == Globals.nullPos.pmax) p else {pfile: core.Path.getFullPath(p.pfile), pmin: p.pmin, pmax: p.pmax};
+		var p:Pos = if (p.pfile == Globals.nullPos.pfile && p.pmin == Globals.nullPos.pmin && p.pmax == Globals.nullPos.pmax) p else
+			{pfile: core.Path.getFullPath(p.pfile), pmin: p.pmin, pmax: p.pmax};
 		referencePosition = {name: name, pos: p, kind: k};
 	}
 
-	public static function get():{name:String, pos:Pos, kind:Symbol} return referencePosition;
+	public static function get():{name:String, pos:Pos, kind:Symbol}
+		return referencePosition;
 
 	public static function reset():Void referencePosition = {name: "", pos: Globals.nullPos, kind: SKOther};
 }

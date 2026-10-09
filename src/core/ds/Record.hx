@@ -22,6 +22,7 @@ class Record {
 		}
 		return macro core.ds.Record.copyDynamic($record);
 	}
+
 	public static function copyDynamic<T>(o:T):T {
 		#if !macro
 		if (std.Type.getClass(o) == null) return Reflect.copy(o); // anonymous record
@@ -31,19 +32,26 @@ class Record {
 		#end
 		return Reflect.copy(o);
 	}
+
 	#if macro
 	static var nextId = 0;
 	#end
-	public static macro function withFields(record:Expr,updates:Expr):Expr {
+
+	public static macro function withFields(record:Expr, updates:Expr):Expr {
 		var fields = switch updates.expr {
 			case EObjectDecl(fields): fields;
 			case _: haxe.macro.Context.error("Expected a record field update", updates.pos);
 		};
-		var name="__hihRecordUpdate"+(nextId++);
-		var ref:Expr={expr:EConst(CIdent(name)),pos:record.pos};
-		var result:Array<Expr>=[{expr:EVars([{name:name,expr:macro core.ds.Record.copy($record)}]),pos:record.pos}];
-		for(field in fields) result.push({expr:EBinop(OpAssign,{expr:EField(ref,field.field),pos:field.expr.pos},field.expr),pos:field.expr.pos});
+		var name = "__hihRecordUpdate" + (nextId++);
+		var ref:Expr = {expr: EConst(CIdent(name)), pos: record.pos};
+		var result:Array<Expr> = [
+			{expr: EVars([{name: name, expr: macro core.ds.Record.copy($record)}]), pos: record.pos}
+		];
+		for (field in fields) result.push({
+			expr: EBinop(OpAssign, {expr: EField(ref, field.field), pos: field.expr.pos}, field.expr),
+			pos: field.expr.pos
+		});
 		result.push(ref);
-		return {expr:EBlock(result),pos:record.pos};
+		return {expr: EBlock(result), pos: record.pos};
 	}
 }

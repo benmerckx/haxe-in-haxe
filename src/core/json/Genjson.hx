@@ -4,7 +4,6 @@ import core.Globals;
 import core.Globals.Pos;
 import core.Json.JsonValue;
 import core.Json.JsonField;
-
 import core.TFunctions.*;
 import core.Ast;
 import core.Meta;
@@ -17,41 +16,63 @@ import core.TType;
 	public var generateDocs:Bool;
 	public var generateExprs:Bool;
 	public var generateOrigins:Bool;
-	public inline function new(generateAbstractImpl:Bool, generateMemberBodies:Bool, generateDocs:Bool, generateExprs:Bool, generateOrigins:Bool) { this.generateAbstractImpl = generateAbstractImpl; this.generateMemberBodies = generateMemberBodies; this.generateDocs = generateDocs; this.generateExprs = generateExprs; this.generateOrigins = generateOrigins; }
-	public inline function clone():GenjsonContext return new GenjsonContext(generateAbstractImpl, generateMemberBodies, generateDocs, generateExprs, generateOrigins);
+
+	public inline function new(generateAbstractImpl:Bool, generateMemberBodies:Bool, generateDocs:Bool, generateExprs:Bool,
+			generateOrigins:Bool) {
+		this.generateAbstractImpl = generateAbstractImpl;
+		this.generateMemberBodies = generateMemberBodies;
+		this.generateDocs = generateDocs;
+		this.generateExprs = generateExprs;
+		this.generateOrigins = generateOrigins;
+	}
+
+	public inline function clone():GenjsonContext return new GenjsonContext(generateAbstractImpl, generateMemberBodies, generateDocs,
+		generateExprs, generateOrigins);
 }
 
 class Genjson {
 	public static final jnull:JsonValue = JNull;
+
 	public static inline function jstring(s:String):JsonValue return JString(s);
+
 	public static inline function jint(i:Int):JsonValue return JInt(i);
+
 	public static inline function jfloat(f:Float):JsonValue return JFloat(f);
+
 	public static inline function jbool(b:Bool):JsonValue return JBool(b);
+
 	public static inline function jarray(l:Array<JsonValue>):JsonValue return JArray(l);
+
 	public static inline function jobject(l:Array<JsonField>):JsonValue return JObject(l);
+
 	/** A `(name,value)` pair of an object. **/
 	public static inline function kv(name:String, value:JsonValue):JsonField return {name: name, value: value};
 
 	public static final jtodo:JsonValue = JNull;
+
 	public static function jopt<T>(f:T->JsonValue, o:Null<T>):JsonValue return o == null ? JNull : f(o);
+
 	public static function jlist<T>(f:T->JsonValue, o:Array<T>):JsonValue return jarray([for (x in o) f(x)]);
 
 	public static function generatePackagePath_(pack:Array<String>):Array<JsonField> return [kv("pack", jarray(pack.map(jstring)))];
 
 	public static function generatePackagePath(pack:Array<String>):JsonValue return jobject(generatePackagePath_(pack));
 
-	public static function generateModulePath_(mpath:GlobalTypePath):Array<JsonField> return [kv("moduleName", jstring(mpath.name))].concat(generatePackagePath_(mpath.pack));
+	public static function generateModulePath_(mpath:GlobalTypePath):Array<JsonField> return [kv("moduleName",
+		jstring(mpath.name))].concat(generatePackagePath_(mpath.pack));
 
 	public static function generateModulePath(mpath:GlobalTypePath):JsonValue return jobject(generateModulePath_(mpath));
 
-	public static function generateTypePath_(mpath:GlobalTypePath, tpath:GlobalTypePath, meta:Metadata):Array<JsonField> return [kv("typeName", jstring(tpath.name))].concat(generateModulePath_(mpath));
+	public static function generateTypePath_(mpath:GlobalTypePath, tpath:GlobalTypePath,
+			meta:Metadata):Array<JsonField> return [kv("typeName", jstring(tpath.name))].concat(generateModulePath_(mpath));
 
 	public static function generateTypePath(mpath:GlobalTypePath, tpath:GlobalTypePath, meta:Metadata):JsonValue {
 		function loop(l:Metadata, i:Int):GlobalTypePath {
 			if (i >= l.length) return tpath;
 			var m = l[i];
 			if (Meta.metaEq(core.MetaList.StrictMeta.RealPath, m.meta) && m.exprs.length == 1) switch m.exprs[0].expr {
-				case EConst(String(s, _)): return Ast.parsePath(s);
+				case EConst(String(s, _)):
+					return Ast.parsePath(s);
 				case _:
 			}
 			return loop(l, i + 1);
@@ -70,16 +91,21 @@ class Genjson {
 		var m = Meta.getOpt(core.MetaList.StrictMeta.RealPath, meta);
 		if (m == null) return name;
 		if (m.exprs.length == 1) switch m.exprs[0].expr {
-			case EConst(String(s, _)): return s;
+			case EConst(String(s, _)):
+				return s;
 			case _:
 		}
 		return name;
 	}
 
 	public static function classRef(ctx:GenjsonContext, c:TClass):JsonValue return generateTypePath(c.clModule.mPath, c.clPath, c.clMeta);
+
 	public static function enumRef(ctx:GenjsonContext, en:TEnum):JsonValue return generateTypePath(en.eModule.mPath, en.ePath, en.eMeta);
+
 	public static function typedefRef(ctx:GenjsonContext, td:TDef):JsonValue return generateTypePath(td.tModule.mPath, td.tPath, td.tMeta);
-	public static function abstractRef(ctx:GenjsonContext, a:TAbstract):JsonValue return generateTypePath(a.aModule.mPath, a.aPath, a.aMeta);
+
+	public static function abstractRef(ctx:GenjsonContext,
+			a:TAbstract):JsonValue return generateTypePath(a.aModule.mPath, a.aPath, a.aMeta);
 
 	public static function moduletypeRef(ctx:GenjsonContext, mt:ModuleType):JsonValue {
 		var infos = tInfos(mt);
@@ -87,14 +113,18 @@ class Genjson {
 	}
 
 	public static function classfieldRef(ctx:GenjsonContext, cf:TClassField):JsonValue return jstring(fieldName(cf.cfName, cf.cfMeta));
+
 	public static function enumfieldRef(ctx:GenjsonContext, ef:TEnumField):JsonValue return jstring(fieldName(ef.efName, ef.efMeta));
+
 	public static function localRef(ctx:GenjsonContext, v:TVar):JsonValue return jint(v.vId);
 
-	public static function generatePos(ctx:GenjsonContext, p:Pos):JsonValue return jobject([kv("file", jstring(p.pfile)), kv("min", jint(p.pmin)), kv("max", jint(p.pmax))]);
+	public static function generatePos(ctx:GenjsonContext,
+			p:Pos):JsonValue return jobject([kv("file", jstring(p.pfile)), kv("min", jint(p.pmin)), kv("max", jint(p.pmax))]);
 
 	public static function generateExprPos(ctx:GenjsonContext, p:Pos):JsonValue return jtodo;
 
-	public static function generateDoc(ctx:GenjsonContext, d:Documentation):JsonValue return ctx.generateDocs ? jopt(jstring, Ast.genDocTextOpt(d)) : jnull;
+	public static function generateDoc(ctx:GenjsonContext,
+			d:Documentation):JsonValue return ctx.generateDocs ? jopt(jstring, Ast.genDocTextOpt(d)) : jnull;
 
 	/**
 		return a range JSON structure for given position
@@ -107,14 +137,20 @@ class Genjson {
 	public static function posToRange(p:Pos):Array<JsonField> {
 		var c = syntax.Lexer.getPosCoords(p);
 		function toJson(l:Int, c:Int):JsonValue return jobject([kv("line", jint(l - 1)), kv("character", jint(c - 1))]);
-		return [kv("start", toJson(c.lineStart, c.columnStart)), kv("end", toJson(c.lineEnd, c.columnEnd))];
+		return [
+			kv("start", toJson(c.lineStart, c.columnStart)),
+			kv("end", toJson(c.lineEnd, c.columnEnd))
+		];
 	}
 
 	public static function generatePosAsRange(p:Pos):JsonValue return p.pmin == -1 ? jnull : jobject(posToRange(p));
 
 	public static function generatePosAsLocation(p:Pos):JsonValue {
 		if (p.pmin == -1) return jnull;
-		return jobject([kv("file", jstring(core.Path.getRealPath(p.pfile))), kv("range", generatePosAsRange(p))]);
+		return jobject([
+			kv("file", jstring(core.Path.getRealPath(p.pfile))),
+			kv("range", generatePosAsRange(p))
+		]);
 	}
 
 	// AST expr
@@ -122,31 +158,57 @@ class Genjson {
 	public static function generateBinop(ctx:GenjsonContext, op:Binop):JsonValue {
 		var name:String, args:Null<JsonValue> = null;
 		switch op {
-			case OpAdd: name = "OpAdd";
-			case OpMult: name = "OpMult";
-			case OpDiv: name = "OpDiv";
-			case OpSub: name = "OpSub";
-			case OpAssign: name = "OpAssign";
-			case OpEq: name = "OpEq";
-			case OpNotEq: name = "OpNotEq";
-			case OpGt: name = "OpGt";
-			case OpGte: name = "OpGte";
-			case OpLt: name = "OpLt";
-			case OpLte: name = "OpLte";
-			case OpAnd: name = "OpAnd";
-			case OpOr: name = "OpOr";
-			case OpXor: name = "OpXor";
-			case OpBoolAnd: name = "OpBoolAnd";
-			case OpBoolOr: name = "OpBoolOr";
-			case OpShl: name = "OpShl";
-			case OpShr: name = "OpShr";
-			case OpUShr: name = "OpUShr";
-			case OpMod: name = "OpMod";
-			case OpAssignOp(op): name = "OpAssignOp"; args = generateBinop(ctx, op);
-			case OpInterval: name = "OpInterval";
-			case OpArrow: name = "OpArrow";
-			case OpIn: name = "OpIn";
-			case OpNullCoal: name = "OpNullCoal";
+			case OpAdd:
+				name = "OpAdd";
+			case OpMult:
+				name = "OpMult";
+			case OpDiv:
+				name = "OpDiv";
+			case OpSub:
+				name = "OpSub";
+			case OpAssign:
+				name = "OpAssign";
+			case OpEq:
+				name = "OpEq";
+			case OpNotEq:
+				name = "OpNotEq";
+			case OpGt:
+				name = "OpGt";
+			case OpGte:
+				name = "OpGte";
+			case OpLt:
+				name = "OpLt";
+			case OpLte:
+				name = "OpLte";
+			case OpAnd:
+				name = "OpAnd";
+			case OpOr:
+				name = "OpOr";
+			case OpXor:
+				name = "OpXor";
+			case OpBoolAnd:
+				name = "OpBoolAnd";
+			case OpBoolOr:
+				name = "OpBoolOr";
+			case OpShl:
+				name = "OpShl";
+			case OpShr:
+				name = "OpShr";
+			case OpUShr:
+				name = "OpUShr";
+			case OpMod:
+				name = "OpMod";
+			case OpAssignOp(op):
+				name = "OpAssignOp";
+				args = generateBinop(ctx, op);
+			case OpInterval:
+				name = "OpInterval";
+			case OpArrow:
+				name = "OpArrow";
+			case OpIn:
+				name = "OpIn";
+			case OpNullCoal:
+				name = "OpNullCoal";
 		}
 		return generateAdt(ctx, {pack: ["haxe", "macro"], name: "Binop"}, name, args);
 	}
@@ -218,12 +280,22 @@ class Genjson {
 	public static function generateAnonStatus(ctx:GenjsonContext, status:AnonStatus):JsonValue {
 		var name:String, args:Null<JsonValue> = null;
 		switch status {
-			case Closed: name = "AClosed";
-			case Const: name = "AConst";
-			case Extend(tl): name = "AExtend"; args = generateTypes(ctx, tl);
-			case ClassStatics(c): name = "AClassStatics"; args = classRef(ctx, c);
-			case EnumStatics(en): name = "AEnumStatics"; args = enumRef(ctx, en);
-			case AbstractStatics(a): name = "AAbstractStatics"; args = abstractRef(ctx, a);
+			case Closed:
+				name = "AClosed";
+			case Const:
+				name = "AConst";
+			case Extend(tl):
+				name = "AExtend";
+				args = generateTypes(ctx, tl);
+			case ClassStatics(c):
+				name = "AClassStatics";
+				args = classRef(ctx, c);
+			case EnumStatics(en):
+				name = "AEnumStatics";
+				args = enumRef(ctx, en);
+			case AbstractStatics(a):
+				name = "AAbstractStatics";
+				args = abstractRef(ctx, a);
 		}
 		return generateAdt(ctx, null, name, args);
 	}
@@ -231,24 +303,42 @@ class Genjson {
 	public static function generateAnon(ctx:GenjsonContext, an:TAnon):JsonValue {
 		function generateAnonFields():JsonValue {
 			// PMap.fold conses in key order: the result is in reverse key order
-			var fields = core.ds.PMap.fold(function(cf:TClassField, acc:Array<JsonValue>) {acc.unshift(generateClassField(ctx, CFSMember, cf)); return acc;}, an.aFields, []);
+			var fields = core.ds.PMap.fold(function(cf:TClassField, acc:Array<JsonValue>) {
+				acc.unshift(generateClassField(ctx, CFSMember, cf));
+				return acc;
+			}, an.aFields, []);
 			return jarray(fields);
 		}
-		return jobject([kv("fields", generateAnonFields()), kv("status", generateAnonStatus(ctx, an.aStatus))]);
+		return jobject([
+			kv("fields", generateAnonFields()),
+			kv("status", generateAnonStatus(ctx, an.aStatus))
+		]);
 	}
 
 	public static function generateFunctionArgument(ctx:GenjsonContext, a:{name:String, optional:Bool, type:T}):JsonValue {
-		return jobject([kv("name", jstring(a.name)), kv("opt", jbool(a.optional)), kv("t", generateType(ctx, a.type))]);
+		return jobject([
+			kv("name", jstring(a.name)),
+			kv("opt", jbool(a.optional)),
+			kv("t", generateType(ctx, a.type))
+		]);
 	}
 
-	public static function generateFunctionSignature(ctx:GenjsonContext, tl:Array<{name:String, optional:Bool, type:T}>, tr:T):Array<JsonField> {
-		return [kv("args", jlist(generateFunctionArgument.bind(ctx), tl)), kv("ret", generateType(ctx, tr))];
+	public static function generateFunctionSignature(ctx:GenjsonContext, tl:Array<{name:String, optional:Bool, type:T}>,
+			tr:T):Array<JsonField> {
+		return [
+			kv("args", jlist(generateFunctionArgument.bind(ctx), tl)),
+			kv("ret", generateType(ctx, tr))
+		];
 	}
 
 	public static function generateTypes(ctx:GenjsonContext, tl:Array<T>):JsonValue return jlist(generateType.bind(ctx), tl);
 
-	public static function generateTypePathWithParams(ctx:GenjsonContext, mpath:GlobalTypePath, tpath:GlobalTypePath, tl:Array<T>, meta:Metadata):JsonValue {
-		return jobject([kv("path", generateTypePath(mpath, tpath, meta)), kv("params", generateTypes(ctx, tl))]);
+	public static function generateTypePathWithParams(ctx:GenjsonContext, mpath:GlobalTypePath, tpath:GlobalTypePath, tl:Array<T>,
+			meta:Metadata):JsonValue {
+		return jobject([
+			kv("path", generateTypePath(mpath, tpath, meta)),
+			kv("params", generateTypes(ctx, tl))
+		]);
 	}
 
 	// type parameter
@@ -266,7 +356,11 @@ class Genjson {
 	public static function generateTvar(ctx:GenjsonContext, v:TVar):JsonValue {
 		function generateExtra(ve:TVarExtra):JsonValue {
 			var fields = [kv("params", jlist(generateTypeParameter.bind(ctx), ve.vParams))];
-			if (ve.vExpr != null) fields.push(kv("expr", jobject([kv("string", jstring(core.TPrinting.sExprPretty(false, "", false, core.TPrinting.sType.bind(core.TPrinting.printContext()), ve.vExpr)))])));
+			if (ve.vExpr != null) fields.push(kv("expr", jobject([
+				kv("string",
+					jstring(core.TPrinting.sExprPretty(false, "", false, core.TPrinting.sType.bind(core.TPrinting.printContext()),
+						ve.vExpr)))
+			])));
 			return jobject(fields);
 		}
 		var fields = [
@@ -289,7 +383,8 @@ class Genjson {
 			case TVOLocalFunction: 5;
 		};
 		switch v.vKind {
-			case VUser(origin): fields.unshift(kv("origin", jint(originToInt(origin))));
+			case VUser(origin):
+				fields.unshift(kv("origin", jint(originToInt(origin))));
 			case _:
 		}
 		return jobject(fields);
@@ -298,20 +393,38 @@ class Genjson {
 	public static function generateTconstant(ctx:GenjsonContext, ct:TConstant):JsonValue {
 		var name:String, args:Null<JsonValue> = null;
 		switch ct {
-			case TInt(i32): name = "TInt"; args = jstring(Std.string(i32));
-			case TFloat(s): name = "TFloat"; args = jstring(s);
-			case TString(s): name = "TString"; args = jstring(s);
-			case TBool(b): name = "TBool"; args = jbool(b);
-			case TNull: name = "TNull";
-			case TThis: name = "TThis";
-			case TSuper: name = "TSuper";
+			case TInt(i32):
+				name = "TInt";
+				args = jstring(Std.string(i32));
+			case TFloat(s):
+				name = "TFloat";
+				args = jstring(s);
+			case TString(s):
+				name = "TString";
+				args = jstring(s);
+			case TBool(b):
+				name = "TBool";
+				args = jbool(b);
+			case TNull:
+				name = "TNull";
+			case TThis:
+				name = "TThis";
+			case TSuper:
+				name = "TSuper";
 		}
 		return generateAdt(ctx, null, name, args);
 	}
 
 	public static function generateTfunction(ctx:GenjsonContext, tf:TFunc):JsonValue {
-		function generateArg(a:{variable:TVar, defaultValue:Null<TExpr>}):JsonValue return jobject([kv("v", generateTvar(ctx, a.variable)), kv("value", jopt(generateTexpr.bind(ctx), a.defaultValue))]);
-		return jobject([kv("args", jlist(generateArg, tf.tfArgs)), kv("ret", generateType(ctx, tf.tfType)), kv("expr", generateTexpr(ctx, tf.tfExpr))]);
+		function generateArg(a:{variable:TVar, defaultValue:Null<TExpr>}):JsonValue return jobject([
+			kv("v", generateTvar(ctx, a.variable)),
+			kv("value", jopt(generateTexpr.bind(ctx), a.defaultValue))
+		]);
+		return jobject([
+			kv("args", jlist(generateArg, tf.tfArgs)),
+			kv("ret", generateType(ctx, tf.tfType)),
+			kv("expr", generateTexpr(ctx, tf.tfExpr))
+		]);
 	}
 
 	// Upstream keeps the full texpr serializer commented out and returns jtodo.
@@ -324,14 +437,23 @@ class Genjson {
 			function generateVarAccess(va:VarAccess):JsonValue {
 				var name:String, args:Null<JsonValue> = null;
 				switch va {
-					case AccNormal: name = "AccNormal";
-					case AccNo: name = "AccNo";
-					case AccNever: name = "AccNever";
-					case AccCtor: name = "AccCtor";
-					case AccCall: name = "AccCall";
-					case AccPrivateCall: name = "AccPrivateCall";
-					case AccInline: name = "AccInline";
-					case AccRequire(s, so): name = "AccRequire"; args = jobject([kv("require", jstring(s)), kv("message", jopt(jstring, so))]);
+					case AccNormal:
+						name = "AccNormal";
+					case AccNo:
+						name = "AccNo";
+					case AccNever:
+						name = "AccNever";
+					case AccCtor:
+						name = "AccCtor";
+					case AccCall:
+						name = "AccCall";
+					case AccPrivateCall:
+						name = "AccPrivateCall";
+					case AccInline:
+						name = "AccInline";
+					case AccRequire(s, so):
+						name = "AccRequire";
+						args = jobject([kv("require", jstring(s)), kv("message", jopt(jstring, so))]);
 				}
 				return generateAdt(ctx, null, name, args);
 			}
@@ -345,20 +467,27 @@ class Genjson {
 				return jstring(name);
 			}
 			return switch cf.cfKind {
-				case Var(vk): generateAdt(ctx, null, "FVar", jobject([kv("read", generateVarAccess(vk.vRead)), kv("write", generateVarAccess(vk.vWrite))]));
+				case Var(vk): generateAdt(ctx, null, "FVar", jobject([
+						kv("read", generateVarAccess(vk.vRead)),
+						kv("write", generateVarAccess(vk.vWrite))
+					]));
 				case Method(m): generateAdt(ctx, null, "FMethod", generateMethodKind(m));
 			};
 		}
 		var expr = if (ctx.generateExprs) {
 			var value:Null<Expr> = switch cf.cfKind {
 				case Method(_): null;
-				case Var(_):
-					var m = Meta.getOpt(core.MetaList.StrictMeta.Value, cf.cfMeta);
-					m != null && m.exprs.length == 1 ? m.exprs[0] : null;
+				case Var(_): var m = Meta.getOpt(core.MetaList.StrictMeta.Value,
+						cf.cfMeta); m != null && m.exprs.length == 1 ? m.exprs[0] : null;
 			};
 			if (value == null) {
 				if (Meta.has(core.MetaList.StrictMeta.Custom(":testHack"), cf.cfMeta)) {
-					if (cf.cfExpr != null) jobject([kv("testHack", jstring(core.TPrinting.sExprPretty(false, "", false, core.TPrinting.sType.bind(core.TPrinting.printContext()), cf.cfExpr)))]) else jnull;
+					if (cf.cfExpr != null) jobject([
+						kv("testHack",
+							jstring(core.TPrinting.sExprPretty(false, "", false, core.TPrinting.sType.bind(core.TPrinting.printContext()),
+								cf.cfExpr)))
+					])
+					else jnull;
 				} else jnull;
 			} else jobject([kv("string", jstring(AstPrinter.sExpr(value)))]);
 		} else jnull;
@@ -379,7 +508,8 @@ class Genjson {
 		];
 	}
 
-	public static function generateClassField(ctx:GenjsonContext, cfs:ClassFieldScope, cf:TClassField):JsonValue return jobject(generateClassField_(ctx, cfs, cf));
+	public static function generateClassField(ctx:GenjsonContext, cfs:ClassFieldScope,
+			cf:TClassField):JsonValue return jobject(generateClassField_(ctx, cfs, cf));
 
 	public static function generateEnumField(ctx:GenjsonContext, ef:TEnumField):JsonValue {
 		return jobject([
@@ -412,19 +542,34 @@ class Genjson {
 		function generateClassKind(ck:TClassKind):JsonValue {
 			var ctor:String, args:Null<JsonValue> = null;
 			switch ck {
-				case KNormal: ctor = "KNormal";
-				case KTypeParameter(ttp): ctor = "KTypeParameter"; args = generateTypes(ctx, getConstraints(ttp));
-				case KExpr(e): ctor = "KExpr"; args = generateExpr(ctx, e);
-				case KGeneric: ctor = "KGeneric";
-				case KGenericInstance(c, tl): ctor = "KGenericInstance"; args = generateTypePathWithParams(ctx, c.clModule.mPath, c.clPath, tl, c.clMeta);
-				case KMacroType: ctor = "KMacroType";
-				case KGenericBuild(_): ctor = "KGenericBuild";
-				case KAbstractImpl(a): ctor = "KAbstractImpl"; args = abstractRef(ctx, a);
-				case KModuleFields(m): ctor = "KModuleFields"; args = generateModulePath(m.mPath);
+				case KNormal:
+					ctor = "KNormal";
+				case KTypeParameter(ttp):
+					ctor = "KTypeParameter";
+					args = generateTypes(ctx, getConstraints(ttp));
+				case KExpr(e):
+					ctor = "KExpr";
+					args = generateExpr(ctx, e);
+				case KGeneric:
+					ctor = "KGeneric";
+				case KGenericInstance(c, tl):
+					ctor = "KGenericInstance";
+					args = generateTypePathWithParams(ctx, c.clModule.mPath, c.clPath, tl, c.clMeta);
+				case KMacroType:
+					ctor = "KMacroType";
+				case KGenericBuild(_):
+					ctor = "KGenericBuild";
+				case KAbstractImpl(a):
+					ctor = "KAbstractImpl";
+					args = abstractRef(ctx, a);
+				case KModuleFields(m):
+					ctor = "KModuleFields";
+					args = generateModulePath(m.mPath);
 			}
 			return generateAdt(ctx, {pack: ["haxe", "macro"], name: "ClassKind"}, ctor, args);
 		}
-		function generateClassRelation(r:{cls:TClass, params:TParams}):JsonValue return jobject([kv("path", classRef(ctx, r.cls)), kv("params", generateTypes(ctx, r.params))]);
+		function generateClassRelation(r:{cls:TClass, params:TParams}):JsonValue return jobject([kv("path",
+			classRef(ctx, r.cls)), kv("params", generateTypes(ctx, r.params))]);
 		return [
 			kv("kind", generateClassKind(c.clKind)),
 			kv("isInterface", jbool(hasClassFlag(c, CInterface))),
@@ -434,7 +579,9 @@ class Genjson {
 			kv("statics", ctx.generateMemberBodies ? jlist(generateClassField.bind(ctx, CFSStatic), c.clOrderedStatics) : jarray([])),
 			kv("constructor", ctx.generateMemberBodies ? jopt(generateClassField.bind(ctx, CFSConstructor), c.clConstructor) : jnull),
 			kv("init", ctx.generateMemberBodies ? jopt(generateTexpr.bind(ctx), core.TOther.TClassTools.getClInit(c)) : jnull),
-			kv("overrides", ctx.generateMemberBodies ? jlist(classfieldRef.bind(ctx), c.clOrderedFields.filter(cf -> hasClassFieldFlag(cf, CfOverride))) : jarray([])),
+			kv("overrides",
+				ctx.generateMemberBodies ? jlist(classfieldRef.bind(ctx),
+					c.clOrderedFields.filter(cf -> hasClassFieldFlag(cf, CfOverride))) : jarray([])),
 			kv("isExtern", jbool(hasClassFlag(c, CExtern))),
 			kv("isFinal", jbool(hasClassFlag(c, CFinal))),
 			kv("isAbstract", jbool(hasClassFlag(c, CAbstract)))
@@ -455,15 +602,23 @@ class Genjson {
 	public static function generateTypedef(ctx:GenjsonContext, td:TDef):Array<JsonField> return [kv("type", generateType(ctx, td.tType))];
 
 	public static function generateAbstract(ctx:GenjsonContext, a:TAbstract):Array<JsonField> {
-		function generateCastRelation(t:T, cfo:Null<TClassField>):JsonValue return jobject([kv("t", generateType(ctx, t)), kv("field", jopt(classfieldRef.bind(ctx), cfo))]);
+		function generateCastRelation(t:T,
+				cfo:Null<TClassField>):JsonValue return jobject([kv("t",
+				generateType(ctx, t)), kv("field", jopt(classfieldRef.bind(ctx), cfo))]);
 		function generateCasts(fields:Array<{type:T, field:TClassField}>, casts:Array<T>):JsonValue {
 			var l1 = fields.map(f -> generateCastRelation(f.type, f.field));
 			var l2 = casts.map(t -> generateCastRelation(t, null));
 			return jarray(l1.concat(l2));
 		}
-		function generateBinop_(o:{op:Binop, field:TClassField}):JsonValue return jobject([kv("op", generateBinop(ctx, o.op)), kv("field", classfieldRef(ctx, o.field))]);
-		function generateUnop_(o:{op:Unop, flag:UnopFlag, field:TClassField}):JsonValue return jobject([kv("op", generateUnop(ctx, o.op)), kv("postFix", jbool(o.flag == Postfix)), kv("field", classfieldRef(ctx, o.field))]);
-		var impl = if (a.aImpl == null) jnull else if (ctx.generateAbstractImpl) jobject(generateClass(ctx, a.aImpl)) else classRef(ctx, a.aImpl);
+		function generateBinop_(o:{op:Binop, field:TClassField}):JsonValue return jobject([kv("op",
+			generateBinop(ctx, o.op)), kv("field", classfieldRef(ctx, o.field))]);
+		function generateUnop_(o:{op:Unop, flag:UnopFlag, field:TClassField}):JsonValue return jobject([
+			kv("op", generateUnop(ctx, o.op)),
+			kv("postFix", jbool(o.flag == Postfix)),
+			kv("field", classfieldRef(ctx, o.field))
+		]);
+		var impl = if (a.aImpl == null) jnull else if (ctx.generateAbstractImpl) jobject(generateClass(ctx,
+			a.aImpl)) else classRef(ctx, a.aImpl);
 		return [
 			kv("type", generateType(ctx, a.aThis)),
 			kv("impl", impl),
@@ -481,10 +636,18 @@ class Genjson {
 		var fields1 = generateModuleTypeFields(ctx, tInfos(mt));
 		var kind:String, fields2:Array<JsonField>;
 		switch mt {
-			case TClassDecl(c): kind = "class"; fields2 = generateClass(ctx, c);
-			case TEnumDecl(e): kind = "enum"; fields2 = generateEnum(ctx, e);
-			case TTypeDecl(t): kind = "typedef"; fields2 = generateTypedef(ctx, t);
-			case TAbstractDecl(a): kind = "abstract"; fields2 = generateAbstract(ctx, a);
+			case TClassDecl(c):
+				kind = "class";
+				fields2 = generateClass(ctx, c);
+			case TEnumDecl(e):
+				kind = "enum";
+				fields2 = generateEnum(ctx, e);
+			case TTypeDecl(t):
+				kind = "typedef";
+				fields2 = generateTypedef(ctx, t);
+			case TAbstractDecl(a):
+				kind = "abstract";
+				fields2 = generateAbstract(ctx, a);
 		}
 		var fields1 = [kv("kind", jstring(kind))].concat(fields1).concat([kv("args", jobject(fields2))]);
 		return jobject(fields1);

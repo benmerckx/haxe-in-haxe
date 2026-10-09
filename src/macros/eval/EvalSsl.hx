@@ -129,7 +129,8 @@ class EvalSsl {
 	}
 	#end
 
-	public static function initFields(initFields:(GlobalTypePathArg, Array<{name:String, value:Value}>, Array<{name:String, value:Value}>) -> Void):Void {
+	public static function initFields(initFields:(GlobalTypePathArg, Array<{name:String, value:Value}>,
+		Array<{name:String, value:Value}>) -> Void):Void {
 		#if (target.name == "hxc")
 		function nativeCert(self:Value):Dynamic {
 			return asX509Crt(EvalField.field(self, EvalHash.hash("native")));
@@ -285,7 +286,10 @@ class EvalSsl {
 			},
 		]);
 		initFields({pack: ["mbedtls"], name: "Error"}, [
-			{name: "strerror", value: EvalEncode.vfun1(code -> EvalEncode.encodeString(hxc.NativeSsl.strerror(EvalDecode.decodeInt(code))))},
+			{
+				name: "strerror",
+				value: EvalEncode.vfun1(code -> EvalEncode.encodeString(hxc.NativeSsl.strerror(EvalDecode.decodeInt(code))))
+			},
 		], []);
 		function decodePassword(password:Value):Null<String> {
 			return switch password {
@@ -388,8 +392,10 @@ class EvalSsl {
 			{name: "SSL_VERIFY_OPTIONAL", value: 1},
 			{name: "SSL_VERIFY_REQUIRED", value: 2}
 		]), []);
-		initFields({pack: ["mbedtls"], name: "SslEndpoint"}, statics([{name: "SSL_IS_CLIENT", value: 0}, {name: "SSL_IS_SERVER", value: 1}]), []);
-		initFields({pack: ["mbedtls"], name: "SslPreset"}, statics([{name: "SSL_PRESET_DEFAULT", value: 0}, {name: "SSL_PRESET_SUITEB", value: 2}]), []);
+		initFields({pack: ["mbedtls"], name: "SslEndpoint"},
+			statics([{name: "SSL_IS_CLIENT", value: 0}, {name: "SSL_IS_SERVER", value: 1}]), []);
+		initFields({pack: ["mbedtls"], name: "SslPreset"},
+			statics([{name: "SSL_PRESET_DEFAULT", value: 0}, {name: "SSL_PRESET_SUITEB", value: 2}]), []);
 		initFields({pack: ["mbedtls"], name: "SslTransport"}, statics([
 			{name: "SSL_TRANSPORT_STREAM", value: 0},
 			{name: "SSL_TRANSPORT_DATAGRAM", value: 1}

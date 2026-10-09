@@ -12,7 +12,8 @@ import core.DisplayTypes;
 
 // haxe/src/context/display/documentSymbols.ml
 class DocumentSymbols {
-	public static function collectModuleSymbols(mname:Null<{file:String, name:String}>, withLocals:Bool, data:Package):Array<SymbolInformationData> {
+	public static function collectModuleSymbols(mname:Null<{file:String, name:String}>, withLocals:Bool,
+			data:Package):Array<SymbolInformationData> {
 		var pack = data.pack, decls = data.declarations;
 		var l:Array<SymbolInformationData> = [];
 		function add(name:String, kind:SymbolKindValue, location:Pos, parent:String, deprecated:Bool):Void {
@@ -29,7 +30,8 @@ class DocumentSymbols {
 			exprOpt(parent, f.fExpr);
 		}
 		expr = function(parent:String, e:Expr):Void {
-			function add_(name:String, kind:SymbolKindValue, location:Pos, deprecated:Bool):Void add(name, kind, location, parent, deprecated);
+			function add_(name:String, kind:SymbolKindValue, location:Pos,
+					deprecated:Bool):Void add(name, kind, location, parent, deprecated);
 			switch e.expr {
 				case EVars(vl):
 					for (v in vl) {
@@ -53,26 +55,28 @@ class DocumentSymbols {
 			}
 		};
 		function isDeprecated(meta:Metadata):Bool return Meta.has(MetaTag.Deprecated, meta);
-		function field_(parent:String, parentKind:SymbolKindValue, cffName:PlacedName, cffKind:ClassFieldKind, cffAccess:Array<PlacedAccess>, cffPos:Pos, cffMeta:Metadata):Void {
+		function field_(parent:String, parentKind:SymbolKindValue, cffName:PlacedName, cffKind:ClassFieldKind,
+				cffAccess:Array<PlacedAccess>, cffPos:Pos, cffMeta:Metadata):Void {
 			var fieldParent = parent + "." + cffName.name;
 			function addField(kind:SymbolKindValue):Void add(cffName.name, kind, cffPos, parent, isDeprecated(cffMeta));
 			switch cffKind {
 				case FVar(_, eo):
-					addField(if (parentKind == EnumAbstract && !core.ds.ArrayTools.exists(cffAccess, a -> a.access == AStatic)) EnumMember
-						else if (core.ds.ArrayTools.exists(cffAccess, a -> a.access == AInline)) Constant
-						else Field);
+					addField(if (parentKind == EnumAbstract
+						&& !core.ds.ArrayTools.exists(cffAccess,
+							a -> a.access == AStatic)) EnumMember else if (core.ds.ArrayTools.exists(cffAccess,
+						a -> a.access == AInline)) Constant else Field);
 					if (withLocals) exprOpt(fieldParent, eo);
 				case FFun(f):
-					addField(if (cffName.name == "new") Constructor
-						else if ((parentKind == EnumAbstract || parentKind == Abstract) && Meta.hasOneOf([MetaTag.Op, MetaTag.ArrayAccess, MetaTag.Resolve], cffMeta)) Operator
-						else Method);
+					addField(if (cffName.name == "new") Constructor else if ((parentKind == EnumAbstract || parentKind == Abstract)
+						&& Meta.hasOneOf([MetaTag.Op, MetaTag.ArrayAccess, MetaTag.Resolve], cffMeta)) Operator else Method);
 					if (withLocals) func(fieldParent, f);
 				case FProp(_, _, _, eo):
 					addField(Property);
 					if (withLocals) exprOpt(fieldParent, eo);
 			}
 		}
-		function field(parent:String, parentKind:SymbolKindValue, cff:ClassField):Void field_(parent, parentKind, cff.cffName, cff.cffKind, cff.cffAccess, cff.cffPos, cff.cffMeta);
+		function field(parent:String, parentKind:SymbolKindValue,
+				cff:ClassField):Void field_(parent, parentKind, cff.cffName, cff.cffKind, cff.cffAccess, cff.cffPos, cff.cffMeta);
 		var typeDecls = new haxe.ds.StringMap<Bool>();
 		for (decl in decls) {
 			var p = decl.pos;
@@ -126,7 +130,8 @@ class DocumentSymbols {
 class DocumentSymbolsPrinter {
 	static inline function kv(n:String, v:JsonValue):JsonField return {name: n, value: v};
 
-	public static function jsonOfModuleSymbols(com:CommonContext, symbols:Array<{file:String, symbols:Array<SymbolInformationData>}>, filter:Null<String>):JsonValue {
+	public static function jsonOfModuleSymbols(com:CommonContext, symbols:Array<{file:String, symbols:Array<SymbolInformationData>}>,
+			filter:Null<String>):JsonValue {
 		var regex = filter == null ? null : StrRegexp.regexpCaseFold(filter);
 		var reported = new haxe.ds.StringMap<Bool>();
 		function posKey(p:Pos):String return p.pmin + ":" + p.pmax + ":" + p.pfile;
@@ -141,7 +146,11 @@ class DocumentSymbolsPrinter {
 			var jl = [];
 			for (si in e.symbols) {
 				if (!add(si)) continue;
-				var l = [kv("name", JString(si.name)), kv("kind", JInt(SymbolKind.toInt(si.kind))), kv("range", core.json.Genjson.generatePosAsRange(si.pos))];
+				var l = [
+					kv("name", JString(si.name)),
+					kv("kind", JInt(SymbolKind.toInt(si.kind))),
+					kv("range", core.json.Genjson.generatePosAsRange(si.pos))
+				];
 				if (si.containerName != null) l.push(kv("containerName", JString(si.containerName)));
 				if (si.deprecated) l.unshift(kv("isDeprecated", JBool(true)));
 				jl.push(JObject(l));
@@ -165,16 +174,21 @@ class StrRegexp {
 			if (c == "\\" && i + 1 < s.length) {
 				var n = s.charAt(i + 1);
 				switch n {
-					case "(" | ")" | "|": b.add(n);
-					case "b": b.add("\\b");
-					case _: b.add("\\" + n);
+					case "(" | ")" | "|":
+						b.add(n);
+					case "b":
+						b.add("\\b");
+					case _:
+						b.add("\\" + n);
 				}
 				i += 2;
 				continue;
 			}
 			switch c {
-				case "(" | ")" | "|" | "{" | "}": b.add("\\" + c);
-				case _: b.add(c);
+				case "(" | ")" | "|" | "{" | "}":
+					b.add("\\" + c);
+				case _:
+					b.add(c);
 			}
 			i++;
 		}

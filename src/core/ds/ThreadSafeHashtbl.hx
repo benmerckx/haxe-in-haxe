@@ -30,15 +30,17 @@ class ThreadSafeHashtbl<Key, Value> {
 		mutex.acquire();
 		try {
 			var result:Value;
-			try result = findUnsafe(key) catch (_:Dynamic) {
+			try result = findUnsafe(key)
+			catch (_:Dynamic) {
 				result = create();
 				values.push({key: key, value: result});
 			}
 			mutex.release();
 			return result;
-		} catch(error:haxe.Exception){
+		} catch (error:haxe.Exception) {
 			mutex.release();
-			throw error;}
+			throw error;
+		}
 	}
 
 	public function exists(key:Key):Bool {
@@ -63,9 +65,10 @@ class ThreadSafeHashtbl<Key, Value> {
 			var result = callback();
 			mutex.release();
 			return result;
-		} catch(error:haxe.Exception){
+		} catch (error:haxe.Exception) {
 			mutex.release();
-			throw error;}
+			throw error;
+		}
 	}
 
 	function findUnsafe(key:Key):Value {

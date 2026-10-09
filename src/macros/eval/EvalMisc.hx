@@ -18,7 +18,8 @@ class EvalMisc {
 	}
 
 	public static function invalidBinop(op:Binop, v1:Value, v2:Value, p:Pos):Dynamic {
-		return throwString('Invalid operation: ${EvalPrinting.valueString(v1)} ${core.Ast.Ast.sBinop(op)} ${EvalPrinting.valueString(v2)}', p);
+		return throwString('Invalid operation: ${EvalPrinting.valueString(v1)} ${core.Ast.Ast.sBinop(op)} ${EvalPrinting.valueString(v2)}',
+			p);
 	}
 
 	public static function updateObjectPrototype(o:Vobject, fields:Array<{name:Int, value:Value}>):Void {
@@ -100,24 +101,31 @@ class EvalMisc {
 
 	public static function setField(v1:Value, name:Int, v2:Value):Void {
 		switch v1.vresolve() {
-			case VObject(o): setObjectField(o, name, v2);
-			case VPrototype(proto): setProtoField(proto, name, v2);
+			case VObject(o):
+				setObjectField(o, name, v2);
+			case VPrototype(proto):
+				setProtoField(proto, name, v2);
 			case VArray(va):
 				// Vector.new does this
 				if (name == EvalHash.key_length) {
 					EvalArray.setLength(va, EvalDecode.decodeInt(v2));
 				} else
 					unexpectedValue(v1, "object");
-			case VInstance({ikind: IBytes(_)}): setBytesLengthField(v1, v2);
-			case VInstance(vi): setInstanceField(vi, name, v2);
-			case _: unexpectedValue(v1, "object");
+			case VInstance({ikind: IBytes(_)}):
+				setBytesLengthField(v1, v2);
+			case VInstance(vi):
+				setInstanceField(vi, name, v2);
+			case _:
+				unexpectedValue(v1, "object");
 		}
 	}
 
 	public static function setFieldRuntime(v1:Value, name:Int, v2:Value):Void {
 		switch v1.vresolve() {
-			case VObject(o): setObjectFieldRuntime(o, name, v2);
-			case _: setField(v1, name, v2);
+			case VObject(o):
+				setObjectFieldRuntime(o, name, v2);
+			case _:
+				setField(v1, name, v2);
 		}
 	}
 
@@ -156,12 +164,9 @@ class EvalMisc {
 			case [VInstance(a), VInstance(b)]: if (a == b) CEq else CUndef;
 			case [VPrototype(a), VPrototype(b)]: if (a == b) CEq else CUndef;
 			case [VEnumValue(a), VEnumValue(b)]:
-				if (a == b) CEq
-				else if (a.eindex < b.eindex) CInf
-				else if (a.eindex > b.eindex) CSup
-				else if (a.epath != b.epath) CUndef
-				else if (a.eargs.length == 0 && b.eargs.length == 0) CEq
-				else CUndef;
+				if (a == b) CEq else if (a.eindex < b.eindex) CInf else if (a.eindex > b.eindex) CSup else if (a.epath != b.epath)
+					CUndef else if (a.eargs.length == 0
+					&& b.eargs.length == 0) CEq else CUndef;
 			case [VFieldClosure(v1, f1), VFieldClosure(v2, f2)]:
 				if (!Reflect.compareMethods(f1, f2)) CUndef else compare(v1, v2);
 			case [VLazy(f1), _]:
@@ -204,7 +209,8 @@ class EvalMisc {
 			case [VArray(a), VArray(b)]: a == b || arraysEqual(equalsStructurally, a.avalues, b.avalues);
 			case [VVector(a), VVector(b)]: a == b || arraysEqual(equalsStructurally, a, b);
 			case [VObject(a), VObject(b)]: a == b || arraysEqual(equalsStructurally, a.ofields, b.ofields);
-			case [VEnumValue(a), VEnumValue(b)]: a == b || a.eindex == b.eindex && arraysEqual(equalsStructurally, a.eargs, b.eargs) && a.epath == b.epath;
+			case [VEnumValue(a), VEnumValue(b)]: a == b || a.eindex == b.eindex && arraysEqual(equalsStructurally, a.eargs,
+					b.eargs) && a.epath == b.epath;
 			case [VPrototype(proto1), VPrototype(proto2)]: proto1.ppath == proto2.ppath;
 			case [VLazy(f1), _]: equalsStructurally(f1.force(), b);
 			case [_, VLazy(f2)]: equalsStructurally(a, f2.force());
@@ -344,7 +350,8 @@ class EvalMisc {
 	public static function opMod(p:Pos, v1:Value, v2:Value):Value {
 		return switch [v1, v2] {
 			// Int32.rem: Division_by_zero gives nan; min_int rem -1 is 0 (avoids the host's overflow trap)
-			case [VInt32(i1), VInt32(i2)]: if (i2 == 0) VFloat(Math.NaN) else if (i2 == -1) EvalValueTools.vint32(0) else EvalValueTools.vint32(i1 % i2);
+			case [VInt32(i1), VInt32(i2)]: if (i2 == 0) VFloat(Math.NaN) else if (i2 == -1) EvalValueTools.vint32(0) else
+					EvalValueTools.vint32(i1 % i2);
 			case [VFloat(f1), VFloat(f2)]: VFloat(f1 % f2);
 			case [VInt32(i1), VFloat(f2)]: VFloat((i1 : Float) % f2);
 			case [VFloat(f1), VInt32(i2)]: VFloat(f1 % (i2 : Float));
@@ -371,7 +378,8 @@ class EvalMisc {
 			case OpShr: opShr.bind(p);
 			case OpUShr: opUshr.bind(p);
 			case OpMod: opMod.bind(p);
-			case OpAssign | OpBoolAnd | OpBoolOr | OpAssignOp(_) | OpInterval | OpArrow | OpIn | OpNullCoal: Globals.die("", "EvalMisc.getBinopFun", p);
+			case OpAssign | OpBoolAnd | OpBoolOr | OpAssignOp(_) | OpInterval | OpArrow | OpIn | OpNullCoal: Globals.die("",
+					"EvalMisc.getBinopFun", p);
 		}
 	}
 

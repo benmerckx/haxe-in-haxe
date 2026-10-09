@@ -121,7 +121,12 @@ class Server {
 
 		return function() {
 			var stdin = makeClosedStdin();
-			return {read: read, write: write, close: close, getStdin: () -> stdin};
+			return {
+				read: read,
+				write: write,
+				close: close,
+				getStdin: () -> stdin
+			};
 		}
 	}
 
@@ -164,7 +169,6 @@ class Server {
 	}
 
 	/* SocketRequest */
-
 	public static function setupClientStdinForward(overflow:Bytes, sin:sys.net.Socket):Input {
 		/* Set up stdin forwarding: a thread reads from the client socket and feeds the request's stdin. */
 		var stdin = new ForwardedInput();
@@ -199,9 +203,7 @@ class Server {
 			} catch (e:haxe.io.Error) {
 				switch e {
 					case Blocked:
-						if (count == 100)
-							throw new Failure("Aborting inactive connection");
-						else {
+						if (count == 100) throw new Failure("Aborting inactive connection"); else {
 							ServerMessage.socketMessage("Waiting for data...");
 							Sys.sleep(0.05);
 							return readLoop(count + 1);
@@ -265,7 +267,8 @@ class Server {
 		var curdir = Sys.getCwd();
 		ServerMessage.arguments(Args.stringOfRequestArgs(requestArgs));
 		ServerCompilationContext.reset(sctx);
-		if (sctx.persistentCwd != null) try Sys.setCwd(sctx.persistentCwd) catch (_:Dynamic) {}
+		if (sctx.persistentCwd != null) try Sys.setCwd(sctx.persistentCwd)
+		catch (_:Dynamic) {}
 		try {
 			HighLevel.entry(sctx, requestScope, requestArgs);
 		} catch (e:Dynamic) {
@@ -278,7 +281,6 @@ class Server {
 	}
 
 	/* WorkerDomain */
-
 	static function workerShutdown(rq:RequestQueue):Void {
 		/* Drain remaining requests by closing their connections, then return
 			without recursing to exit the loop gracefully. */
@@ -290,7 +292,8 @@ class Server {
 			var conn = req.conn;
 			/* No CompilerIo.t exists for pending requests, so signal error
 				directly through the raw connection using v1 protocol encoding. */
-			try conn.write("\x02\nServer shutdown\n") catch (_:Dynamic) {}
+			try conn.write("\x02\nServer shutdown\n")
+			catch (_:Dynamic) {}
 			conn.close();
 		}
 	}
@@ -354,7 +357,12 @@ class Server {
 			var cs = sctx.cs;
 			function loop() {
 				while (true) {
-					rq.semaphore.acquire();
+					// Eval threads left by a request (--interp) run while the worker waits
+					// (it holds the Eval lock otherwise, see macros.eval.EvalLock)
+					macros.eval.EvalLock.blocking(() -> {
+						rq.semaphore.acquire();
+						true;
+					});
 					/* Check for shutdown before doing any work */
 					if (rq.shutdownFlag) {
 						workerShutdown(rq);
@@ -469,7 +477,8 @@ class Server {
 		}
 		var sock = new sys.net.Socket();
 		// SO_REUSEADDR: the host's bind sets it
-		try sock.bind(new sys.net.Host(host), port) catch (_:Dynamic) throw new Failure("Couldn't wait on " + host + ":" + port);
+		try sock.bind(new sys.net.Host(host), port)
+		catch (_:Dynamic) throw new Failure("Couldn't wait on " + host + ":" + port);
 		ServerMessage.socketMessage("Waiting on " + host + ":" + port);
 		sock.listen(10);
 		var bufsize = 1024;
@@ -490,15 +499,23 @@ class Server {
 					closed = true;
 					/* Shutdown before close to ensure FIN is sent to the client even if
 						the stdin-forwarding thread has a pending recv on the same fd. */
-					try sin.shutdown(true, true) catch (_:Dynamic) {}
-					try sin.close() catch (_:Dynamic) Sys.println("Error while closing socket.");
+					try sin.shutdown(true, true)
+					catch (_:Dynamic) {}
+					try sin.close()
+					catch (_:Dynamic) Sys.println("Error while closing socket.");
 				}
 			}
 			function write(s:String) {
 				if (!closed)
-					try PipeThings.ssend(sin, Bytes.ofString(s)) catch (_:Dynamic) close();
+					try PipeThings.ssend(sin, Bytes.ofString(s))
+					catch (_:Dynamic) close();
 			}
-			return {read: read, write: write, close: close, getStdin: () -> stdinRef};
+			return {
+				read: read,
+				write: write,
+				close: close,
+				getStdin: () -> stdinRef
+			};
 		}
 		return accept;
 	}

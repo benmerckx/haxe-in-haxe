@@ -2,44 +2,35 @@ package sys.thread;
 
 import hxc.NativeThread;
 
-// hxc target (backend/): over green threads (rt_thread.c) and the hxc Mutex.
+// hxc target (backend/): a condition variable and its own re-entrant mutex
+// (rt_thread.c). As with pthread conditions, wait may return spuriously.
 class Condition {
-	final mutex = new Mutex();
-	var waiters:Array<Int> = [];
+	final mutex:Dynamic = NativeThread.mutexNew();
+	final cond:Dynamic = NativeThread.condNew();
 
 	public function new():Void {}
 
 	public function acquire():Void {
-		mutex.acquire();
+		NativeThread.mutexAcquire(mutex);
 	}
 
 	public function tryAcquire():Bool {
-		return mutex.tryAcquire();
+		return NativeThread.mutexTryAcquire(mutex);
 	}
 
 	public function release():Void {
-		mutex.release();
+		NativeThread.mutexRelease(mutex);
 	}
 
 	public function wait():Void {
-		var cur = NativeThread.current();
-		waiters.push(cur);
-		// release the mutex fully, then take it back at the same depth
-		var depth = @:privateAccess mutex.depth;
-		@:privateAccess mutex.depth = 1;
-		mutex.release();
-		while (waiters.indexOf(cur) >= 0) NativeThread.park(-1);
-		mutex.acquire();
-		@:privateAccess mutex.depth = depth;
+		NativeThread.condWait(cond, mutex, -1);
 	}
 
 	public function signal():Void {
-		if (waiters.length > 0) NativeThread.unpark(waiters.shift());
+		NativeThread.condSignal(cond);
 	}
 
 	public function broadcast():Void {
-		var all = waiters;
-		waiters = [];
-		for (id in all) NativeThread.unpark(id);
+		NativeThread.condBroadcast(cond);
 	}
 }

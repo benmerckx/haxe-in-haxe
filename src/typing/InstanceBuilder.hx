@@ -1,6 +1,6 @@
 package typing;
-import core.MetaList.StrictMeta as MetaTag;
 
+import core.MetaList.StrictMeta as MetaTag;
 import core.TType;
 import core.Ast;
 import core.Ast.Expr;
@@ -28,9 +28,16 @@ import context.display.DeprecationCheck;
 	public var path:GlobalTypePath;
 	public var field:String;
 	public var args:Array<Expr>;
-	public inline function new(path:GlobalTypePath, field:String, args:Array<Expr>) { this.path = path; this.field = field; this.args = args; }
+
+	public inline function new(path:GlobalTypePath, field:String, args:Array<Expr>) {
+		this.path = path;
+		this.field = field;
+		this.args = args;
+	}
+
 	public inline function clone():MacroCallPath return new MacroCallPath(path, field, args);
 }
+
 class InstanceBuilder {
 	public static function getMacroPath(ctx:Typer, e:Expr, args:Array<Expr>, p:Pos):MacroCallPath {
 		function loop(e:Expr):Array<String> return switch e.expr {
@@ -51,13 +58,15 @@ class InstanceBuilder {
 			case _: loop(e);
 		};
 		if (path.length < 2) return raiseTypingError("Invalid macro call", p);
-		var pack = path.slice(2); pack.reverse();
-		return {path:{pack:pack, name:path[1]}, field:path[0], args:args};
+		var pack = path.slice(2);
+		pack.reverse();
+		return {path: {pack: pack, name: path[1]}, field: path[0], args: args};
 	}
+
 	public static function buildMacroType(ctx:Typer, pl:TParams, p:Pos):T {
 		var call = switch pl {
-			case [TInst({clKind:KExpr({expr:ECall(e, args)})}, _)]: getMacroPath(ctx, e, args, p);
-			case [TInst({clKind:KExpr({expr:EArrayDecl([{expr:ECall(e, args)}])})}, _)]: getMacroPath(ctx, e, args, p);
+			case [TInst({clKind: KExpr({expr: ECall(e, args)})}, _)]: getMacroPath(ctx, e, args, p);
+			case [TInst({clKind: KExpr({expr: EArrayDecl([{expr: ECall(e, args)}])})}, _)]: getMacroPath(ctx, e, args, p);
 			case _: raiseTypingError("MacroType requires a single expression call parameter", p);
 		};
 		var old = ctx.e.ret;
@@ -67,25 +76,30 @@ class InstanceBuilder {
 			case MError | MMacroInMacro: spawnMonomorph(ctx, p);
 			case MSuccess(_): ctx.e.ret;
 		};
-		ctx.e.ret = old; return t;
+		ctx.e.ret = old;
+		return t;
 	}
+
 	public static function buildMacroBuild(ctx:Typer, c:TClass, pl:TParams, cfl:Array<ClassField>, p:Pos):T {
 		var buildExpr = try Meta.get(MetaTag.GenericBuild, c.clMeta) catch (_:NotFound) {
 			raiseTypingError(Globals.sTypePath(c.clPath) + " is missing @:genericBuild meta. Was it removed by a macro?", p);
 		};
 		var call = switch buildExpr.exprs {
-			case [{expr:ECall(e, args)}]: getMacroPath(ctx, e, args, p);
+			case [{expr: ECall(e, args)}]: getMacroPath(ctx, e, args, p);
 			case _: raiseTypingError("genericBuild requires a single expression call parameter", p);
 		};
 		var oldRet = ctx.e.ret, oldBuild = ctx.c.getBuildInfos;
-		ctx.c.getBuildInfos = function() return {type:TClassDecl(c), params:pl, fields:cfl};
+		ctx.c.getBuildInfos = function() return {type: TClassDecl(c), params: pl, fields: cfl};
 		var macroResult:context.Typecore.MacroResult = ctx.g.doMacro(ctx, MMacroType, call.path, call.field, call.args, p);
 		var t = switch macroResult {
 			case MError | MMacroInMacro: spawnMonomorph(ctx, p);
 			case MSuccess(_): ctx.e.ret;
 		};
-		ctx.e.ret = oldRet; ctx.c.getBuildInfos = oldBuild; return t;
+		ctx.e.ret = oldRet;
+		ctx.c.getBuildInfos = oldBuild;
+		return t;
 	}
+
 	public static function getBuildInfo(ctx:Typer, mtype:ModuleType, p:Pos):BuildInfo {
 		return switch mtype {
 			case TClassDecl(c):
@@ -93,8 +107,16 @@ class InstanceBuilder {
 				inline function build(f:TParams->T, label:String, tl:TParams):T {
 					var t = spawnMonomorph(ctx, p);
 					var r = makeLazy(ctx.g, t, function() {
-						var tf = f(tl); unifyRaise(tf, t, p); linkDynamic(t, tf);
-						switch tf {case TInst(c, _): c.clBuild(); case TAbstract(a, _): Abstract.buildAbstract(a); case _:}
+						var tf = f(tl);
+						unifyRaise(tf, t, p);
+						linkDynamic(t, tf);
+						switch tf {
+							case TInst(c, _):
+								c.clBuild();
+							case TAbstract(a, _):
+								Abstract.buildAbstract(a);
+							case _:
+						}
 						return t;
 					}, label);
 					return TLazy(r);
@@ -110,7 +132,9 @@ class InstanceBuilder {
 					case KMacroType:
 						kind = BuildMacroType;
 						function(tl) return build(function(tl) return buildMacroType(ctx, tl, p), "build_macro_type", tl);
-					case _: kind = BuildNormal; function(tl) return TInst(c, tl);
+					case _:
+						kind = BuildNormal;
+						function(tl) return TInst(c, tl);
 				};
 				makeBuildInfo(kind, c.clPath, c.clParams, hasClassFlag(c, CExtern), apply);
 			case TEnumDecl(e): makeBuildInfo(BuildNormal, e.ePath, e.eParams, hasEnumFlag(e, EnExtern), function(tl) return TEnum(e, tl));
@@ -118,7 +142,7 @@ class InstanceBuilder {
 				try {
 					var deprecated = Meta.get(MetaTag.Deprecated, td.tMeta);
 					var msg = switch deprecated.exprs {
-						case [{expr:EConst(String(s, _))}]: s;
+						case [{expr: EConst(String(s, _))}]: s;
 						case _: "This typedef is deprecated in favor of " + sType(printContext(), td.tType);
 					};
 					DeprecationCheck.warnDeprecation(createDeprecationContext(ctx), msg, p);

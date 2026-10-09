@@ -13,16 +13,22 @@ class EvalStackTrace {
 			var pos = e.pos;
 			inline function filePos(s:Value):Value {
 				var c = syntax.Lexer.getPosCoords(pos);
-				return EvalEncode.encodeEnumValue(EvalHash.key_haxe_StackItem, 2, [s, EvalString.createUnknown(pos.pfile), VInt32(c.lineStart), VInt32(c.columnStart)],
-					pos);
+				return EvalEncode.encodeEnumValue(EvalHash.key_haxe_StackItem, 2, [
+					s,
+					EvalString.createUnknown(pos.pfile),
+					VInt32(c.lineStart),
+					VInt32(c.columnStart)
+				], pos);
 			}
 			switch e.kind {
 				case EKLocalFunction(i):
 					var localFunction = EvalEncode.encodeEnumValue(EvalHash.key_haxe_StackItem, 4, [VInt32(i)], pos);
 					l.push(filePos(localFunction));
 				case EKMethod(st, sf):
-					var localFunction = EvalEncode.encodeEnumValue(EvalHash.key_haxe_StackItem, 3,
-						[EvalString.createUnknown(EvalHash.revHash(st)), EvalString.createUnknown(EvalHash.revHash(sf))], pos);
+					var localFunction = EvalEncode.encodeEnumValue(EvalHash.key_haxe_StackItem, 3, [
+						EvalString.createUnknown(EvalHash.revHash(st)),
+						EvalString.createUnknown(EvalHash.revHash(sf))
+					], pos);
 					l.push(filePos(localFunction));
 				case EKMacro(st, sf):
 				case EKEntrypoint:
@@ -32,7 +38,10 @@ class EvalStackTrace {
 	}
 
 	public static function makeStackValue(envs:Array<Env>):Value {
-		return makeStack(envs.map(env -> {pos: new Pos(EvalHash.revHash(env.envInfo.pfile), env.envLeavePmin, env.envLeavePmax), kind: env.envInfo.kind}));
+		return makeStack(envs.map(env -> {
+			pos: new Pos(EvalHash.revHash(env.envInfo.pfile), env.envLeavePmin, env.envLeavePmax),
+			kind: env.envInfo.kind
+		}));
 	}
 
 	public static final getCallStack:Value = EvalEncode.vfun0(() -> {

@@ -38,13 +38,20 @@ class StringHelper {
 		for (index in 0...value.length) {
 			var code = value.charCodeAt(index);
 			switch (code) {
-				case 10: result.add("\\n");
-				case 9: result.add("\\t");
-				case 13: result.add("\\r");
-				case 34: result.add('\\"');
-				case 92: result.add("\\\\");
-				case _ if (code < 32 && hex): result.add('\\x${StringTools.hex(code, 2)}');
-				case _: result.addChar(code);
+				case 10:
+					result.add("\\n");
+				case 9:
+					result.add("\\t");
+				case 13:
+					result.add("\\r");
+				case 34:
+					result.add('\\"');
+				case 92:
+					result.add("\\\\");
+				case _ if (code < 32 && hex):
+					result.add('\\x${StringTools.hex(code, 2)}');
+				case _:
+					result.addChar(code);
 			}
 		}
 		return result.toString();
@@ -55,7 +62,12 @@ class StringHelper {
 		for (index in 0...name.length) {
 			var character = name.charAt(index);
 			var code = name.charCodeAt(index);
-			if ((code >= "a".code && code <= "z".code) || (code >= "A".code && code <= "Z".code) || (code >= "0".code && code <= "9".code) || character == "_" || character == "." || allowed.indexOf(character) >= 0) result.add(character);
+			if ((code >= "a".code && code <= "z".code)
+				|| (code >= "A".code && code <= "Z".code)
+				|| (code >= "0".code && code <= "9".code)
+				|| character == "_"
+				|| character == "."
+				|| allowed.indexOf(character) >= 0) result.add(character);
 			else result.add('-x$code');
 		}
 		return result.toString();
@@ -124,7 +136,12 @@ class StringHelper {
 		var hex = "0123456789ABCDEF";
 		for (index in 0...bytes.length) {
 			var code = bytes.get(index);
-			if ((code >= "A".code && code <= "Z".code) || (code >= "a".code && code <= "z".code) || (code >= "0".code && code <= "9".code) || code == "_".code || code == "-".code || code == ".".code) addCharacter(String.fromCharCode(code));
+			if ((code >= "A".code && code <= "Z".code)
+				|| (code >= "a".code && code <= "z".code)
+				|| (code >= "0".code && code <= "9".code)
+				|| code == "_".code
+				|| code == "-".code
+				|| code == ".".code) addCharacter(String.fromCharCode(code));
 			else {
 				addCharacter("%");
 				addCharacter(hex.charAt(code >> 4));

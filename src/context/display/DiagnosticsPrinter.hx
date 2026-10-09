@@ -26,7 +26,20 @@ import core.display.CompletionItem;
 	public var diagCode:Null<String>;
 	public var diagArgs:JsonValue;
 	public var diagRelatedInformation:Array<{pos:Pos, depth:Int, msg:String}>;
-	public inline function new(diagKind:MessageKind, diagPos:Pos, diagSeverity:MessageSeverity, diagCode:Null<String>, diagArgs:JsonValue, diagRelatedInformation:Array<{pos:Pos, depth:Int, msg:String}>) { this.diagKind = diagKind; this.diagPos = diagPos; this.diagSeverity = diagSeverity; this.diagCode = diagCode; this.diagArgs = diagArgs; this.diagRelatedInformation = diagRelatedInformation; }
+
+	public inline function new(diagKind:MessageKind, diagPos:Pos, diagSeverity:MessageSeverity, diagCode:Null<String>, diagArgs:JsonValue,
+			diagRelatedInformation:Array<{
+			pos:Pos,
+			depth:Int,
+			msg:String
+		}>) {
+		this.diagKind = diagKind;
+		this.diagPos = diagPos;
+		this.diagSeverity = diagSeverity;
+		this.diagCode = diagCode;
+		this.diagArgs = diagArgs;
+		this.diagRelatedInformation = diagRelatedInformation;
+		}
 }
 
 enum UnresolvedIdentifierSuggestion {
@@ -64,13 +77,20 @@ class DiagnosticsPrinter {
 		switch mf.mfCause {
 			case AbstractParent(csup, tl):
 				kind = "AbstractParent";
-				args = jobject([kv("parent", generateTypePathWithParams(jctx, csup.clModule.mPath, csup.clPath, tl, csup.clMeta))]);
+				args = jobject([
+					kv("parent", generateTypePathWithParams(jctx, csup.clModule.mPath, csup.clPath, tl, csup.clMeta))
+				]);
 			case ImplementedInterface(ci, tl):
 				kind = "ImplementedInterface";
-				args = jobject([kv("parent", generateTypePathWithParams(jctx, ci.clModule.mPath, ci.clPath, tl, ci.clMeta))]);
+				args = jobject([
+					kv("parent", generateTypePathWithParams(jctx, ci.clModule.mPath, ci.clPath, tl, ci.clMeta))
+				]);
 			case PropertyAccessor(cf, isGetter):
 				kind = "PropertyAccessor";
-				args = jobject([kv("property", generateClassField(jctx, scope(cf), cf)), kv("isGetter", jbool(isGetter))]);
+				args = jobject([
+					kv("property", generateClassField(jctx, scope(cf), cf)),
+					kv("isGetter", jbool(isGetter))
+				]);
 			case FieldAccess:
 				kind = "FieldAccess";
 				args = jobject([]);
@@ -83,7 +103,8 @@ class DiagnosticsPrinter {
 			var cf = f.field.clone();
 			cf.cfOverloads = [];
 			var t = f.type;
-			if (core.ds.ArrayTools.exists(currentFields, e -> cf.cfName == e.cf.cfName && codegen.Overloads.sameOverloadArgs(t, e.t, cf, e.cf))) return null;
+			if (core.ds.ArrayTools.exists(currentFields,
+				e -> cf.cfName == e.cf.cfName && codegen.Overloads.sameOverloadArgs(t, e.t, cf, e.cf))) return null;
 			currentFields.unshift({t: t, cf: cf});
 			return jobject([
 				kv("name", jstring(cf.cfName)),
@@ -96,7 +117,10 @@ class DiagnosticsPrinter {
 			var j = mapField(f);
 			if (j != null) fields.push(j);
 		}
-		var entry = jobject([kv("fields", jarray(fields)), kv("cause", jobject([kv("kind", jstring(kind)), kv("args", args)]))]);
+		var entry = jobject([
+			kv("fields", jarray(fields)),
+			kv("cause", jobject([kv("kind", jstring(kind)), kv("args", args)]))
+		]);
 		var jctx2 = jctx.clone();
 		jctx2.generateMemberBodies = false;
 		var j = jobject([
@@ -108,13 +132,20 @@ class DiagnosticsPrinter {
 	}
 
 	/** Create a [Message.t] for an UnresolvedIdentifier diagnostic. **/
-	public static function makeUnresolvedIdentifierMessage(i:String, p:Pos, suggestions:Array<{s:String, item:CompletionItemData, r:Int}>):CompilerMessage {
+	public static function makeUnresolvedIdentifierMessage(i:String, p:Pos,
+			suggestions:Array<{s:String, item:CompletionItemData, r:Int}>):CompilerMessage {
 		var out = [];
 		for (sugg in suggestions) {
 			var j:Null<JsonValue> = switch sugg.item.ciKind {
 				case ITType(t, _) if (sugg.r == 0):
-					var path:GlobalTypePath = t.moduleName == t.name ? {pack: t.pack, name: t.name} : {pack: t.pack.concat([t.moduleName]), name: t.name};
-					JObject([kv("kind", JInt(std.Type.enumIndex(UISImport))), kv("name", JString(Globals.sTypePath(path)))]);
+					var path:GlobalTypePath = t.moduleName == t.name ? {pack: t.pack, name: t.name} : {
+						pack: t.pack.concat([t.moduleName]),
+						name: t.name
+					};
+					JObject([
+						kv("kind", JInt(std.Type.enumIndex(UISImport))),
+						kv("name", JString(Globals.sTypePath(path)))
+					]);
 				case _ if (sugg.r == 0):
 					// TODO !!!
 					null;
@@ -138,7 +169,8 @@ class DiagnosticsPrinter {
 				diagnostics.add(file, d);
 				fdiag = d;
 			}
-			if (append || !core.ds.ArrayTools.exists(fdiag, diag -> posEq(diag.diagPos, p))) diagnostics.replace(file, [diag].concat(fdiag));
+			if (append
+				|| !core.ds.ArrayTools.exists(fdiag, diag -> posEq(diag.diagPos, p))) diagnostics.replace(file, [diag].concat(fdiag));
 		}
 		var fileKeys = new context.Common.FileKeys();
 		function add(dk:MessageKind, p:Pos, sev:MessageSeverity, code:Null<String>, args:JsonValue):Void {
@@ -239,20 +271,25 @@ class DiagnosticsPrinter {
 				var e = processEntry(d);
 				if (e != null) groupedEntries.push(e);
 			}
-			var j = jobject([kv("moduleType", moduleType), kv("moduleFile", moduleFile), kv("entries", jarray(groupedEntries))]);
+			var j = jobject([
+				kv("moduleType", moduleType),
+				kv("moduleFile", moduleFile),
+				kv("entries", jarray(groupedEntries))
+			]);
 			add(DKMissingFields, p, Error, null, j);
 		});
 		// non-append from here
 		switch core.Warning.getMode(WDeprecated, com.warningOptions) {
 			case WMEnable:
-				(com.partScope.warnedPositions : OcamlHashtbl<{file:String, offset:Int}, {message:String, pos:Pos, options:Array<Array<core.Message.WarningOption>>}>).iter(function(_, w) {
-					switch core.Warning.getMode(WDeprecated, com.warningOptions.concat(w.options)) {
-						case WMEnable:
-							var wobj = core.WarningList.warningObj(WDeprecated);
-							add(DKDeprecationWarning, w.pos, Warning, wobj.wName, JString(w.message));
-						case WMDisable:
-					}
-				});
+				(com.partScope.warnedPositions : OcamlHashtbl<{file:String, offset:Int},
+					{message:String, pos:Pos, options:Array<Array<core.Message.WarningOption>>}>).iter(function(_, w) {
+						switch core.Warning.getMode(WDeprecated, com.warningOptions.concat(w.options)) {
+							case WMEnable:
+								var wobj = core.WarningList.warningObj(WDeprecated);
+								add(DKDeprecationWarning, w.pos, Warning, wobj.wName, JString(w.message));
+							case WMDisable:
+						}
+					});
 			case WMDisable:
 		}
 		for (ip in ImportHandling.sortedImportPositions(dctx.importPositions)) {

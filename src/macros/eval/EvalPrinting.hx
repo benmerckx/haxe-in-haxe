@@ -40,8 +40,8 @@ class EvalPrinting {
 	/** `Unix.localtime` of seconds since the epoch, printed as %.4d-%.2d-%.2d %.2d:%.2d:%.2d. **/
 	public static function sDate(d:Float):Vstring {
 		var t = Date.fromTime(d * 1000.);
-		return EvalString.createAscii(pad(t.getFullYear(), 4) + "-" + pad(t.getMonth() + 1, 2) + "-" + pad(t.getDate(), 2) + " " + pad(t.getHours(), 2) + ":"
-			+ pad(t.getMinutes(), 2) + ":" + pad(t.getSeconds(), 2));
+		return EvalString.createAscii(pad(t.getFullYear(), 4) + "-" + pad(t.getMonth() + 1, 2) + "-" + pad(t.getDate(), 2) + " "
+			+ pad(t.getHours(), 2) + ":" + pad(t.getMinutes(), 2) + ":" + pad(t.getSeconds(), 2));
 	}
 
 	public static function sHash(key:Int):Vstring return EvalString.createAscii(EvalHash.revHash(key));
@@ -70,7 +70,8 @@ class EvalPrinting {
 			var kv = fields[i];
 			if (i > 0) {
 				switch EvalContext.getCtx().printIndentation {
-					case null: buf.add(", ");
+					case null:
+						buf.add(", ");
 					case s:
 						buf.add(",\n");
 						indent(buf, s, innerIndentLevel);
@@ -95,7 +96,11 @@ class EvalPrinting {
 	}
 
 	public static function sArray(depth:Int, indentLevel:Int, va:Varray):Vstring {
-		return EvalString.join(EvalString.emptyString, [rbkopen, EvalArray.join(va, v -> sValue(depth, v, indentLevel), rcomma), rbkclose]);
+		return EvalString.join(EvalString.emptyString, [
+			rbkopen,
+			EvalArray.join(va, v -> sValue(depth, v, indentLevel), rcomma),
+			rbkclose
+		]);
 	}
 
 	public static function sVector(depth:Int, indentLevel:Int, vv:Vvector):Vstring {
@@ -171,21 +176,12 @@ class EvalPrinting {
 				EvalString.createAscii("#pos(" + syntax.Lexer.getErrorPos((file, line) -> '$file:$line:', p) + ")"); // STODO: not ascii?
 			case VInstance({ikind: IRegex(r)}): r.rRexString;
 			case VInstance(i):
-				try
-					callToString()
-				catch (_:NotFound)
-					sHash(i.iproto.ppath);
+				try callToString() catch (_:NotFound) sHash(i.iproto.ppath);
 			case VObject(o):
-				try
-					callToString()
-				catch (_:NotFound)
-					sObject(depth + 1, indentLevel, o);
+				try callToString() catch (_:NotFound) sObject(depth + 1, indentLevel, o);
 			case VLazy(f): sValue(depth, f.force(), indentLevel);
 			case VPrototype(proto):
-				try
-					callToString()
-				catch (_:NotFound)
-					sProtoKind(proto);
+				try callToString() catch (_:NotFound) sProtoKind(proto);
 		}
 	}
 

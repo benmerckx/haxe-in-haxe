@@ -170,8 +170,7 @@
 	}
 
 	public static function escape(s:String):String {
-		return escapeRegExpRe.map(s, function(r) return "\\" + r.matched(0));
+		// a fresh EReg per call: an EReg keeps its last match, and threads may escape at the same time
+		return new EReg("[\\[\\]{}()*+?.\\\\\\^$|]", "g").map(s, function(r) return "\\" + r.matched(0));
 	}
-
-	static var escapeRegExpRe = ~/[\[\]{}()*+?.\\\^$|]/g;
 }

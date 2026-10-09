@@ -55,7 +55,8 @@ class DisplayEmitter {
 			case DMHover:
 				var t = typeOfModuleType(mt);
 				var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), t);
-				DisplayException.raiseHover(CompletionItem.makeCiType(CompletionModuleType.ofModuleType(mt), Imported, {t: t, ct: ct}), null, p);
+				DisplayException.raiseHover(CompletionItem.makeCiType(CompletionModuleType.ofModuleType(mt), Imported, {t: t, ct: ct}),
+					null, p);
 			case DMDefault:
 				DisplayToplevel.collectAndRaise(ctx, TKType, WithTypeTools.value, CRTypeHint, Globals.sTypePath(tInfos(mt).mtPath), p, p);
 			case _:
@@ -69,7 +70,8 @@ class DisplayEmitter {
 		} catch (_:core.ds.Exit) {
 			switch [follow(t), follow(ctx.g.tDynamicDef)] {
 				case [_, TDynamic(_)]: // sanity check in case it's still t_dynamic
-				case [TDynamic(_), _]: displayType(ctx, ctx.g.tDynamicDef, p);
+				case [TDynamic(_), _]:
+					displayType(ctx, ctx.g.tDynamicDef, p);
 				case _:
 					switch dm.dmsKind {
 						case DMHover:
@@ -97,7 +99,8 @@ class DisplayEmitter {
 		var mt = {
 			function followNull(t:T):T {
 				return switch t {
-					case TMono(r): r.tmType == null ? DisplayException.sendPositionsRaise(ctx.com, [Globals.nullPos]) : followNull(r.tmType);
+					case TMono(r): r.tmType == null ? DisplayException.sendPositionsRaise(ctx.com,
+							[Globals.nullPos]) : followNull(r.tmType);
 					case TLazy(f): followNull(lazyType(f));
 					case TAbstract({aPath: {pack: [], name: "Null"}}, [t]): followNull(t);
 					case TDynamic(_): ctx.g.tDynamicDef;
@@ -115,9 +118,12 @@ class DisplayEmitter {
 
 	public static function displayVariable(ctx:Typer, v:TVar, p:Pos):Void {
 		switch ctx.com.display.dmsKind {
-			case DMDefinition: DisplayException.sendPositionsRaise(ctx.com, [v.vPos]);
-			case DMTypeDefinition: raisePositionOfType(ctx, v.vType);
-			case DMUsage(_): ReferencePosition.set(v.vName, v.vPos, SKVariable(v));
+			case DMDefinition:
+				DisplayException.sendPositionsRaise(ctx.com, [v.vPos]);
+			case DMTypeDefinition:
+				raisePositionOfType(ctx, v.vType);
+			case DMUsage(_):
+				ReferencePosition.set(v.vName, v.vPos, SKVariable(v));
 			case DMHover:
 				var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), core.Ast.Ast.getValueMeta(v.vMeta), v.vType);
 				DisplayException.raiseHover(CompletionItem.makeCiLocal(v, {t: v.vType, ct: ct}), null, p);
@@ -127,8 +133,10 @@ class DisplayEmitter {
 
 	public static function displayField(ctx:Typer, origin:ClassFieldOrigin, scope:ClassFieldScope, cf:TClassField, p:Pos):Void {
 		switch ctx.com.display.dmsKind {
-			case DMDefinition: DisplayException.sendPositionsRaise(ctx.com, [cf.cfNamePos]);
-			case DMTypeDefinition: raisePositionOfType(ctx, cf.cfType);
+			case DMDefinition:
+				DisplayException.sendPositionsRaise(ctx.com, [cf.cfNamePos]);
+			case DMTypeDefinition:
+				raisePositionOfType(ctx, cf.cfType);
 			case DMUsage(_) | DMImplementation:
 				var r = switch [cf.cfName, origin] {
 					case ["new", Self(TClassDecl(c)) | Parent(TClassDecl(c))]:
@@ -150,7 +158,8 @@ class DisplayEmitter {
 					case _: cf;
 				};
 				var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), core.Ast.Ast.getValueMeta(cf.cfMeta), cf.cfType);
-				DisplayException.raiseHover(CompletionItem.makeCiClassField(CompletionClassField.make(cf, scope, origin, true), {t: cf.cfType, ct: ct}), null, p);
+				DisplayException.raiseHover(CompletionItem.makeCiClassField(CompletionClassField.make(cf, scope, origin, true),
+					{t: cf.cfType, ct: ct}), null, p);
 			case _:
 		}
 	}
@@ -161,12 +170,17 @@ class DisplayEmitter {
 
 	public static function displayEnumField(ctx:Typer, en:TEnum, ef:TEnumField, p:Pos):Void {
 		switch ctx.com.display.dmsKind {
-			case DMDefinition: DisplayException.sendPositionsRaise(ctx.com, [ef.efNamePos]);
-			case DMTypeDefinition: raisePositionOfType(ctx, ef.efType);
-			case DMUsage(_): ReferencePosition.set(ef.efName, ef.efNamePos, SKEnumField(ef));
+			case DMDefinition:
+				DisplayException.sendPositionsRaise(ctx.com, [ef.efNamePos]);
+			case DMTypeDefinition:
+				raisePositionOfType(ctx, ef.efType);
+			case DMUsage(_):
+				ReferencePosition.set(ef.efName, ef.efNamePos, SKEnumField(ef));
 			case DMHover:
 				var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), ef.efType);
-				DisplayException.raiseHover(CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, Self(TEnumDecl(en)), true), {t: ef.efType, ct: ct}), null, p);
+				DisplayException.raiseHover(CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, Self(TEnumDecl(en)), true),
+					{t: ef.efType, ct: ct}), null,
+					p);
 			case _:
 		}
 	}
@@ -200,7 +214,8 @@ class DisplayEmitter {
 		}
 	}
 
-	public static function checkFieldModifiers(ctx:Typer, c:TClass, cf:TClassField, override_:Null<Pos>, displayModifier:Null<core.Ast.PlacedAccess>):Void {
+	public static function checkFieldModifiers(ctx:Typer, c:TClass, cf:TClassField, override_:Null<Pos>,
+			displayModifier:Null<core.Ast.PlacedAccess>):Void {
 		if (override_ != null && DisplayPosition.displayPosition.enclosedIn(override_) && ctx.com.display.dmsKind == DMDefinition) {
 			if (c.clSuper != null) {
 				var r = rawClassField(function(cf) return cf.cfType, c.clSuper.cls, c.clSuper.params, cf.cfName);
@@ -213,8 +228,10 @@ class DisplayEmitter {
 			var l = core.ds.PMap.fold(function(e:{cls:TClass, field:TClassField}, fields:Array<CompletionItemData>) {
 				var origin = Parent(TClassDecl(e.cls));
 				follow(e.field.cfType);
-				var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), core.Ast.Ast.getValueMeta(e.field.cfMeta), e.field.cfType);
-				fields.unshift(CompletionItem.makeCiClassField(CompletionClassField.make(e.field, CFSMember, origin, true), {t: e.field.cfType, ct: ct}));
+				var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), core.Ast.Ast.getValueMeta(e.field.cfMeta),
+					e.field.cfType);
+				fields.unshift(CompletionItem.makeCiClassField(CompletionClassField.make(e.field, CFSMember, origin, true),
+					{t: e.field.cfType, ct: ct}));
 				return fields;
 			}, missingFields, []);
 			var l = Display.sortFields(l, NoValue, TKOverride);

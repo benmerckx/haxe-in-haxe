@@ -42,27 +42,44 @@ import haxe.ds.StringMap;
 // save_class_state: the saved fields of one class field (mk_field_restore)
 private typedef FieldRestoreState = {name:String, kind:FieldKind, expr:Null<TExpr>, type:T, meta:Metadata, params:TypeParams};
 private typedef FieldRestore = {field:TClassField, state:FieldRestoreState, overloads:Array<{field:TClassField, state:FieldRestoreState}>};
+
 class Filters {
-	public static function getNativeName(meta:Metadata):{name:String,pos:Pos} return Native.getNativeName(meta);
+	public static function getNativeName(meta:Metadata):{name:String, pos:Pos}
+		return Native.getNativeName(meta);
+
 	public static function applyMacroExclude(t:ModuleType):Void switch t {
-		case TClassDecl(c) if (TypeOps.hasClassFlag(c, CExcluded)): TypeOps.addClassFlag(c, CExtern);
-		case TEnumDecl(e) if (TypeOps.hasEnumFlag(e, EnExcluded)): TypeOps.addEnumFlag(e, EnExtern);
+		case TClassDecl(c) if (TypeOps.hasClassFlag(c, CExcluded)):
+			TypeOps.addClassFlag(c, CExtern);
+		case TEnumDecl(e) if (TypeOps.hasEnumFlag(e, EnExcluded)):
+			TypeOps.addEnumFlag(e, EnExtern);
 		case _:
 	}
+
 	public static function removeExternFields(scom:SafeContext, t:ModuleType):Void switch t {
 		case TClassDecl(c):
 			if (!Define.defined(scom.defines, Define.DocGen)) {
-				c.clOrderedFields = c.clOrderedFields.filter(function(f) { var b = FilterContext.isRemovableField(scom.isMacroContext, f); if (b) c.clFields.remove(f.cfName); return !b; });
-				c.clOrderedStatics = c.clOrderedStatics.filter(function(f) { var b = FilterContext.isRemovableField(scom.isMacroContext, f); if (b) c.clStatics.remove(f.cfName); return !b; });
+				c.clOrderedFields = c.clOrderedFields.filter(function(f) {
+					var b = FilterContext.isRemovableField(scom.isMacroContext, f);
+					if (b) c.clFields.remove(f.cfName);
+					return !b;
+				});
+				c.clOrderedStatics = c.clOrderedStatics.filter(function(f) {
+					var b = FilterContext.isRemovableField(scom.isMacroContext, f);
+					if (b) c.clStatics.remove(f.cfName);
+					return !b;
+				});
 			}
 		case _:
 	}
+
 	public static function checkPrivatePath(com:CommonContext, t:ModuleType):Void switch t {
 		case TClassDecl(c) if (c.clPrivate):
-			var rpath:core.Globals.GlobalTypePath = {pack:c.clModule.mPath.pack, name:"_" + c.clModule.mPath.name};
-			if (com.moduleLut.getTypeLut().mem(rpath)) Error.raiseTypingError("This private class name will clash with " + Globals.sTypePath(rpath), c.clPos);
+			var rpath:core.Globals.GlobalTypePath = {pack: c.clModule.mPath.pack, name: "_" + c.clModule.mPath.name};
+			if (com.moduleLut.getTypeLut()
+				.mem(rpath)) Error.raiseTypingError("This private class name will clash with " + Globals.sTypePath(rpath), c.clPos);
 		case _:
 	}
+
 	public static function addRtti(scom:SafeContext, t:ModuleType):Void {
 		function hasRtti(c:TClass):Bool return Meta.has(Rtti, c.clMeta) || c.clSuper != null && hasRtti(c.clSuper.cls);
 		switch t {
@@ -70,65 +87,111 @@ class Filters {
 				var f = TypeOps.mkField("__rtti", scom.basic.tstring, c.clPos, Globals.nullPos, true, true);
 				var str = Genxml.genTypeString(t);
 				f.cfExpr = TypeOps.mk(TConst(TString(str)), f.cfType, c.clPos);
-				c.clOrderedStatics.unshift(f); c.clStatics.set(f.cfName, f);
+				c.clOrderedStatics.unshift(f);
+				c.clStatics.set(f.cfName, f);
 			case _:
 		}
 	}
+
 	public static function addMetaField(com:CommonContext, t:ModuleType):Void switch t {
 		case TClassDecl(c):
 			var e = Texpr.buildMetadata(com.basic, t);
 			if (e != null) {
 				Common.addFeature(com, "has_metadata");
-				var cf = TypeOps.mkField("__meta__", e.etype, e.epos, Globals.nullPos, true, true); cf.cfExpr = e;
+				var cf = TypeOps.mkField("__meta__", e.etype, e.epos, Globals.nullPos, true, true);
+				cf.cfExpr = e;
 				if (TypeOps.hasClassFlag(c, CInterface) && com.platform == Jvm) {
-					var path:core.Globals.GlobalTypePath = {pack:c.clPath.pack, name:c.clPath.name + "_HxMeta"};
+					var path:core.Globals.GlobalTypePath = {pack: c.clPath.pack, name: c.clPath.name + "_HxMeta"};
 					var ncls = TypeOps.mkClass(c.clModule, path, c.clPos, Globals.nullPos);
-					ncls.clOrderedStatics.unshift(cf); ncls.clStatics.set(cf.cfName, cf);
-					com.types = (cast com.types:Array<ModuleType>).concat([TClassDecl(ncls)]);
-					c.clMeta = ([{meta:Custom(":hasMetadata"),exprs:[], pos:e.epos}] : Array<core.Ast.MetadataEntry>).concat(c.clMeta);
-				} else { c.clOrderedStatics.unshift(cf); c.clStatics.set(cf.cfName, cf); }
+					ncls.clOrderedStatics.unshift(cf);
+					ncls.clStatics.set(cf.cfName, cf);
+					com.types = (cast com.types : Array<ModuleType>).concat([TClassDecl(ncls)]);
+					c.clMeta = ([{meta: Custom(":hasMetadata"), exprs: [], pos: e.epos}] : Array<core.Ast.MetadataEntry>).concat(c.clMeta);
+				} else {
+					c.clOrderedStatics.unshift(cf);
+					c.clStatics.set(cf.cfName, cf);
+				}
 			}
 		case _:
 	}
-	public static function checkRemoveMetadata(t:ModuleType):Void switch t { case TClassDecl(c): c.clImplements = c.clImplements.filter(c -> !Meta.has(Remove, c.cls.clMeta)); case _: }
-	public static function checkVoidField(t:ModuleType):Void {
-		inline function check(f:TClassField):Void switch TypeOps.follow(f.cfType) { case TAbstract({aPath:{pack:[], name:"Void"}}, _): Error.raiseTypingError("Fields of type Void are not allowed", f.cfPos); case _: }
-		switch t { case TClassDecl(c): for (f in c.clOrderedFields) check(f); for (f in c.clOrderedStatics) check(f); case _: }
+
+	public static function checkRemoveMetadata(t:ModuleType):Void switch t {
+		case TClassDecl(c):
+			c.clImplements = c.clImplements.filter(c -> !Meta.has(Remove, c.cls.clMeta));
+		case _:
 	}
+
+	public static function checkVoidField(t:ModuleType):Void {
+		inline function check(f:TClassField):Void switch TypeOps.follow(f.cfType) {
+			case TAbstract({aPath: {pack: [], name: "Void"}}, _):
+				Error.raiseTypingError("Fields of type Void are not allowed", f.cfPos);
+			case _:
+		}
+		switch t {
+			case TClassDecl(c):
+				for (f in c.clOrderedFields) check(f);
+				for (f in c.clOrderedStatics) check(f);
+			case _:
+		}
+	}
+
 	public static function promoteFirstInterfaceToSuper(t:ModuleType):Void switch t {
 		case TClassDecl(c) if (TypeOps.hasClassFlag(c, CInterface)):
 			if (c.clImplements.length > 0) switch c.clImplements[0].cls.clPath {
-				case {pack:["cpp", "rtti"]}:
-				case _: c.clSuper = c.clImplements[0]; c.clImplements = c.clImplements.slice(1);
+				case {pack: ["cpp", "rtti"]}:
+				case _:
+					c.clSuper = c.clImplements[0];
+					c.clImplements = c.clImplements.slice(1);
 			}
 		case _:
 	}
+
 	public static function commitFeatures(com:CommonContext, t:ModuleType):Void {
 		for (k in TypeOps.tModule(t).mExtra.mFeatures.keys()) Common.addFeature(com, k);
 	}
+
 	public static function checkReservedTypePaths(scom:SafeContext, t:ModuleType):Void {
 		inline function check(path:GlobalTypePath, pos:Pos):Void {
 			var paths:Array<GlobalTypePath> = scom.platformConfig.pfReservedTypePaths;
 			if (core.ds.ArrayTools.exists(paths, p -> p.name == path.name && p.pack.join(".") == path.pack.join(".")))
 				SafeCom.addWarning(scom, WReservedTypePath, "Type path " + Globals.sTypePath(path) + " is reserved on this target", pos);
 		}
-		switch t { case TClassDecl(c) if (!TypeOps.hasClassFlag(c, CExtern)): check(c.clPath, c.clPos); case TEnumDecl(e) if (!TypeOps.hasEnumFlag(e, EnExtern)): check(e.ePath, e.ePos); case _: }
+		switch t {
+			case TClassDecl(c) if (!TypeOps.hasClassFlag(c, CExtern)):
+				check(c.clPath, c.clPos);
+			case TEnumDecl(e) if (!TypeOps.hasEnumFlag(e, EnExtern)):
+				check(e.ePath, e.ePos);
+			case _:
+		}
 	}
+
 	public static function iterExpressions(fl:Array<TExpr->Void>, mt:ModuleType):Void switch mt {
 		case TClassDecl(c):
-			inline function field(cf:TClassField):Void { if (cf.cfExpr != null) for (f in fl) f(cf.cfExpr); }
-			for (cf in c.clOrderedStatics) field(cf); for (cf in c.clOrderedFields) field(cf); if (c.clConstructor != null) field(c.clConstructor);
+			inline function field(cf:TClassField):Void {
+				if (cf.cfExpr != null) for (f in fl) f(cf.cfExpr);
+			}
+			for (cf in c.clOrderedStatics) field(cf);
+			for (cf in c.clOrderedFields) field(cf);
+			if (c.clConstructor != null) field(c.clConstructor);
 		case _:
 	}
+
 	public static function destructionBeforeDce(pool:Null<TaskPool>, scom:SafeContext, allTypes:Array<ModuleType>):Void {
-		var filters:Array<ModuleType->Void> = [FiltersCommon.removeGenericBase, scom.platform == Hl ? function(_) {} : applyMacroExclude,
-			t -> removeExternFields(scom, t), checkRemoveMetadata];
-		Parallel.ParallelArray.iter(pool, function(mt) { for (f in filters) f(mt); }, allTypes);
+		var filters:Array<ModuleType->Void> = [
+			 FiltersCommon.removeGenericBase, scom.platform == Hl ? function(_) {} : applyMacroExclude,
+			t -> removeExternFields(scom, t),                                      checkRemoveMetadata
+		];
+		Parallel.ParallelArray.iter(pool, function(mt) {
+			for (f in filters) f(mt);
+		}, allTypes);
 	}
-	public static function destructionOnScom(pool:Null<TaskPool>, scom:SafeContext, ectx:Null<ExceptionContext>, rename:RenameVars.RenameInit, allTypes:Array<ModuleType>):Void {
+
+	public static function destructionOnScom(pool:Null<TaskPool>, scom:SafeContext, ectx:Null<ExceptionContext>,
+			rename:RenameVars.RenameInit, allTypes:Array<ModuleType>):Void {
 		Parallel.ParallelArray.iter(pool, function(mt) {
 			var scom = SafeCom.adaptScomToMt(scom, mt);
-			SaveStacks.patchConstructors(ectx, scom)(mt); Native.applyNativePaths(mt);
+			SaveStacks.patchConstructors(ectx, scom)(mt);
+			Native.applyNativePaths(mt);
 		}, allTypes);
 		Parallel.ParallelArray.iter(pool, function(mt) {
 			var scom = SafeCom.adaptScomToMt(scom, mt);
@@ -138,59 +201,114 @@ class Filters {
 			if (scom.platformConfig.pfReservedTypePaths.length != 0) checkReservedTypePaths(scom, mt);
 		}, allTypes);
 	}
+
 	public static function destructionOnCom(scom:SafeContext, com:CommonContext, types:Array<ModuleType>):Void {
-		var filters:Array<SafeContext->ModuleType->Void> = [(_, mt) -> addRtti(scom, mt), (_, mt) -> checkPrivatePath(com, mt),
-			(_, mt) -> { if (com.platform != Hl) addMetaField(com, mt); }, (_, mt) -> commitFeatures(com, mt)];
+		var filters:Array<SafeContext->ModuleType->Void> = [
+			(_, mt) -> addRtti(scom, mt),
+			(_, mt) -> checkPrivatePath(com, mt),
+			(_, mt) -> {
+				if (com.platform != Hl) addMetaField(com, mt);
+			},
+			(_, mt) -> commitFeatures(com, mt)
+		];
 		SafeCom.runTypeFiltersSafe(scom, filters, types);
 	}
-	public static function destruction(com:CommonContext, scom:SafeContext, ectx:Null<ExceptionContext>, detailTimes:Int, rename:RenameVars.RenameInit, allTypes:Array<ModuleType>, allTypesArray:Array<ModuleType>):Void {
+
+	public static function destruction(com:CommonContext, scom:SafeContext, ectx:Null<ExceptionContext>, detailTimes:Int,
+			rename:RenameVars.RenameInit, allTypes:Array<ModuleType>, allTypesArray:Array<ModuleType>):Void {
 		allTypes = Parallel.runWithPool(com.sctx.pool, function(pool) {
 			FilterContext.withTimer(scom.timerCtx, detailTimes, "type 2", null, function() {
-				SafeCom.runWithScom(com, scom, function() { destructionBeforeDce(pool, scom, allTypesArray); });
+				SafeCom.runWithScom(com, scom, function() {
+					destructionBeforeDce(pool, scom, allTypesArray);
+				});
 			});
 			Common.enterStage(com, CDceStart);
 			var allTypes = FilterContext.withTimer(scom.timerCtx, detailTimes, "dce", null, function() {
-				var mode:String; try mode = Define.definedValue(scom.defines, Define.Dce) catch (_:Dynamic) mode = "no";
-				var mode = switch mode { case "full": Define.defined(scom.defines, Define.Interp) ? DceNo : DceFull; case "std": DceStd; case "no": DceNo; case _: throw "Unknown DCE mode " + mode; };
+				var mode:String;
+				try mode = Define.definedValue(scom.defines, Define.Dce)
+				catch (_:Dynamic) mode = "no";
+				var mode = switch mode {
+					case "full": Define.defined(scom.defines, Define.Interp) ? DceNo : DceFull;
+					case "std": DceStd;
+					case "no": DceNo;
+					case _: throw "Unknown DCE mode " + mode;
+				};
 				var stdPaths = com.classPaths.getStdPaths();
-				var macros = com.getMacros(); var mscom = macros == null ? null : SafeCom.ofCom(macros);
+				var macros = com.getMacros();
+				var mscom = macros == null ? null : SafeCom.ofCom(macros);
 				return Dce.run(pool, scom, mscom, com.main.mainExpr, mode, stdPaths, allTypes);
 			});
-			var allTypesArray = allTypes.copy(); Common.enterStage(com, CDceDone);
+			var allTypesArray = allTypes.copy();
+			Common.enterStage(com, CDceDone);
 			Finalization.maybeAddEntrypoint(com);
 			if (ectx != null && Common.hasFeature(com, "haxe.NativeStackTrace.exceptionStack"))
-				Parallel.ParallelArray.iter(pool, mt -> SafeCom.runExpressionFiltersSafe(scom, detailTimes, [{name:"insert_save_stacks", run:(scom,e) -> SaveStacks.insertSaveStacks(ectx,scom)(e)}], mt, true), allTypesArray);
+				Parallel.ParallelArray.iter(pool, mt -> SafeCom.runExpressionFiltersSafe(scom, detailTimes, [
+					{name: "insert_save_stacks", run: (scom, e) -> SaveStacks.insertSaveStacks(ectx, scom)(e)}
+				], mt, true), allTypesArray);
 			FilterContext.withTimer(scom.timerCtx, detailTimes, "type 3", null, function() {
-				SafeCom.runWithScom(com, scom, function() { destructionOnScom(pool, scom, ectx, rename, allTypesArray); });
+				SafeCom.runWithScom(com, scom, function() {
+					destructionOnScom(pool, scom, ectx, rename, allTypesArray);
+				});
 			});
 			return allTypes;
 		});
 		com.types = allTypes;
-		FilterContext.withTimer(scom.timerCtx, detailTimes, "type 4", null, function() { SafeCom.runWithScom(com, scom, function() { destructionOnCom(scom, com, allTypes); }); });
-		com.callbacks.run(com.errorExt, com.callbacks.getAfterFilters()); Common.enterStage(com, CFilteringDone);
+		FilterContext.withTimer(scom.timerCtx, detailTimes, "type 4", null, function() {
+			SafeCom.runWithScom(com, scom, function() {
+				destructionOnCom(scom, com, allTypes);
+			});
+		});
+		com.callbacks.run(com.errorExt, com.callbacks.getAfterFilters());
+		Common.enterStage(com, CFilteringDone);
 	}
+
 	public static function updateCacheDependencies(closeMonomorphs:Bool, scom:SafeContext, t:ModuleType):Void {
 		var visitedAnons:Array<TAnon> = [];
 		function checkT(m:ModuleDef, t:T):Void switch t {
-			case TInst(c, tl): TypeOps.addDependency(m, c.clModule, MDepFromTyping); for (t in tl) checkT(m, t);
-			case TEnum(en, tl): TypeOps.addDependency(m, en.eModule, MDepFromTyping); for (t in tl) checkT(m, t);
-			case TType(td, tl): TypeOps.addDependency(m, td.tModule, MDepFromTyping); for (t in tl) checkT(m, t);
-			case TAbstract(a, tl): TypeOps.addDependency(m, a.aModule, MDepFromTyping); for (t in tl) checkT(m, t);
-			case TFun(sig): for (a in sig.args) checkT(m, a.type); checkT(m, sig.ret);
+			case TInst(c, tl):
+				TypeOps.addDependency(m, c.clModule, MDepFromTyping);
+				for (t in tl) checkT(m, t);
+			case TEnum(en, tl):
+				TypeOps.addDependency(m, en.eModule, MDepFromTyping);
+				for (t in tl) checkT(m, t);
+			case TType(td, tl):
+				TypeOps.addDependency(m, td.tModule, MDepFromTyping);
+				for (t in tl) checkT(m, t);
+			case TAbstract(a, tl):
+				TypeOps.addDependency(m, a.aModule, MDepFromTyping);
+				for (t in tl) checkT(m, t);
+			case TFun(sig):
+				for (a in sig.args) checkT(m, a.type);
+				checkT(m, sig.ret);
 			case TAnon(an):
 				if (!visitedAnons.contains(an)) {
 					visitedAnons.unshift(an);
-					var keys = [for (k in an.aFields.keys()) k]; keys.sort(Reflect.compare);
+					var keys = [for (k in an.aFields.keys()) k];
+					keys.sort(Reflect.compare);
 					for (k in keys) checkT(m, an.aFields.get(k).cfType);
 				}
-			case TMono(r): if (r.tmType != null) checkT(m, r.tmType); else if (closeMonomorphs) Monomorph.doBind(r, scom.basic.tany);
-			case TLazy(f): checkT(m, TypeOps.lazyType(f));
+			case TMono(r):
+				if (r.tmType != null) checkT(m, r.tmType);
+				else if (closeMonomorphs) Monomorph.doBind(r, scom.basic.tany);
+			case TLazy(f):
+				checkT(m, TypeOps.lazyType(f));
 			case TDynamic(null):
-			case TDynamic(t): checkT(m, t);
+			case TDynamic(t):
+				checkT(m, t);
 		}
-		function checkField(m:ModuleDef, cf:TClassField):Void { checkT(m, cf.cfType); for (f in cf.cfOverloads) checkField(m, f); }
-		switch t { case TClassDecl(c): for (cf in c.clOrderedStatics) checkField(c.clModule, cf); for (cf in c.clOrderedFields) checkField(c.clModule, cf); if (c.clConstructor != null) checkField(c.clModule, c.clConstructor); case _: }
+		function checkField(m:ModuleDef, cf:TClassField):Void {
+			checkT(m, cf.cfType);
+			for (f in cf.cfOverloads) checkField(m, f);
+		}
+		switch t {
+			case TClassDecl(c):
+				for (cf in c.clOrderedStatics) checkField(c.clModule, cf);
+				for (cf in c.clOrderedFields) checkField(c.clModule, cf);
+				if (c.clConstructor != null) checkField(c.clModule, c.clConstructor);
+			case _:
+		}
 	}
+
 	public static function saveClassState(compilationStep:Int, t:ModuleType):Void {
 		TypeOps.tModule(t).mExtra.mProcessed = compilationStep;
 		switch t {
@@ -198,104 +316,219 @@ class Filters {
 				var vars:Array<{variable:TVar, type:T}> = [];
 				function saveVars(e:TExpr):Void {
 					// push, not unshift (quadratic): entries only restore each var's type, so order is irrelevant
-					inline function add(v:TVar):Void vars.push({variable:v, type:v.vType});
-					switch e.eexpr { case TFunction(fn): for (a in fn.tfArgs) add(a.variable); saveVars(fn.tfExpr); case TVar(v, eo): add(v); if (eo != null) saveVars(eo); case _: core.Texpr.iter(saveVars, e); }
+					inline function add(v:TVar):Void vars.push({variable: v, type: v.vType});
+					switch e.eexpr {
+						case TFunction(fn):
+							for (a in fn.tfArgs) add(a.variable);
+							saveVars(fn.tfExpr);
+						case TVar(v, eo):
+							add(v);
+							if (eo != null) saveVars(eo);
+						case _:
+							core.Texpr.iter(saveVars, e);
+					}
 				}
 				inline function mkOverloadRestore(f:TClassField):FieldRestoreState {
 					TypeOps.addClassFieldFlag(f, CfPostProcessed);
 					// cf_meta and cf_params are immutable lists upstream; the port's arrays are
 					// modified in place, so the saved state holds copies.
-					return {name:f.cfName, kind:f.cfKind, expr:f.cfExpr, type:f.cfType, meta:f.cfMeta.copy(), params:f.cfParams.copy()};
+					return {
+						name: f.cfName,
+						kind: f.cfKind,
+						expr: f.cfExpr,
+						type: f.cfType,
+						meta: f.cfMeta.copy(),
+						params: f.cfParams.copy()
+					};
 				}
 				function mkFieldRestore(f:TClassField):FieldRestore {
 					if (f.cfExpr != null) saveVars(f.cfExpr);
-					return {field:f, state:mkOverloadRestore(f), overloads:f.cfOverloads.map(f -> {field:f, state:mkOverloadRestore(f)})};
+					return {
+						field: f,
+						state: mkOverloadRestore(f),
+						overloads: f.cfOverloads.map(f -> {
+							field: f,
+							state: mkOverloadRestore(f)
+						})
+					};
 				}
 				inline function restoreOne(f:TClassField, s:FieldRestoreState):TClassField {
-					f.cfName = s.name; f.cfKind = s.kind; f.cfExpr = s.expr; f.cfType = s.type; f.cfMeta = s.meta.copy(); f.cfParams = s.params.copy(); return f;
+					f.cfName = s.name;
+					f.cfKind = s.kind;
+					f.cfExpr = s.expr;
+					f.cfType = s.type;
+					f.cfMeta = s.meta.copy();
+					f.cfParams = s.params.copy();
+					return f;
 				}
 				function restoreField(saved:FieldRestore):TClassField {
 					var f = restoreOne(saved.field, saved.state);
-					f.cfOverloads = [for (o in saved.overloads) restoreOne(o.field, o.state)]; return f;
+					f.cfOverloads = [for (o in saved.overloads) restoreOne(o.field, o.state)];
+					return f;
 				}
-				inline function mkPmap(lst:Array<TClassField>):StringMap<TClassField> { var map = new StringMap(); for (f in lst) map.set(f.cfName, f); return map; }
-				var meta = c.clMeta.copy(); var path = c.clPath; var ext = TypeOps.hasClassFlag(c, CExtern); var sup = c.clSuper; var impl = c.clImplements.copy();
+				inline function mkPmap(lst:Array<TClassField>):StringMap<TClassField> {
+					var map = new StringMap();
+					for (f in lst) map.set(f.cfName, f);
+					return map;
+				}
+				var meta = c.clMeta.copy();
+				var path = c.clPath;
+				var ext = TypeOps.hasClassFlag(c, CExtern);
+				var sup = c.clSuper;
+				var impl = c.clImplements.copy();
 				var csr = c.clConstructor == null ? null : mkFieldRestore(c.clConstructor);
-				var ofr = c.clOrderedFields.map(mkFieldRestore); var osr = c.clOrderedStatics.map(mkFieldRestore); var init = c.clInit == null ? null : mkFieldRestore(c.clInit);
+				var ofr = c.clOrderedFields.map(mkFieldRestore);
+				var osr = c.clOrderedStatics.map(mkFieldRestore);
+				var init = c.clInit == null ? null : mkFieldRestore(c.clInit);
 				c.clRestore = function() {
-					c.clSuper = sup; c.clImplements = impl.copy(); c.clMeta = meta.copy();
-					if (ext) TypeOps.addClassFlag(c, CExtern); else TypeOps.removeClassFlag(c, CExtern);
-					c.clPath = path; c.clInit = init == null ? null : restoreField(init);
-					c.clOrderedFields = ofr.map(restoreField); c.clOrderedStatics = osr.map(restoreField);
-					c.clFields = mkPmap(c.clOrderedFields); c.clStatics = mkPmap(c.clOrderedStatics);
-					c.clConstructor = csr == null ? null : restoreField(csr); c.clDescendants = [];
+					c.clSuper = sup;
+					c.clImplements = impl.copy();
+					c.clMeta = meta.copy();
+					if (ext) TypeOps.addClassFlag(c, CExtern);
+					else TypeOps.removeClassFlag(c, CExtern);
+					c.clPath = path;
+					c.clInit = init == null ? null : restoreField(init);
+					c.clOrderedFields = ofr.map(restoreField);
+					c.clOrderedStatics = osr.map(restoreField);
+					c.clFields = mkPmap(c.clOrderedFields);
+					c.clStatics = mkPmap(c.clOrderedStatics);
+					c.clConstructor = csr == null ? null : restoreField(csr);
+					c.clDescendants = [];
 					for (v in vars) v.variable.vType = v.type;
 				};
 			case TEnumDecl(en):
 				var path = en.ePath;
 				en.eRestore = function() {
 					for (i in 0...en.eMeta.length) switch en.eMeta[i] {
-						case {meta:core.MetaList.StrictMeta.RealPath,exprs:[{expr:EConst(String(path, _))}]}:
-							en.ePath = Ast.parsePath(path); en.eMeta = en.eMeta.slice(0, i).concat(en.eMeta.slice(i + 1)); return;
+						case {meta: core.MetaList.StrictMeta.RealPath, exprs: [{expr: EConst(String(path, _))}]}:
+							en.ePath = Ast.parsePath(path);
+							en.eMeta = en.eMeta.slice(0, i).concat(en.eMeta.slice(i + 1));
+							return;
 						case _:
 					}
 					en.ePath = path;
 				};
-			case TTypeDecl(td): var path = td.tPath; td.tRestore = function() { td.tPath = path; };
-			case TAbstractDecl(a): var path = a.aPath; a.aRestore = function() { a.aPath = path; a.aMeta = a.aMeta.filter(m -> m.meta != core.MetaList.StrictMeta.ValueUsed); };
+			case TTypeDecl(td):
+				var path = td.tPath;
+				td.tRestore = function() {
+					td.tPath = path;
+				};
+			case TAbstractDecl(a):
+				var path = a.aPath;
+				a.aRestore = function() {
+					a.aPath = path;
+					a.aMeta = a.aMeta.filter(m -> m.meta != core.MetaList.StrictMeta.ValueUsed);
+				};
 		}
 	}
-	public static function mightNeedCfUnoptimized(c:TClass, cf:TClassField):Bool return switch [cf.cfKind, c.clKind] { case [Method(MethInline), _] | [_, KGeneric]: true; case _: TypeOps.hasClassFieldFlag(cf, CfGeneric); };
-	public static function runSafeFilters(ectx:Null<ExceptionContext>, com:CommonContext, scom:SafeContext, allTypes:Array<ModuleType>, newTypes:Array<ModuleType>, rename:RenameVars.RenameInit):Void {
+
+	public static function mightNeedCfUnoptimized(c:TClass, cf:TClassField):Bool return switch [cf.cfKind, c.clKind] {
+		case [Method(MethInline), _] | [_, KGeneric]: true;
+		case _: TypeOps.hasClassFieldFlag(cf, CfGeneric);
+	};
+
+	public static function runSafeFilters(ectx:Null<ExceptionContext>, com:CommonContext, scom:SafeContext, allTypes:Array<ModuleType>,
+			newTypes:Array<ModuleType>, rename:RenameVars.RenameInit):Void {
 		var detailTimes = Timer.levelFromDefine(scom.defines, Define.FilterTimes);
 		var wrapper = com.localWrapper;
-		var beforeInlining:Array<{name:String,run:SafeContext->TExpr->TExpr}> = [{name:"handle_abstract_casts", run:AbstractCast.handleAbstractCasts}];
-		var beforeParallel:Array<{name:String,run:SafeContext->TExpr->TExpr}> = [{name:"local_statics", run:LocalStatic.run}, {name:"fix_return_dynamic_from_void_function", run:SafeFilters.fixReturnDynamicFromVoidFunction},
-			{name:"check_local_vars_init", run:CheckVarInit.checkLocalVarsInit}, {name:"check_abstract_as_value", run:SafeFilters.checkAbstractAsValue},
-			{name:"Tre", run:(scom, e) -> Define.defined(scom.defines, Define.AnalyzerOptimize) ? Tre.run(scom)(e) : e}];
-		var beforeAnalyzer:Array<{name:String,run:SafeContext->TExpr->TExpr}> = [{name:"reduce_expression", run:Optimizer.reduceExpression}, {name:"inline_constructors", run:InlineConstructors.inlineConstructors},
-			{name:"Exceptions_filter", run:(scom, e) -> Exceptions.filter(ectx, scom)(e)}, {name:"captured_vars", run:(scom, e) -> CapturedVars.capturedVars(scom, wrapper, false, e)}];
-		var afterAnalyzer:Array<{name:String,run:SafeContext->TExpr->TExpr}> = [{name:"sanitize", run:Sanitize.sanitize}, {name:"add_final_return", run:(_, e) -> scom.platformConfig.pfAddFinalReturn ? AddFinalReturn.addFinalReturn(e) : e},
-			{name:"RenameVars", run:(scom, e) -> scom.platform == Eval ? e : RenameVars.run(scom.curclass.clPath, rename, e)}, {name:"mark_switch_break_loops", run:SafeFilters.markSwitchBreakLoops}];
+		var beforeInlining:Array<{name:String, run:SafeContext->TExpr->TExpr}> = [
+			{
+				name: "handle_abstract_casts",
+				run: AbstractCast.handleAbstractCasts
+			}
+		];
+		var beforeParallel:Array<{name:String, run:SafeContext->TExpr->TExpr}> = [
+			{name: "local_statics", run: LocalStatic.run},
+			{name: "fix_return_dynamic_from_void_function", run: SafeFilters.fixReturnDynamicFromVoidFunction},
+			{name: "check_local_vars_init", run: CheckVarInit.checkLocalVarsInit},
+			{name: "check_abstract_as_value", run: SafeFilters.checkAbstractAsValue},
+			{name: "Tre", run: (scom, e) -> Define.defined(scom.defines, Define.AnalyzerOptimize) ? Tre.run(scom)(e) : e}
+		];
+		var beforeAnalyzer:Array<{name:String, run:SafeContext->TExpr->TExpr}> = [
+			{name: "reduce_expression", run: Optimizer.reduceExpression},
+			{name: "inline_constructors", run: InlineConstructors.inlineConstructors},
+			{
+				name: "Exceptions_filter",
+				run: (scom, e) -> Exceptions.filter(ectx, scom)(e)
+			},
+			{name: "captured_vars", run: (scom, e) -> CapturedVars.capturedVars(scom, wrapper, false, e)}
+		];
+		var afterAnalyzer:Array<{name:String, run:SafeContext->TExpr->TExpr}> = [
+			{name: "sanitize", run: Sanitize.sanitize},
+			{
+				name: "add_final_return",
+				run: (_, e) -> scom.platformConfig.pfAddFinalReturn ? AddFinalReturn.addFinalReturn(e) : e
+			},
+			{
+				name: "RenameVars",
+				run: (scom, e) -> scom.platform == Eval ? e : RenameVars.run(scom.curclass.clPath, rename, e)
+			},
+			{
+				name: "mark_switch_break_loops",
+				run: SafeFilters.markSwitchBreakLoops
+			}
+		];
 		Parallel.runWithPool(com.sctx.pool, function(pool) {
 			var castPool = Common.defined(com, Define.EnableParallelAbstractCast) ? pool : null;
 			Parallel.ParallelArray.iter(castPool, mt -> SafeCom.runExpressionFiltersSafe(scom, detailTimes, beforeInlining, mt), newTypes);
 			Parallel.ParallelArray.iter(pool, mt -> SafeCom.runExpressionFiltersSafe(scom, detailTimes, beforeParallel, mt), newTypes);
 			Dump.maybeGenerateDump(com, AfterCasting);
 			Parallel.ParallelArray.iter(pool, mt -> SafeCom.runExpressionFiltersSafe(scom, detailTimes, beforeAnalyzer, mt), newTypes);
-			Dump.maybeGenerateDump(com, AfterInlining); Common.enterStage(com, CAnalyzerStart);
+			Dump.maybeGenerateDump(com, AfterInlining);
+			Common.enterStage(com, CAnalyzerStart);
 			if (scom.platform != Cross) Analyzer.Run.runOnTypes(scom, pool, allTypes, newTypes);
-			Dump.maybeGenerateDump(com, AfterAnalyzing); Common.enterStage(com, CAnalyzerDone);
+			Dump.maybeGenerateDump(com, AfterAnalyzing);
+			Common.enterStage(com, CAnalyzerDone);
 			Parallel.ParallelArray.iter(pool, mt -> SafeCom.runExpressionFiltersSafe(scom, detailTimes, afterAnalyzer, mt), newTypes);
 			Dump.maybeGenerateDump(com, AfterSanitizing);
 		});
 	}
+
 	public static function run(com:CommonContext, ectx:Null<ExceptionContext>, beforeDestruction:Void->Void):Void {
-		var scom = SafeCom.ofCom(com); var detailTimes = Timer.levelFromDefine(com.defines, Define.FilterTimes);
-		var newTypes = (cast com.types:Array<ModuleType>).filter(function(t) {
+		var scom = SafeCom.ofCom(com);
+		var detailTimes = Timer.levelFromDefine(com.defines, Define.FilterTimes);
+		var newTypes = (cast com.types : Array<ModuleType>).filter(function(t) {
 			var cached = FiltersCommon.isCached(com, t);
 			switch t {
 				case TClassDecl(cls):
 					for (iface in cls.clImplements) TypeOps.addDescendant(iface.cls, cls);
 					if (cls.clSuper != null) TypeOps.addDescendant(cls.clSuper.cls, cls);
 					if (!cached) {
-						inline function field(cf:TClassField):Void { if (cf.cfExpr != null && cf.cfExprUnoptimized == null && mightNeedCfUnoptimized(cls, cf)) cf.cfExprUnoptimized = cf.cfExpr; }
-						for (cf in cls.clOrderedFields) field(cf); for (cf in cls.clOrderedStatics) field(cf); if (cls.clConstructor != null) field(cls.clConstructor);
+						inline function field(cf:TClassField):Void {
+							if (cf.cfExpr != null && cf.cfExprUnoptimized == null && mightNeedCfUnoptimized(cls,
+								cf)) cf.cfExprUnoptimized = cf.cfExpr;
+						}
+						for (cf in cls.clOrderedFields) field(cf);
+						for (cf in cls.clOrderedStatics) field(cf);
+						if (cls.clConstructor != null) field(cls.clConstructor);
 					}
 				case _:
 			}
 			return !cached;
 		});
-		var newTypesArray = newTypes.copy(); var allTypesArray:Array<ModuleType> = com.types.copy();
-		DeprecationCheck.run(com, newTypes); NullSafety.run(com, newTypes);
+		var newTypesArray = newTypes.copy();
+		var allTypesArray:Array<ModuleType> = com.types.copy();
+		DeprecationCheck.run(com, newTypes);
+		NullSafety.run(com, newTypes);
 		var rename = RenameVars.init(scom.platformConfig, com.types);
-		SafeCom.runWithScom(com, scom, function() { runSafeFilters(ectx, com, scom, allTypesArray, newTypesArray, rename); });
-		FilterContext.withTimer(com.timerCtx, detailTimes, "callbacks", null, function() { com.callbacks.run(com.errorExt, com.callbacks.getBeforeSave()); });
+		SafeCom.runWithScom(com, scom, function() {
+			runSafeFilters(ectx, com, scom, allTypesArray, newTypesArray, rename);
+		});
+		FilterContext.withTimer(com.timerCtx, detailTimes, "callbacks", null, function() {
+			com.callbacks.run(com.errorExt, com.callbacks.getBeforeSave());
+		});
 		Common.enterStage(com, CSaveStart);
-		FilterContext.withTimer(com.timerCtx, detailTimes, "save state", null, function() { for (mt in newTypes) updateCacheDependencies(true, scom, mt); });
-		Parallel.runWithPool(com.sctx.pool, function(pool) { Parallel.ParallelArray.iter(pool, mt -> saveClassState(com.partScope.compilationStep, mt), newTypesArray); });
+		FilterContext.withTimer(com.timerCtx, detailTimes, "save state", null, function() {
+			for (mt in newTypes) updateCacheDependencies(true, scom, mt);
+		});
+		Parallel.runWithPool(com.sctx.pool, function(pool) {
+			Parallel.ParallelArray.iter(pool, mt -> saveClassState(com.partScope.compilationStep, mt), newTypesArray);
+		});
 		Common.enterStage(com, CSaveDone);
-		FilterContext.withTimer(com.timerCtx, detailTimes, "callbacks", null, function() { com.callbacks.run(com.errorExt, com.callbacks.getAfterSave()); });
-		beforeDestruction(); destruction(com, scom, ectx, detailTimes, rename, com.types, allTypesArray);
+		FilterContext.withTimer(com.timerCtx, detailTimes, "callbacks", null, function() {
+			com.callbacks.run(com.errorExt, com.callbacks.getAfterSave());
+		});
+		beforeDestruction();
+		destruction(com, scom, ectx, detailTimes, rename, com.types, allTypesArray);
 	}
 }

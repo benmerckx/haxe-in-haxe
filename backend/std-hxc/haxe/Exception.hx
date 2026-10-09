@@ -12,12 +12,15 @@ class Exception {
 	@:noCompletion var __previousException:Null<Exception>;
 	@:noCompletion var __nativeException:Any;
 
-	static function caught(value:Any):Exception {
+	// caught/thrown are called by the backend for each catch and throw of a
+	// haxe.Exception (FnLower.tryStmt, TThrow), not by typed code: keep them
+	// under -dce full
+	@:keep static function caught(value:Any):Exception {
 		var e:Null<Exception> = Std.downcast(cast value, Exception);
 		return e != null ? e : new ValueException(value, null, value);
 	}
 
-	static function thrown(value:Any):Any {
+	@:keep static function thrown(value:Any):Any {
 		var ex:Null<Exception> = Std.downcast(cast value, Exception);
 		return ex != null ? ex.native : new ValueException(value);
 	}

@@ -71,9 +71,11 @@ class JsonrpcHandler {
 
 	public function getBoolField(desc:String, name:String, fl:Array<JsonField>):Bool return getBool(desc, getField(desc, fl, name));
 
-	public function getArrayField(desc:String, name:String, fl:Array<JsonField>):Array<JsonValue> return getArray(desc, getField(desc, fl, name));
+	public function getArrayField(desc:String, name:String,
+			fl:Array<JsonField>):Array<JsonValue> return getArray(desc, getField(desc, fl, name));
 
-	public function getObjectField(desc:String, name:String, fl:Array<JsonField>):Array<JsonField> return getObject(desc, getField(desc, fl, name));
+	public function getObjectField(desc:String, name:String,
+			fl:Array<JsonField>):Array<JsonField> return getObject(desc, getField(desc, fl, name));
 
 	function getObjParams():Array<JsonField> return switch params {
 		case JObject(fl): fl;

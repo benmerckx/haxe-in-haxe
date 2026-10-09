@@ -11,9 +11,10 @@ import filters.exception.ExceptionFunctions;
 class SaveStacks {
 	public static function insertSaveStacks(ectx:ExceptionContext, scom:context.SafeCom.SafeContext):TExpr->TExpr {
 		function containsInsertionPoints(e:TExpr):Bool return switch e.eexpr {
-			case TTry(body, catches):
-				core.ds.ArrayTools.exists(catches, c -> Meta.has(NeedsExceptionStack, c.variable.vMeta)) || containsInsertionPoints(body)
-					|| core.ds.ArrayTools.exists(catches, c -> containsInsertionPoints(c.expr));
+			case TTry(body, catches): core.ds.ArrayTools.exists(catches,
+					c -> Meta.has(NeedsExceptionStack,
+						c.variable.vMeta)) || containsInsertionPoints(body) || core.ds.ArrayTools.exists(catches,
+					c -> containsInsertionPoints(c.expr));
 			case _: core.Texpr.checkExpr(containsInsertionPoints, e);
 		};
 		inline function saveExceptionStack(catchVar:TVar):TExpr {
@@ -22,7 +23,8 @@ class SaveStacks {
 			var field = cls.clStatics.get("saveStack");
 			var returnType = switch TypeOps.follow(field.cfType) {
 				case TFun(sig): sig.ret;
-				case _: Error.raiseTypingError("haxe.NativeStackTrace." + field.cfName + " is not a function and cannot be called", catchVar.vPos);
+				case _: Error.raiseTypingError("haxe.NativeStackTrace." + field.cfName + " is not a function and cannot be called",
+						catchVar.vPos);
 			};
 			var local = TypeOps.mk(TLocal(catchVar), catchVar.vType, catchVar.vPos);
 			return ExceptionFunctions.makeStaticCall(scom, cls, field, [local], returnType, catchVar.vPos);
@@ -32,28 +34,37 @@ class SaveStacks {
 				var e1 = core.Texpr.mapExpr(run, e1);
 				var catches = catches.map(function(c) {
 					if (!Meta.has(NeedsExceptionStack, c.variable.vMeta)) return c;
-					var exprs = switch c.expr.eexpr { case TBlock(exprs): [saveExceptionStack(c.variable)].concat(exprs); case _: [saveExceptionStack(c.variable), c.expr]; };
-					return {variable:c.variable, expr:TypeOps.mk(TBlock(exprs), c.expr.etype, c.expr.epos)};
+					var exprs = switch c.expr.eexpr {
+						case TBlock(exprs): [saveExceptionStack(c.variable)].concat(exprs);
+						case _: [saveExceptionStack(c.variable), c.expr];
+					};
+					return {variable: c.variable, expr: TypeOps.mk(TBlock(exprs), c.expr.etype, c.expr.epos)};
 				});
 				TypeOps.mk(TTry(e1, catches), e.etype, e.epos);
 			case _: core.Texpr.mapExpr(run, e);
 		};
 		return e -> containsInsertionPoints(e) ? run(e) : e;
 	}
+
 	static function patchConstructorsContext(ectx:ExceptionContext):ModuleType->Void {
 		var exception = ectx.haxeException.force();
 		switch exception.type {
 			case TInst(cls, _) if (cls.clFields.exists("__shiftStack") && cls.clConstructor != null):
-			case _: return function(_) {};
+			case _:
+				return function(_) {};
 		}
 		return function(mt) {
 			switch mt {
-				case TClassDecl(cls) if (!TypeOps.hasClassFlag(cls, CExtern) && !ExceptionFunctions.isHaxeExceptionClass(cls, false) && ExceptionFunctions.isHaxeExceptionClass(cls)):
+				case TClassDecl(cls)
+					if (!TypeOps.hasClassFlag(cls, CExtern)
+						&& !ExceptionFunctions.isHaxeExceptionClass(cls, false)
+						&& ExceptionFunctions.isHaxeExceptionClass(cls)):
 					function shiftStack(p:core.Globals.Pos):TExpr {
 						var t = TypeOps.typeOfModuleType(mt);
 						var ethis = TypeOps.mk(TConst(TThis), t, p);
 						var faccess:TFieldAccess;
-						try faccess = TypeOps.quickField(t, "__shiftStack") catch (_:Dynamic) {
+						try faccess = TypeOps.quickField(t, "__shiftStack")
+						catch (_:Dynamic) {
 							return Error.raiseTypingError("haxe.Exception has no field __shiftStack", p);
 						}
 						return switch faccess {
@@ -61,7 +72,8 @@ class SaveStacks {
 								var efield = TypeOps.mk(TField(ethis, faccess), cf.cfType, p);
 								var rt = switch TypeOps.follow(cf.cfType) {
 									case TFun(sig): sig.ret;
-									case _: Error.raiseTypingError("haxe.Exception.__shiftStack is not a function and cannot be called", cf.cfNamePos);
+									case _: Error.raiseTypingError("haxe.Exception.__shiftStack is not a function and cannot be called",
+											cf.cfNamePos);
 								};
 								ExceptionFunctions.makeCall(ectx.scom, efield, [], rt, p);
 							case _: Error.raiseTypingError("haxe.Exception.__shiftStack is expected to be an instance method", p);
@@ -78,8 +90,9 @@ class SaveStacks {
 						var eCtor = ctor.cfExpr;
 						ctor.cfExpr = switch eCtor.eexpr {
 							case TFunction(fn):
-								var body = TypeOps.mk(TBlock([add(fn.tfExpr), shiftStack(fn.tfExpr.epos)]), ectx.scom.basic.tvoid, fn.tfExpr.epos);
-								TypeOps.mk(TFunction({tfArgs:fn.tfArgs, tfType:fn.tfType, tfExpr:body}), eCtor.etype, eCtor.epos);
+								var body = TypeOps.mk(TBlock([add(fn.tfExpr), shiftStack(fn.tfExpr.epos)]), ectx.scom.basic.tvoid,
+									fn.tfExpr.epos);
+								TypeOps.mk(TFunction({tfArgs: fn.tfArgs, tfType: fn.tfType, tfExpr: body}), eCtor.etype, eCtor.epos);
 							case _: throw "saveStacks: constructor is not a function";
 						};
 					}
@@ -87,9 +100,11 @@ class SaveStacks {
 			}
 		};
 	}
+
 	public static function patchConstructors(ectx:Null<ExceptionContext>, scom:context.SafeCom.SafeContext):ModuleType->Void {
 		if (ectx == null) return function(_) {};
-		var ctx:ExceptionContext = core.ds.Record.copy(ectx); ctx.scom = scom;
+		var ctx:ExceptionContext = core.ds.Record.copy(ectx);
+		ctx.scom = scom;
 		return patchConstructorsContext(ctx);
 	}
 }

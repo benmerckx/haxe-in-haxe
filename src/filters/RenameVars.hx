@@ -1,6 +1,6 @@
 package filters;
-import context.PlatformConfig;
 
+import context.PlatformConfig;
 import core.Ast;
 import core.TType;
 import core.TFunctions as TypeOps;
@@ -19,9 +19,22 @@ import haxe.ds.StringMap;
 	public var riSwitchCasesNoBlocks:Bool;
 	public var riReserved:StringMap<Bool>;
 	public var riReserveCurrentTopLevelSymbol:Bool;
-	public inline function new(riScope:context.PlatformConfig.VarScope, riHoisting:Bool, riNoShadowing:Bool, riNoCatchVarShadowing:Bool, riSwitchCasesNoBlocks:Bool, riReserved:StringMap<Bool>, riReserveCurrentTopLevelSymbol:Bool) { this.riScope = riScope; this.riHoisting = riHoisting; this.riNoShadowing = riNoShadowing; this.riNoCatchVarShadowing = riNoCatchVarShadowing; this.riSwitchCasesNoBlocks = riSwitchCasesNoBlocks; this.riReserved = riReserved; this.riReserveCurrentTopLevelSymbol = riReserveCurrentTopLevelSymbol; }
-	public inline function clone():RenameInit return new RenameInit(riScope, riHoisting, riNoShadowing, riNoCatchVarShadowing, riSwitchCasesNoBlocks, riReserved, riReserveCurrentTopLevelSymbol);
+
+	public inline function new(riScope:context.PlatformConfig.VarScope, riHoisting:Bool, riNoShadowing:Bool, riNoCatchVarShadowing:Bool,
+			riSwitchCasesNoBlocks:Bool, riReserved:StringMap<Bool>, riReserveCurrentTopLevelSymbol:Bool) {
+		this.riScope = riScope;
+		this.riHoisting = riHoisting;
+		this.riNoShadowing = riNoShadowing;
+		this.riNoCatchVarShadowing = riNoCatchVarShadowing;
+		this.riSwitchCasesNoBlocks = riSwitchCasesNoBlocks;
+		this.riReserved = riReserved;
+		this.riReserveCurrentTopLevelSymbol = riReserveCurrentTopLevelSymbol;
+	}
+
+	public inline function clone():RenameInit return new RenameInit(riScope, riHoisting, riNoShadowing, riNoCatchVarShadowing,
+		riSwitchCasesNoBlocks, riReserved, riReserveCurrentTopLevelSymbol);
 }
+
 @:structInit class RenameScope {
 	public var parent:Null<RenameScope>;
 	public var children:Array<RenameScope>;
@@ -29,9 +42,20 @@ import haxe.ds.StringMap;
 	public var foreignVars:Overlaps;
 	public var loopVars:Overlaps;
 	public var loopCount:Int;
-	public inline function new(parent:Null<RenameScope>, children:Array<RenameScope>, ownVars:Array<{variable:TVar, overlaps:Overlaps}>, foreignVars:Overlaps, loopVars:Overlaps, loopCount:Int) { this.parent = parent; this.children = children; this.ownVars = ownVars; this.foreignVars = foreignVars; this.loopVars = loopVars; this.loopCount = loopCount; }
+
+	public inline function new(parent:Null<RenameScope>, children:Array<RenameScope>, ownVars:Array<{variable:TVar, overlaps:Overlaps}>,
+			foreignVars:Overlaps, loopVars:Overlaps, loopCount:Int) {
+		this.parent = parent;
+		this.children = children;
+		this.ownVars = ownVars;
+		this.foreignVars = foreignVars;
+		this.loopVars = loopVars;
+		this.loopCount = loopCount;
+	}
+
 	public inline function clone():RenameScope return new RenameScope(parent, children, ownVars, foreignVars, loopVars, loopCount);
 }
+
 @:structInit class RenameContext {
 	public var rcHoisting:Bool;
 	public var rcNoShadowing:Bool;
@@ -40,94 +64,180 @@ import haxe.ds.StringMap;
 	public var rcScope:context.PlatformConfig.VarScope;
 	public var rcReserved:StringMap<Bool>;
 	public var rcVarOrigins:IntMap<RenameScope>;
-	public inline function new(rcHoisting:Bool, rcNoShadowing:Bool, rcNoCatchVarShadowing:Bool, rcSwitchCasesNoBlocks:Bool, rcScope:context.PlatformConfig.VarScope, rcReserved:StringMap<Bool>, rcVarOrigins:IntMap<RenameScope>) { this.rcHoisting = rcHoisting; this.rcNoShadowing = rcNoShadowing; this.rcNoCatchVarShadowing = rcNoCatchVarShadowing; this.rcSwitchCasesNoBlocks = rcSwitchCasesNoBlocks; this.rcScope = rcScope; this.rcReserved = rcReserved; this.rcVarOrigins = rcVarOrigins; }
-	public inline function clone():RenameContext return new RenameContext(rcHoisting, rcNoShadowing, rcNoCatchVarShadowing, rcSwitchCasesNoBlocks, rcScope, rcReserved, rcVarOrigins);
+
+	public inline function new(rcHoisting:Bool, rcNoShadowing:Bool, rcNoCatchVarShadowing:Bool, rcSwitchCasesNoBlocks:Bool,
+			rcScope:context.PlatformConfig.VarScope, rcReserved:StringMap<Bool>, rcVarOrigins:IntMap<RenameScope>) {
+		this.rcHoisting = rcHoisting;
+		this.rcNoShadowing = rcNoShadowing;
+		this.rcNoCatchVarShadowing = rcNoCatchVarShadowing;
+		this.rcSwitchCasesNoBlocks = rcSwitchCasesNoBlocks;
+		this.rcScope = rcScope;
+		this.rcReserved = rcReserved;
+		this.rcVarOrigins = rcVarOrigins;
+	}
+
+	public inline function clone():RenameContext return new RenameContext(rcHoisting, rcNoShadowing, rcNoCatchVarShadowing,
+		rcSwitchCasesNoBlocks, rcScope, rcReserved, rcVarOrigins);
 }
+
 // haxe/src/filters/renameVars.ml — mechanical draft; not compiled or validated.
 // Persistent map/list snapshots are explicitly copied where mutation would change sharing semantics.
 class Overlaps {
 	public var ovVars:Array<TVar> = [];
 	public var ovLut:IntMap<Bool> = new IntMap();
 	public var ovNameCache:Null<StringMap<Bool>> = null;
+
 	public function new() {}
+
 	public static function create():Overlaps return new Overlaps();
+
 	public function copy():Overlaps {
-		var ov = new Overlaps(); ov.ovVars = ovVars.copy(); ov.ovLut = ovLut.copy(); ov.ovNameCache = ovNameCache; return ov;
+		var ov = new Overlaps();
+		ov.ovVars = ovVars.copy();
+		ov.ovLut = ovLut.copy();
+		ov.ovNameCache = ovNameCache;
+		return ov;
 	}
-	public function add(v:TVar):Void { ovVars.unshift(v); ovLut.set(v.vId, true); ovNameCache = null; }
+
+	public function add(v:TVar):Void {
+		ovVars.unshift(v);
+		ovLut.set(v.vId, true);
+		ovNameCache = null;
+	}
+
 	public function getCache():StringMap<Bool> {
-		if (ovNameCache == null) { ovNameCache = new StringMap(); for (v in ovVars) ovNameCache.set(v.vName, true); }
+		if (ovNameCache == null) {
+			ovNameCache = new StringMap();
+			for (v in ovVars) ovNameCache.set(v.vName, true);
+		}
 		return ovNameCache;
 	}
+
 	public function hasName(name:String):Bool return getCache().exists(name);
-	public function iter(f:TVar->Void):Void { for (v in ovVars) f(v); }
+
+	public function iter(f:TVar->Void):Void {
+		for (v in ovVars) f(v);
+	}
+
 	public function mem(id:Int):Bool return ovLut.exists(id);
-	public function reset():Void { ovVars = []; ovLut.clear(); ovNameCache = null; }
+
+	public function reset():Void {
+		ovVars = [];
+		ovLut.clear();
+		ovNameCache = null;
+	}
+
 	public function isEmpty():Bool return ovVars.length == 0;
 }
+
 class RenameVars {
 	public static function reserveInit(ri:RenameInit, name:String):Void ri.riReserved.set(name, true);
+
 	public static function reserveAllTypes(ri:RenameInit, types:Array<ModuleType>, pathToName:GlobalTypePath->String):Void {
 		for (mt in types) {
 			var infos = TypeOps.tInfos(mt);
 			var nativeName:String;
-			try nativeName = Native.getNativeName(infos.mtMeta).name catch (_:Dynamic) nativeName = pathToName(infos.mtPath);
+			try nativeName = Native.getNativeName(infos.mtMeta).name
+			catch (_:Dynamic) nativeName = pathToName(infos.mtPath);
 			switch mt {
 				case TClassDecl(c) if (nativeName == ""):
 					for (cf in c.clOrderedStatics) {
-						var name:String; try name = Native.getNativeName(cf.cfMeta).name catch (_:Dynamic) name = cf.cfName;
+						var name:String;
+						try name = Native.getNativeName(cf.cfMeta).name
+						catch (_:Dynamic) name = cf.cfName;
 						reserveInit(ri, name);
 					}
-				case TClassDecl({clKind:KModuleFields(m), clOrderedStatics:fl}):
+				case TClassDecl({clKind: KModuleFields(m), clOrderedStatics: fl}):
 					var prefix = Path.flatPath(m.mPath) + "_";
 					for (cf in fl) {
-						var name:String; try name = Native.getNativeName(cf.cfMeta).name catch (_:Dynamic) name = prefix + cf.cfName;
+						var name:String;
+						try name = Native.getNativeName(cf.cfMeta).name
+						catch (_:Dynamic) name = prefix + cf.cfName;
 						reserveInit(ri, name);
 					}
-				case _: reserveInit(ri, nativeName);
+				case _:
+					reserveInit(ri, nativeName);
 			}
 		}
 	}
+
 	public static function init(config:context.PlatformConfig, types:Array<ModuleType>):RenameInit {
-		var ri:RenameInit = {riScope:config.pfScoping.vsScope, riReserved:new StringMap(), riHoisting:false, riNoShadowing:false,
-			riNoCatchVarShadowing:false, riSwitchCasesNoBlocks:false, riReserveCurrentTopLevelSymbol:false};
+		var ri:RenameInit = {
+			riScope: config.pfScoping.vsScope,
+			riReserved: new StringMap(),
+			riHoisting: false,
+			riNoShadowing: false,
+			riNoCatchVarShadowing: false,
+			riSwitchCasesNoBlocks: false,
+			riReserveCurrentTopLevelSymbol: false
+		};
 		reserveInit(ri, "this");
 		for (flag in config.pfScoping.vsFlags) switch flag {
-			case VarHoisting: ri.riHoisting = true;
-			case NoShadowing: ri.riNoShadowing = true;
-			case NoCatchVarShadowing: ri.riNoCatchVarShadowing = true;
-			case SwitchCasesNoBlocks: ri.riSwitchCasesNoBlocks = true;
-			case ReserveNames(names): for (name in names) reserveInit(ri, name);
-			case ReserveAllTopLevelSymbols: reserveAllTypes(ri, types, p -> p.pack.length == 0 ? p.name : p.pack[0]);
-			case ReserveAllTypesFlat: reserveAllTypes(ri, types, Path.flatPath);
-			case ReserveCurrentTopLevelSymbol: ri.riReserveCurrentTopLevelSymbol = true;
+			case VarHoisting:
+				ri.riHoisting = true;
+			case NoShadowing:
+				ri.riNoShadowing = true;
+			case NoCatchVarShadowing:
+				ri.riNoCatchVarShadowing = true;
+			case SwitchCasesNoBlocks:
+				ri.riSwitchCasesNoBlocks = true;
+			case ReserveNames(names):
+				for (name in names) reserveInit(ri, name);
+			case ReserveAllTopLevelSymbols:
+				reserveAllTypes(ri, types, p -> p.pack.length == 0 ? p.name : p.pack[0]);
+			case ReserveAllTypesFlat:
+				reserveAllTypes(ri, types, Path.flatPath);
+			case ReserveCurrentTopLevelSymbol:
+				ri.riReserveCurrentTopLevelSymbol = true;
 		}
 		return ri;
 	}
+
 	public static function reserveCtx(rc:RenameContext, name:String):Void rc.rcReserved.set(name, true);
+
 	public static function reserve(reserved:StringMap<Bool>, name:String):Void reserved.set(name, true);
+
 	public static function createScope(parent:Null<RenameScope>):RenameScope {
-		var scope:RenameScope = {parent:parent, children:[], ownVars:[], foreignVars:Overlaps.create(), loopVars:Overlaps.create(), loopCount:0};
-		if (parent != null) parent.children.unshift(scope); return scope;
+		var scope:RenameScope = {
+			parent: parent,
+			children: [],
+			ownVars: [],
+			foreignVars: Overlaps.create(),
+			loopVars: Overlaps.create(),
+			loopCount: 0
+		};
+		if (parent != null) parent.children.unshift(scope);
+		return scope;
 	}
+
 	public static function declareVar(rc:RenameContext, scope:RenameScope, v:TVar):Void {
 		var overlaps:Overlaps;
 		if (!rc.rcHoisting || scope.foreignVars.isEmpty()) overlaps = scope.loopCount == 0 ? Overlaps.create() : scope.loopVars.copy();
 		else if (scope.loopCount == 0) overlaps = scope.foreignVars.copy();
-		else { overlaps = scope.loopVars.copy(); scope.foreignVars.iter(o -> overlaps.add(o)); }
-		scope.ownVars.unshift({variable:v, overlaps:overlaps}); rc.rcVarOrigins.set(v.vId, scope);
+		else {
+			overlaps = scope.loopVars.copy();
+			scope.foreignVars.iter(o -> overlaps.add(o));
+		}
+		scope.ownVars.unshift({variable: v, overlaps: overlaps});
+		rc.rcVarOrigins.set(v.vId, scope);
 		if (scope.loopCount > 0) scope.loopVars.add(v);
 	}
-	public static function willBeReserved(rc:RenameContext, v:TVar):Bool return rc.rcNoShadowing || TypeOps.hasVarFlag(v, VCaptured) && rc.rcHoisting;
+
+	public static function willBeReserved(rc:RenameContext,
+			v:TVar):Bool return rc.rcNoShadowing || TypeOps.hasVarFlag(v, VCaptured) && rc.rcHoisting;
+
 	public static function unboundVariable(v:TVar):Dynamic throw "Unbound variable: " + v.vName + "<" + v.vId + ">";
+
 	public static function determineOverlaps(rc:RenameContext, scope:RenameScope, v:TVar):Void {
 		for (decl in scope.ownVars) {
 			if (decl.variable == v || decl.overlaps.mem(v.vId)) return;
 			decl.overlaps.add(v);
 		}
 		if (rc.rcNoShadowing || rc.rcHoisting) scope.foreignVars.add(v);
-		if (scope.parent != null) determineOverlaps(rc, scope.parent, v); else unboundVariable(v);
+		if (scope.parent != null) determineOverlaps(rc, scope.parent, v);
+		else unboundVariable(v);
 	}
+
 	public static function useVar(rc:RenameContext, scope:RenameScope, v:TVar):Void {
 		if (!willBeReserved(rc, v)) determineOverlaps(rc, scope, v);
 		else {
@@ -136,81 +246,148 @@ class RenameVars {
 			function loop(scope:RenameScope):Void {
 				if (scope == origin) return;
 				if (rc.rcNoShadowing || rc.rcHoisting) scope.foreignVars.add(v);
-				if (scope.parent != null) loop(scope.parent); else unboundVariable(v);
+				if (scope.parent != null) loop(scope.parent);
+				else unboundVariable(v);
 			}
 			loop(scope);
 		}
 		if (scope.loopCount > 0) scope.loopVars.add(v);
 	}
+
 	public static function collectLoop(scope:RenameScope, fn:Void->Void):Void {
-		++scope.loopCount; fn(); --scope.loopCount;
+		++scope.loopCount;
+		fn();
+		--scope.loopCount;
 		if (scope.loopCount < 0) throw "Unexpected loop count";
 		if (scope.loopCount == 0) scope.loopVars.reset();
 	}
+
 	public static function collectVars(rc:RenameContext, scope:RenameScope, e:TExpr, inBlock:Bool = false):Void {
-		var childInBlock = switch e.eexpr { case TBlock(_) | TFunction(_): true; case _: false; };
+		var childInBlock = switch e.eexpr {
+			case TBlock(_) | TFunction(_): true;
+			case _: false;
+		};
 		function collect(scope:RenameScope, e:TExpr):Void collectVars(rc, scope, e, childInBlock);
 		switch e.eexpr {
 			case TVar(v, eo):
-				var fn = eo != null && switch eo.eexpr { case TFunction(_): true; case _: false; };
-				if (rc.rcHoisting || fn) { declareVar(rc, scope, v); if (eo != null) collect(scope, eo); }
-				else { if (eo != null) collect(scope, eo); declareVar(rc, scope, v); }
-			case TLocal(v): useVar(rc, scope, v);
+				var fn = eo != null && switch eo.eexpr {
+					case TFunction(_): true;
+					case _: false;
+				};
+				if (rc.rcHoisting || fn) {
+					declareVar(rc, scope, v);
+					if (eo != null) collect(scope, eo);
+				} else {
+					if (eo != null) collect(scope, eo);
+					declareVar(rc, scope, v);
+				}
+			case TLocal(v):
+				useVar(rc, scope, v);
 			case TFunction(fn):
 				var scope = createScope(scope);
 				for (a in fn.tfArgs) declareVar(rc, scope, a.variable);
 				for (a in fn.tfArgs) useVar(rc, scope, a.variable);
 				for (a in fn.tfArgs) if (a.defaultValue != null) collect(scope, a.defaultValue);
-				switch fn.tfExpr.eexpr { case TBlock(exprs): for (e in exprs) collect(scope, e); case _: collect(scope, fn.tfExpr); }
+				switch fn.tfExpr.eexpr {
+					case TBlock(exprs): for (e in exprs) collect(scope, e);
+					case _: collect(scope, fn.tfExpr);
+				}
 			case TTry(tryExpr, catches):
 				collect(scope, tryExpr);
 				for (c in catches) {
 					var vExpr = TypeOps.mk(TVar(c.variable, null), TypeOps.tDynamic, c.variable.vPos);
-					var exprs = switch c.expr.eexpr { case TBlock(exprs): [vExpr].concat(exprs); case _: [vExpr, c.expr]; };
+					var exprs = switch c.expr.eexpr {
+						case TBlock(exprs): [vExpr].concat(exprs);
+						case _: [vExpr, c.expr];
+					};
 					collect(scope, TypeOps.mk(TBlock(exprs), c.expr.etype, c.expr.epos));
 					if (rc.rcNoCatchVarShadowing) useVar(rc, scope, c.variable);
 				}
 			case TSwitch(sw) if (rc.rcSwitchCasesNoBlocks):
 				collect(scope, sw.switchSubject);
-				for (c in sw.switchCases) { for (e in c.casePatterns) collect(scope, e); collectIgnoreBlock(rc, scope, c.caseExpr, true); }
+				for (c in sw.switchCases) {
+					for (e in c.casePatterns) collect(scope, e);
+					collectIgnoreBlock(rc, scope, c.caseExpr, true);
+				}
 				if (sw.switchDefault != null) collectIgnoreBlock(rc, scope, sw.switchDefault, true);
 			case TBlock(exprs) if (rc.rcScope == BlockScope && !inBlock):
-				var scope = createScope(scope); for (e in exprs) collect(scope, e);
-			case TWhile(condition, body, flag): collectLoop(scope, function() {
-				if (flag == NormalWhile) collect(scope, condition);
-				collect(scope, body);
-				if (flag == DoWhile) collect(scope, condition);
-			});
-			case _: core.Texpr.iterWith(collect,scope,e);
+				var scope = createScope(scope);
+				for (e in exprs) collect(scope, e);
+			case TWhile(condition, body, flag):
+				collectLoop(scope, function() {
+					if (flag == NormalWhile) collect(scope, condition);
+					collect(scope, body);
+					if (flag == DoWhile) collect(scope, condition);
+				});
+			case _:
+				core.Texpr.iterWith(collect, scope, e);
 		}
 	}
+
 	public static function collectIgnoreBlock(rc:RenameContext, scope:RenameScope, e:TExpr, inBlock:Bool = false):Void {
-		switch e.eexpr { case TBlock(el): for (e in el) collectVars(rc, scope, e, inBlock); case _: collectVars(rc, scope, e, inBlock); }
+		switch e.eexpr {
+			case TBlock(el):
+				for (e in el) collectVars(rc, scope, e, inBlock);
+			case _:
+				collectVars(rc, scope, e, inBlock);
+		}
 	}
-	static final trailingNumbers = ~/[0-9]+$/;
+
+	// Deviation: a fresh EReg per use; an EReg keeps its last match, and this
+	// runs on several threads at once (upstream's Str.regexp is immutable)
+	static inline function trailingNumbers():EReg return ~/[0-9]+$/;
+
 	public static function maybeRenameVar(rc:RenameContext, reserved:StringMap<Bool>, entry:{variable:TVar, overlaps:Overlaps}):Void {
 		var v = entry.variable;
 		inline function commit(name:String):Void {
-			v.vMeta = ([{meta:core.MetaList.StrictMeta.RealPath,exprs:[{expr:EConst(String(v.vName, SDoubleQuotes)), pos:Globals.nullPos}], pos:Globals.nullPos}]:core.Ast.Metadata).concat(v.vMeta);
+			v.vMeta = ([
+				{
+					meta: core.MetaList.StrictMeta.RealPath,
+					exprs: [
+						{
+							expr: EConst(String(v.vName, SDoubleQuotes)),
+							pos: Globals.nullPos
+						}
+					],
+					pos: Globals.nullPos
+				}
+			] : core.Ast.Metadata).concat(v.vMeta);
 			v.vName = name;
 		}
-		if (v.vName.charAt(0) == core.Globals.genLocalPrefix.charAt(0)) commit("_g" + trailingNumbers.replace(v.vName.substr(1), ""));
-		var name = v.vName; var count = 0;
-		while (reserved.exists(name) || entry.overlaps.hasName(name)) { ++count; name = v.vName + count; }
-		commit(name); if (willBeReserved(rc, v)) reserve(reserved, v.vName);
+		if (v.vName.charAt(0) == core.Globals.genLocalPrefix.charAt(0)) commit("_g" + trailingNumbers().replace(v.vName.substr(1), ""));
+		var name = v.vName;
+		var count = 0;
+		while (reserved.exists(name) || entry.overlaps.hasName(name)) {
+			++count;
+			name = v.vName + count;
+		}
+		commit(name);
+		if (willBeReserved(rc, v)) reserve(reserved, v.vName);
 	}
+
 	public static function renameVars(rc:RenameContext, scope:RenameScope):Void {
 		var reserved = rc.rcReserved.copy();
 		if ((rc.rcHoisting || rc.rcNoShadowing) && !scope.foreignVars.isEmpty()) scope.foreignVars.iter(v -> reserve(reserved, v.vName));
-		var own = scope.ownVars.copy(); own.reverse();
+		var own = scope.ownVars.copy();
+		own.reverse();
 		for (entry in own) maybeRenameVar(rc, reserved, entry);
 		for (child in scope.children) renameVars(rc, child);
 	}
+
 	public static function run(clPath:GlobalTypePath, ri:RenameInit, e:TExpr):TExpr {
-		var rc:RenameContext = {rcScope:ri.riScope, rcHoisting:ri.riHoisting, rcNoShadowing:ri.riNoShadowing,
-			rcNoCatchVarShadowing:ri.riNoCatchVarShadowing, rcSwitchCasesNoBlocks:ri.riSwitchCasesNoBlocks,
-			rcReserved:ri.riReserved.copy(), rcVarOrigins:new IntMap()};
+		var rc:RenameContext = {
+			rcScope: ri.riScope,
+			rcHoisting: ri.riHoisting,
+			rcNoShadowing: ri.riNoShadowing,
+			rcNoCatchVarShadowing: ri.riNoCatchVarShadowing,
+			rcSwitchCasesNoBlocks: ri.riSwitchCasesNoBlocks,
+			rcReserved: ri.riReserved.copy(),
+			rcVarOrigins: new IntMap()
+		};
 		if (ri.riReserveCurrentTopLevelSymbol) reserveCtx(rc, clPath.pack.length == 0 ? clPath.name : clPath.pack[0]);
-		var scope = createScope(null); collectVars(rc, scope, e); renameVars(rc, scope); return e;
+		var scope = createScope(null);
+		collectVars(rc, scope, e);
+		renameVars(rc, scope);
+		return e;
 	}
 }

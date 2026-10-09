@@ -20,7 +20,6 @@ import macros.eval.EvalMisc.throwString;
 **/
 class EvalIntegers {
 	// Unsigned.UInt64
-
 	public static final uint64MaxInt:Int64 = Int64.make(-1, -1);
 
 	/** UInt64.div; raises Division_by_zero. **/
@@ -85,8 +84,10 @@ class EvalIntegers {
 			case _:
 		}
 		inline function digit(c:Int):Int {
-			return if (c >= "0".code && c <= "9".code) c - "0".code else if (c >= "A".code && c <= "F".code) c - "A".code + 10 else if (c >= "a".code
-				&& c <= "f".code) c - "a".code + 10 else -1;
+			return if (c >= "0".code && c <= "9".code) c - "0".code else if (c >= "A".code && c <= "F".code) c - "A".code + 10 else
+				if (c >= "a".code
+				&& c <= "f".code) c
+				- "a".code + 10 else -1;
 		}
 		var maxPrefix = uint64Div(uint64MaxInt, Int64.ofInt(base));
 		var d = i < s.length ? digit(StringTools.fastCodeAt(s, i)) : -1;

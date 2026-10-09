@@ -11,7 +11,8 @@ import core.ds.NotFound;
 
 // Port of haxe/src/compiler/highLevel.ml.
 class HighLevel {
-	public static function addLibs(timerCtx:core.Timer.TimerContext, libsCwd:{libs:Array<String>, cwd:String}, args:Array<String>, cs:Cache, hasDisplay:Bool):Array<String> {
+	public static function addLibs(timerCtx:core.Timer.TimerContext, libsCwd:{libs:Array<String>, cwd:String}, args:Array<String>,
+			cs:Cache, hasDisplay:Bool):Array<String> {
 		var libs = libsCwd.libs, cwd = libsCwd.cwd;
 		var globalRepo = args.indexOf("--haxelib-global") >= 0;
 		function fail(msg:String):Dynamic {
@@ -35,7 +36,8 @@ class HighLevel {
 			var err = inputList(errBytes.toString());
 			if (ret != 0) fail(switch [lines, err] {
 				case [[], []]: "Failed to call haxelib (command not found ?)";
-				case [[], [s]] if (StringTools.endsWith(StringTools.trim(s), "Module not found: path")): "The haxelib command has been strip'ed, please install it again";
+				case [[], [s]] if (StringTools.endsWith(StringTools.trim(s),
+					"Module not found: path")): "The haxelib command has been strip'ed, please install it again";
 				case _: lines.concat(err).join("\n");
 			});
 			return lines;
@@ -73,7 +75,8 @@ class HighLevel {
 						acc.unshift("-libcp");
 					} else {
 						var space = l.indexOf(" ");
-						var param = space < 0 ? l : l.substr(0, space), value = space < 0 ? "" : l.substr(space + 1);
+						var param = space < 0 ? l : l.substr(0, space),
+							value = space < 0 ? "" : l.substr(space + 1);
 						if (space >= 0 && param == "-L") {
 							acc.unshift(l.substr(3));
 							acc.unshift("--neko-lib-path");
@@ -95,7 +98,8 @@ class HighLevel {
 		return lines.map(l -> StringTools.endsWith(l, "\r") ? l.substr(0, l.length - 1) : l);
 	}
 
-	public static function createContextFromPart(sctx:ServerCompilationContext, requestScope:RequestScope, hasDisplay:Bool, hasNext:Bool, part:PartArgs):CommonContext {
+	public static function createContextFromPart(sctx:ServerCompilationContext, requestScope:RequestScope, hasDisplay:Bool, hasNext:Bool,
+			part:PartArgs):CommonContext {
 		sctx.compilationStep = sctx.compilationStep + 1;
 		var com = Compiler.createContext(sctx, requestScope, part.runtimeArgs, hasNext);
 		/* Expand Expand markers by calling haxelib, caching the result in the marker state */
@@ -107,7 +111,8 @@ class HighLevel {
 							case AlreadyExpanded(expanded):
 								expanded;
 							case NotYetExpanded(AddLibs(libs, cwd)):
-								var rawLines = addLibs(requestScope.timerCtx, {libs: libs, cwd: cwd}, if (hasGlobal) ["--haxelib-global"] else [], sctx.cs, hasDisplay);
+								var rawLines = addLibs(requestScope.timerCtx, {libs: libs, cwd: cwd},
+									if (hasGlobal) ["--haxelib-global"] else [], sctx.cs, hasDisplay);
 								var expanded = Args.parseArgs(rawLines);
 								ex.state = AlreadyExpanded(expanded);
 								expanded;

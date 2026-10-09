@@ -16,7 +16,6 @@ import core.display.CompletionItem;
 // haxe/src/compiler/displayOutput.ml
 class DisplayOutput {
 	// Mode processing
-
 	public static function handleSyntaxCompletion(com:CommonContext, kind:SyntaxCompletion, subj:CompletionSubject):Void {
 		var r:{l:Array<Keyword>, kind:CompletionResultKindValue} = switch kind {
 			case SCClassRelation:
@@ -63,11 +62,14 @@ class DisplayOutput {
 		}
 	}
 
-	public static function handleDisplayException(com:CommonContext, dex:DisplayExceptionKind):Void handleDisplayExceptionJson(com, dex, com.requestScope.resultHandler);
+	public static function handleDisplayException(com:CommonContext,
+			dex:DisplayExceptionKind):Void handleDisplayExceptionJson(com, dex, com.requestScope.resultHandler);
 
-	public static function handleTypePathException(com:CommonContext, p:Array<String>, c:Null<{name:String, isSub:Bool}>, isImport:Bool, pos:Pos):Void {
+	public static function handleTypePathException(com:CommonContext, p:Array<String>, c:Null<{name:String, isSub:Bool}>, isImport:Bool,
+			pos:Pos):Void {
 		var fields = try {
-			if (c == null) context.display.DisplayPath.TypePathHandler.completeTypePath(com, p) else {
+			if (c == null) context.display.DisplayPath.TypePathHandler.completeTypePath(com, p)
+			else {
 				var ctx = typing.TyperEntry.create(com, null);
 				context.display.DisplayPath.TypePathHandler.completeTypePathInner(ctx, p, c.name, c.isSub, isImport);
 			}

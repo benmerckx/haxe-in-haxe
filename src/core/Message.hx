@@ -67,9 +67,15 @@ enum abstract WarningCode(String) from String to String {
 @:structInit class WarningOption {
 	public var woWarning:WarningCode;
 	public var woMode:WarningMode;
-	public inline function new(woWarning:WarningCode, woMode:WarningMode) { this.woWarning = woWarning; this.woMode = woMode; }
+
+	public inline function new(woWarning:WarningCode, woMode:WarningMode) {
+		this.woWarning = woWarning;
+		this.woMode = woMode;
+	}
+
 	public inline function clone():WarningOption return new WarningOption(woWarning, woMode);
 }
+
 enum CompilerMessageKind {
 	MKError;
 	MKWarning(warning:WarningCode, options:Array<Array<WarningOption>>);
@@ -84,9 +90,22 @@ enum CompilerMessageKind {
 	public var cmMessageKind:CompilerMessageKind;
 	public var cmDiagnosticsKind:MessageKind;
 	public var cmJson:JsonValue;
-	public inline function new(cmMessage:String, cmPos:Pos, cmDepth:Int, cmFromMacro:Bool, cmMessageKind:CompilerMessageKind, cmDiagnosticsKind:MessageKind, cmJson:JsonValue) { this.cmMessage = cmMessage; this.cmPos = cmPos; this.cmDepth = cmDepth; this.cmFromMacro = cmFromMacro; this.cmMessageKind = cmMessageKind; this.cmDiagnosticsKind = cmDiagnosticsKind; this.cmJson = cmJson; }
-	public inline function clone():CompilerMessage return new CompilerMessage(cmMessage, cmPos, cmDepth, cmFromMacro, cmMessageKind, cmDiagnosticsKind, cmJson);
+
+	public inline function new(cmMessage:String, cmPos:Pos, cmDepth:Int, cmFromMacro:Bool, cmMessageKind:CompilerMessageKind,
+			cmDiagnosticsKind:MessageKind, cmJson:JsonValue) {
+		this.cmMessage = cmMessage;
+		this.cmPos = cmPos;
+		this.cmDepth = cmDepth;
+		this.cmFromMacro = cmFromMacro;
+		this.cmMessageKind = cmMessageKind;
+		this.cmDiagnosticsKind = cmDiagnosticsKind;
+		this.cmJson = cmJson;
+	}
+
+	public inline function clone():CompilerMessage return new CompilerMessage(cmMessage, cmPos, cmDepth, cmFromMacro, cmMessageKind,
+		cmDiagnosticsKind, cmJson);
 }
+
 class Message {
 	public static function severityToInt(severity:MessageSeverity):Int {
 		return switch (severity) {
@@ -130,7 +149,7 @@ class Message {
 	}
 
 	public static function make(fromMacro:Bool, diagnosticsKind:MessageKind, json:JsonValue, message:String, pos:Pos, depth:Int,
-		messageKind:CompilerMessageKind):CompilerMessage {
+			messageKind:CompilerMessageKind):CompilerMessage {
 		return {
 			cmMessage: message,
 			cmPos: pos,
@@ -142,12 +161,13 @@ class Message {
 		};
 	}
 
-	public static function makeMessage(fromMacro:Bool, message:String, pos:Pos, depth:Int, messageKind:CompilerMessageKind):CompilerMessage {
+	public static function makeMessage(fromMacro:Bool, message:String, pos:Pos, depth:Int,
+			messageKind:CompilerMessageKind):CompilerMessage {
 		return make(fromMacro, DKCompilerMessage, JString(message), message, pos, depth, messageKind);
 	}
 
 	public static function makeDiagnostic(fromMacro:Bool, diagnosticsKind:MessageKind, json:JsonValue, pos:Pos, depth:Int,
-		messageKind:CompilerMessageKind):CompilerMessage {
+			messageKind:CompilerMessageKind):CompilerMessage {
 		return make(fromMacro, diagnosticsKind, json, "", pos, depth, messageKind);
 	}
 }

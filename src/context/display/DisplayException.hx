@@ -18,6 +18,7 @@ import core.TType;
 import core.display.CompletionItem;
 
 // haxe/src/context/display/displayException.ml
+
 /** `((args,ret),ctf),doc` of a signature, as produced by TyperDisplay.convert_function_signature. **/
 typedef SignatureInfo = {sig:{args:Array<{name:String, optional:Bool, type:T}>, ret:T, ctf:CtFunction}, doc:Documentation};
 
@@ -29,9 +30,19 @@ class DisplayException extends haxe.Exception {
 		this.kind = kind;
 	}
 
-	public static function raiseHover<R>(item:CompletionItemData, expected:Null<WithTypeValue>, p:Pos):R throw new DisplayException(DisplayHover({hitem: item, hpos: p, hexpected: expected}));
+	public static function raiseHover<R>(item:CompletionItemData, expected:Null<WithTypeValue>,
+			p:Pos):R throw new DisplayException(DisplayHover({
+			hitem: item,
+			hpos: p,
+			hexpected: expected
+		}));
 
-	public static function raiseFields<R>(ckl:Array<CompletionItemData>, cr:CompletionResultKindValue, subj:CompletionSubject):R throw new DisplayException(DisplayFields({fitems: ckl, fkind: cr, fsubject: subj}));
+	public static function raiseFields<R>(ckl:Array<CompletionItemData>, cr:CompletionResultKindValue,
+			subj:CompletionSubject):R throw new DisplayException(DisplayFields({
+			fitems: ckl,
+			fkind: cr,
+			fsubject: subj
+		}));
 
 	// global state
 	public static var lastCompletionResult:Array<CompletionItemData> = [];
@@ -42,7 +53,11 @@ class DisplayException extends haxe.Exception {
 		lastCompletionPos = null;
 	}
 
-	public static function filterSomehow(ctx:GenjsonContext, items:Array<CompletionItemData>, kind:CompletionResultKindValue, subj:CompletionSubject):{items:Array<JsonValue>, length:Int} {
+	public static function filterSomehow(ctx:GenjsonContext, items:Array<CompletionItemData>, kind:CompletionResultKindValue,
+			subj:CompletionSubject):{
+		items:Array<JsonValue>,
+		length:Int
+	} {
 		var subject = subj.sName == null ? "" : subj.sName.toLowerCase();
 		var subjectLength = subject.length;
 		function determineCost(s:String):Int {
@@ -89,10 +104,12 @@ class DisplayException extends haxe.Exception {
 			if (cost >= 0) acc.unshift({item: item, index: index, cost: cost});
 			index++;
 		}
-		if (subjectLength == 0) acc.reverse() else haxe.ds.ArraySort.sort(acc, (a, b) -> Reflect.compare(a.cost, b.cost));
+		if (subjectLength == 0) acc.reverse()
+		else haxe.ds.ArraySort.sort(acc, (a, b) -> Reflect.compare(a.cost, b.cost));
 		var ret:Array<JsonValue> = [];
 		for (e in acc) {
-			if (ret.length < ServerConfig.maxCompletionItems) ret.push(CompletionItem.toJson(ctx, e.index, e.item)) else break;
+			if (ret.length < ServerConfig.maxCompletionItems) ret.push(CompletionItem.toJson(ctx, e.index, e.item))
+			else break;
 		}
 		return {items: ret, length: ret.length};
 	}
@@ -108,7 +125,8 @@ class DisplayException extends haxe.Exception {
 		return {sName: null, sStartPos: subj.sStartPos, sInsertPos: p};
 	}
 
-	public static function fieldsToJson(ctx:GenjsonContext, fields:Array<CompletionItemData>, kind:CompletionResultKindValue, subj:CompletionSubject):JsonValue {
+	public static function fieldsToJson(ctx:GenjsonContext, fields:Array<CompletionItemData>, kind:CompletionResultKindValue,
+			subj:CompletionSubject):JsonValue {
 		lastCompletionResult = fields.copy();
 		var needsFiltering = ServerConfig.maxCompletionItems > 0 && lastCompletionResult.length > ServerConfig.maxCompletionItems;
 		var subj = patchCompletionSubject(subj);
@@ -147,12 +165,14 @@ class DisplayException extends haxe.Exception {
 	public static function toJson(ctx:GenjsonContext, de:DisplayExceptionKind):JsonValue {
 		return switch de {
 			case DisplayHover(hover):
-				function namedSourceKind(kind:core.WithType.WithTypeSource):{i:Int, si:core.WithType.WithTypeSourceInformation} return switch kind {
-					case FunctionArgument(name): {i: 0, si: name};
-					case StructureField(name): {i: 1, si: name};
-					case LocalVariable(name): {i: 2, si: name};
-					case ImplicitReturn: throw new core.Globals.InternalCompilerError("displayException.ml: ImplicitReturn has no name", "");
-				};
+				function namedSourceKind(kind:core.WithType.WithTypeSource):{i:Int, si:core.WithType.WithTypeSourceInformation}
+					return switch kind {
+						case FunctionArgument(name): {i: 0, si: name};
+						case StructureField(name): {i: 1, si: name};
+						case LocalVariable(name): {i: 2, si: name};
+						case ImplicitReturn: throw new core.Globals.InternalCompilerError("displayException.ml: ImplicitReturn has no name",
+								"");
+					};
 				var ctx = Genjson.createFullConfig();
 				function generateName(kind:core.WithType.WithTypeSource):JsonValue {
 					var r = namedSourceKind(kind);

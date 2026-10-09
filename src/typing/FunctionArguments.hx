@@ -1,8 +1,8 @@
 package typing;
+
 import core.WithType as WithTypeTools;
 import core.WithType.WithTypeValue;
 import core.MetaList.StrictMeta as MetaTag;
-
 import core.TType;
 import core.Ast;
 import context.Typecore.Typer as TyperContext;
@@ -36,24 +36,38 @@ import optimization.Optimizer;
 	public var name:String;
 	public var expr:Null<Expr>;
 	public var type:T;
-	public inline function new(name:String, expr:Null<Expr>, type:T) { this.name = name; this.expr = expr; this.type = type; }
+
+	public inline function new(name:String, expr:Null<Expr>, type:T) {
+		this.name = name;
+		this.expr = expr;
+		this.type = type;
+	}
+
 	public inline function clone():ArgumentWithDefault return new ArgumentWithDefault(name, expr, type);
 }
+
 class FunctionArguments {
 	public static function isFlashNativeBasic(t:T):Bool return switch follow(t) {
-		case TAbstract(a, _):
-			(a.aPath.pack.length == 0 && ["Int", "Float", "Bool"].contains(a.aPath.name)) || (a.aPath.pack.join(".") == "haxe" && ["Int32", "UInt32"].contains(a.aPath.name));
-		case TInst(c, _):
-			(c.clPath.pack.length == 0 && ["Int", "Float"].contains(c.clPath.name)) || (c.clPath.pack.join(".") == "haxe" && c.clPath.name == "Int32");
+		case TAbstract(a, _): (a.aPath.pack.length == 0
+				&& ["Int", "Float", "Bool"].contains(a.aPath.name)) || (a.aPath.pack.join(".") == "haxe"
+				&& ["Int32", "UInt32"].contains(a.aPath.name));
+		case TInst(c, _): (c.clPath.pack.length == 0
+				&& ["Int", "Float"].contains(c.clPath.name)) || (c.clPath.pack.join(".") == "haxe" && c.clPath.name == "Int32");
 		case TEnum(e, _): e.ePath.pack.length == 0 && e.ePath.name == "Bool";
 		case _: false;
 	};
+
 	public static function typeFunctionArg(com:CommonContext, t:T, e:Null<Expr>, opt:Bool, p:Pos):{type:T, expr:Null<Expr>} {
-		if (opt) return {type:com.basic.tnull(t), expr:e == null ? {expr:EConst(Ident("null")), pos:Globals.nullPos} : e};
+		if (opt) return {type: com.basic.tnull(t), expr: e == null ? {expr: EConst(Ident("null")), pos: Globals.nullPos} : e};
 		// null_pos in this OCaml pattern is a binding, not a position comparison.
-		if (e != null) switch e.expr {case EConst(Ident("null")): t = com.basic.tnull(t); case _:}
-		return {type:t, expr:e};
+		if (e != null) switch e.expr {
+			case EConst(Ident("null")):
+				t = com.basic.tnull(t);
+			case _:
+		}
+		return {type: t, expr: e};
 	}
+
 	public static function typeFunctionArgValue(ctx:TyperContext, t:T, c:Null<Expr>, doDisplay:Bool):Null<TExpr> {
 		if (c == null) return null;
 		var p = c.pos;
@@ -61,13 +75,17 @@ class FunctionArguments {
 		var e = typeExpr(ctx, input, WithTypeTools.withType(t));
 		e = AbstractCast.castOrUnify(ctx, t, e, p);
 		e = Optimizer.reduceExpression(SafeCom.ofTyper(ctx), e);
-		inline function runAnalyzer(e:TExpr):TExpr return analyzerRunOnExprRef(ctx.com, Globals.sTypePath(ctx.c.curclass.clPath) + "." + ctx.f.curfield.cfName, e);
+		inline function runAnalyzer(e:TExpr):TExpr return analyzerRunOnExprRef(ctx.com,
+			Globals.sTypePath(ctx.c.curclass.clPath) + "." + ctx.f.curfield.cfName, e);
 		if (ctx.e.curfun == FunConstructor) {
 			function checkThis(e:TExpr):Void {
 				switch e.eexpr {
-					case TConst(TThis): raiseTypingError("Cannot access this in a constructor's default argument value", e.epos);
-					case TLocal(v) if (ctx.f.vthis != null && v == ctx.f.vthis): raiseTypingError("Cannot access this in a constructor's default argument value", e.epos);
-					case _: core.Texpr.iter(checkThis, e);
+					case TConst(TThis):
+						raiseTypingError("Cannot access this in a constructor's default argument value", e.epos);
+					case TLocal(v) if (ctx.f.vthis != null && v == ctx.f.vthis):
+						raiseTypingError("Cannot access this in a constructor's default argument value", e.epos);
+					case _:
+						core.Texpr.iter(checkThis, e);
 				}
 			}
 			checkThis(e);
@@ -77,24 +95,30 @@ class FunctionArguments {
 			function loop(e:TExpr):Void {
 				if (found) return;
 				switch e.eexpr {
-					case TLocal(v) if (ctx.f.locals.findOpt(v.vName) == v): found = true;
-					case _: core.Texpr.iter(loop, e);
+					case TLocal(v) if (ctx.f.locals.findOpt(v.vName) == v):
+						found = true;
+					case _:
+						core.Texpr.iter(loop, e);
 				}
 			}
-			loop(e); return found;
+			loop(e);
+			return found;
 		}
 		function loop(analyzed:Bool, e:TExpr):TExpr return switch e.eexpr {
 			case TConst(_) | TLocal(_): e;
-			case TField({eexpr:TTypeExpr(_)}, FEnum(_, _)): e;
-			case TField({eexpr:TTypeExpr(_)}, FStatic({clKind:KAbstractImpl(a)}, cf)) if (a.aEnum && hasClassFieldFlag(cf, CfEnum)): e;
+			case TField({eexpr: TTypeExpr(_)}, FEnum(_, _)): e;
+			case TField({eexpr: TTypeExpr(_)}, FStatic({clKind: KAbstractImpl(a)}, cf)) if (a.aEnum && hasClassFieldFlag(cf, CfEnum)): e;
 			case TCast(e, null): loop(analyzed, e);
 			case _ if (!analyzed && !referencesArg(e)): loop(true, runAnalyzer(e));
 			case _ if (ctx.com.platform == Flash && isFlashNativeBasic(t)):
-				raiseTypingError("Non-constant default argument values are not supported on the flash target for basic type " + sType(printContext(), t), p);
+				raiseTypingError("Non-constant default argument values are not supported on the flash target for basic type "
+					+ sType(printContext(), t),
+					p);
 			case _: e;
 		};
 		return loop(false, e);
 	}
+
 	final com:CommonContext;
 	final isExtern:Bool;
 	final doDisplay:Bool;
@@ -103,17 +127,24 @@ class FunctionArguments {
 	final withDefault:Array<ArgumentWithDefault>;
 	var typeRepr:Null<Array<{name:String, optional:Bool, type:T}>> = null;
 	var exprRepr:Null<Array<{variable:TVar, defaultValue:Null<TExpr>}>> = null;
-	public function new(com:CommonContext, typeArg:Int->Bool->Null<TypeHint>->Pos->T, isExtern:Bool, doDisplay:Bool, abstractThis:Null<T>, syntax:Array<FuncArg>) {
-		this.com = com; this.isExtern = isExtern; this.doDisplay = doDisplay; this.abstractThis = abstractThis; this.syntax = syntax;
+
+	public function new(com:CommonContext, typeArg:Int->Bool->Null<TypeHint>->Pos->T, isExtern:Bool, doDisplay:Bool, abstractThis:Null<T>,
+			syntax:Array<FuncArg>) {
+		this.com = com;
+		this.isExtern = isExtern;
+		this.doDisplay = doDisplay;
+		this.abstractThis = abstractThis;
+		this.syntax = syntax;
 		withDefault = [];
 		for (i in 0...syntax.length) {
 			var arg = syntax[i];
 			var t = typeArg(i, arg.optional, arg.type, arg.name.pos);
 			var typed = typeFunctionArg(com, t, arg.expr, arg.optional, arg.name.pos);
-			withDefault.push({name:arg.name.name, expr:typed.expr, type:typed.type});
+			withDefault.push({name: arg.name.name, expr: typed.expr, type: typed.type});
 		}
-		if (abstractThis != null) withDefault.unshift({name:"this", expr:null, type:abstractThis});
+		if (abstractThis != null) withDefault.unshift({name: "this", expr: null, type: abstractThis});
 	}
+
 	static function checkCoroutineScope(v:TVar):Void {
 		try {
 			var mt = tInfos(moduleTypeOfType(v.vType));
@@ -124,16 +155,19 @@ class FunctionArguments {
 			}
 		} catch (_:core.ds.Exit) {}
 	}
+
 	public function forType():Array<{name:String, optional:Bool, type:T}> {
-		if (typeRepr == null) typeRepr = withDefault.map(function(arg) return {name:arg.name, optional:arg.expr != null, type:arg.type});
+		if (typeRepr == null) typeRepr = withDefault.map(function(arg) return {name: arg.name, optional: arg.expr != null, type: arg.type});
 		return typeRepr;
 	}
+
 	function checkRest(isLast:Bool, eo:Null<Expr>, opt:Bool, t:T, pn:Pos):Void {
 		if (!ExtType.isRest(follow(t))) return;
 		if (opt) raiseTypingError("Rest argument cannot be optional", pn);
 		if (eo != null) raiseTypingError("Rest argument cannot have default value", eo.pos);
 		if (!isLast) raiseTypingError("Rest should only be used for the last function argument", pn);
 	}
+
 	public function forExpr(ctx:TyperContext):Array<{variable:TVar, defaultValue:Null<TExpr>}> {
 		if (exprRepr != null) return exprRepr;
 		inline function makeLocal(name:String, kind:TVarKind, t:T, meta:Metadata, pn:Pos):TVar {
@@ -147,8 +181,9 @@ class FunctionArguments {
 			var typed = withDefault[i];
 			if (i == 0 && offset == 1) {
 				var v = makeLocal(typed.name, VAbstractThis, typed.type, [], Globals.nullPos);
-				v.vMeta.unshift({meta:MetaTag.This, exprs:[], pos:Globals.nullPos});
-				acc.unshift({variable:v, defaultValue:null}); continue;
+				v.vMeta.unshift({meta: MetaTag.This, exprs: [], pos: Globals.nullPos});
+				acc.unshift({variable: v, defaultValue: null});
+				continue;
 			}
 			if (i - offset >= syntax.length) throw "Invalid function argument lists";
 			var arg = syntax[i - offset], pn = arg.name.pos;
@@ -156,27 +191,37 @@ class FunctionArguments {
 			delay(ctx.g, PTypeField, function() checkRest(last, typed.expr, arg.optional, typed.type, pn));
 			if (!isExtern) {
 				Naming.checkLocalVariableName(ctx.com, typed.name, TVOArgument, pn);
-				if (typed.name != "_" && core.ds.ArrayTools.exists(acc, function(arg) return arg.variable.vName == typed.name)) raiseTypingError('Duplicate argument name "' + typed.name + '"', pn);
+				if (typed.name != "_"
+					&& core.ds.ArrayTools.exists(acc,
+						function(arg) return arg.variable.vName == typed.name)) raiseTypingError('Duplicate argument name "'
+						+ typed.name
+						+ '"', pn);
 			}
 			var eo = typeFunctionArgValue(ctx, typed.type, typed.expr, doDisplay);
 			var v = makeLocal(typed.name, VUser(TVOArgument), typed.type, arg.meta, pn);
 			if (doDisplay && DisplayPosition.displayPosition.enclosedIn(pn)) context.display.DisplayEmitter.displayVariable(ctx, v, pn);
 			if (acc.length == 0 && TyperManager.isCoroutineContext(ctx)) checkCoroutineScope(v);
 			if (typed.name != "_") ctx.f.locals = ctx.f.locals.add(v.vName, v);
-			acc.unshift({variable:v, defaultValue:eo});
+			acc.unshift({variable: v, defaultValue: eo});
 		}
 		if (syntax.length + offset != withDefault.length) throw "Invalid function argument lists";
-		acc.reverse(); exprRepr = acc; return acc;
+		acc.reverse();
+		exprRepr = acc;
+		return acc;
 	}
+
 	public function verifyExtern(ctx:TyperContext):Void {
 		var offset = abstractThis == null ? 0 : 1;
 		if (syntax.length + offset != withDefault.length) throw "Invalid function argument lists";
 		for (i in offset...withDefault.length) {
-			var typed = withDefault[i], arg = syntax[i - offset], last = i == withDefault.length - 1;
+			var typed = withDefault[i],
+				arg = syntax[i - offset],
+				last = i == withDefault.length - 1;
 			delay(ctx.g, PTypeField, function() checkRest(last, typed.expr, arg.optional, typed.type, arg.name.pos));
 			typeFunctionArgValue(ctx, typed.type, typed.expr, doDisplay);
 		}
 	}
+
 	public function bringIntoContext(ctx:TyperContext):Void {
 		for (arg in forExpr(ctx)) ctx.f.locals = ctx.f.locals.add(arg.variable.vName, arg.variable);
 	}

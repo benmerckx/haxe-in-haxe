@@ -7,9 +7,12 @@ import core.Json.JsonField;
 enum JsonRpcErrorKind {
 	ParseError(s:String);
 	InvalidRequest(s:String);
+
 	/** id->methodname **/
 	MethodNotFound(id:JsonValue, name:String);
+
 	InvalidParams(json:JsonValue);
+
 	/** id->code->message **/
 	Custom(id:JsonValue, code:Int, message:String);
 }
@@ -27,7 +30,12 @@ class JsonRpcError extends haxe.Exception {
 	public var id:JsonValue;
 	public var method:String;
 	public var params:Null<JsonValue>;
-	public inline function new(id:JsonValue, method:String, params:Null<JsonValue>) { this.id = id; this.method = method; this.params = params; }
+
+	public inline function new(id:JsonValue, method:String, params:Null<JsonValue>) {
+		this.id = id;
+		this.method = method;
+		this.params = params;
+	}
 }
 
 class JsonRpc {
@@ -41,7 +49,8 @@ class JsonRpc {
 		return JObject(fl);
 	}
 
-	public static function result(id:JsonValue, data:JsonValue):JsonValue return JObject([jsonrpcField(), kv("id", id), kv("result", data)]);
+	public static function result(id:JsonValue,
+			data:JsonValue):JsonValue return JObject([jsonrpcField(), kv("id", id), kv("result", data)]);
 
 	public static function error(id:JsonValue, code:Int, ?data:JsonValue, message:String):JsonValue {
 		var fl = [kv("code", JInt(code)), kv("message", JString(message))];
@@ -70,7 +79,8 @@ class JsonRpc {
 	}
 
 	public static function parseRequest(input:String):JsonRpcRequest {
-		var json = try core.Json.Reader.readJson(input) catch (e:JsonRpcError) throw e catch (e:Dynamic) throw new JsonRpcError(ParseError(Std.string(e)));
+		var json = try core.Json.Reader.readJson(input) catch (e:JsonRpcError) throw e catch (e:Dynamic)
+			throw new JsonRpcError(ParseError(Std.string(e)));
 		var fields = switch json {
 			case JObject(fl): fl;
 			case _: throw new JsonRpcError(InvalidRequest("not an object"));

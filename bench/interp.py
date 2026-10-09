@@ -42,6 +42,10 @@ def main():
         row, expected = [], None
         for name, cmd in runners:
             times, out = [], None
+            exe = pathlib.Path(cmd(w)[1 if name.endswith("JIT)") else 0])
+            if name.startswith("port") and not exe.is_file():
+                row.append("not built")  # bench/build.sh hl / hlc
+                continue
             for _ in range(opts.n):
                 t, code, out = timed(cmd(w), env)
                 if code != 0:

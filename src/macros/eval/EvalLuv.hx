@@ -71,7 +71,6 @@ using macros.eval.EvalValue.EvalValueTools;
 **/
 class EvalLuv {
 	// ---- host access
-
 	static function notSupported():Dynamic {
 		return EvalContext.excString("libuv (eval.luv) is not supported by haxe-in-haxe");
 	}
@@ -112,7 +111,6 @@ class EvalLuv {
 	static function i64():Int64 return Int64.make(Uv.i64Hi(), Uv.i64Lo());
 
 	// ---- luv's callback bookkeeping (Handle.set_reference, Request.set_callback)
-
 	static final handleCallbacks = new Map<Int, LuvHandleCallbacks>();
 	static final requestCallbacks = new Map<Int, Int->Void>();
 
@@ -169,7 +167,30 @@ class EvalLuv {
 
 	static function unhandledException(e:Dynamic):Void exceptionHandler(e);
 
-	static function loopRun(loop:Int, mode:Int):Bool return Uv.loopRun(loop, mode, dispatch);
+	/**
+		uv_run waits without the Eval lock (luv's `Loop.run` releases OCaml's
+		runtime lock) and its callbacks take it. A callback that activates the
+		lock (by starting a thread) holds it until it returns.
+	**/
+	static function loopRun(loop:Int, mode:Int):Bool {
+		EvalLock.leave();
+		var r = try Uv.loopRun(loop, mode, lockedDispatch) catch (e:Dynamic) {
+			EvalLock.enter();
+			throw e;
+		}
+		EvalLock.enter();
+		return r;
+	}
+
+	static function lockedDispatch(id:Int, event:Int, a:Int, b:Dynamic):Void {
+		EvalLock.enter();
+		try dispatch(id, event, a, b)
+		catch (e:Dynamic) {
+			EvalLock.leave();
+			throw e;
+		}
+		EvalLock.leave();
+	}
 
 	// ---- encoders/decoders
 
@@ -231,8 +252,8 @@ class EvalLuv {
 
 	static function decodeLuvHandle(v:Value):Int {
 		return switch EvalDecode.decodeHandle(v) {
-			case HIdle(t) | HTimer(t) | HAsync(t) | HPipe(t) | HTcp(t) | HTty(t) | HUdp(t) | HSignal(t) | HProcess(t) | HFsEvent(t) | HFsPoll(t) |
-				HPrepare(t) | HCheck(t): t;
+			case HIdle(t) | HTimer(t) | HAsync(t) | HPipe(t) | HTcp(t) | HTty(t) | HUdp(t) | HSignal(t) | HProcess(t) | HFsEvent(t) |
+				HFsPoll(t) | HPrepare(t) | HCheck(t): t;
 			case _: EvalExceptions.unexpectedValue(v, "eval.luv.Handle");
 		}
 	}
@@ -330,15 +351,17 @@ class EvalLuv {
 
 	/** `encode_address_family` of `Address_family.from_c`. **/
 	static function encodeAddressFamily(a:Int):Value {
-		var r = if (a == Uv.constant(3, 0)) {index: 0, args: []} else if (a == Uv.constant(3, 1)) {index: 1, args: []} else if (a == Uv.constant(3,
-			2)) {index: 2, args: []} else {index: 3, args: [a.vint()]};
+		var r = if (a == Uv.constant(3,
+			0)) {index: 0, args: []} else if (a == Uv.constant(3,
+			1)) {index: 1, args: []} else if (a == Uv.constant(3, 2)) {index: 2, args: []} else {index: 3, args: [a.vint()]};
 		return EvalEncode.encodeEnumValue(EvalHash.key_eval_luv_AddressFamily, r.index, r.args, null);
 	}
 
 	/** `encode_socket_type` of `Socket_type.from_c`. **/
 	static function encodeSocketType(a:Int):Value {
-		var r = if (a == Uv.constant(4, 0)) {index: 0, args: []} else if (a == Uv.constant(4, 1)) {index: 1, args: []} else if (a == Uv.constant(4,
-			2)) {index: 2, args: []} else {index: 3, args: [a.vint()]};
+		var r = if (a == Uv.constant(4,
+			0)) {index: 0, args: []} else if (a == Uv.constant(4,
+			1)) {index: 1, args: []} else if (a == Uv.constant(4, 2)) {index: 2, args: []} else {index: 3, args: [a.vint()]};
 		return EvalEncode.encodeEnumValue(EvalHash.key_eval_luv_SocketType, r.index, r.args, null);
 	}
 
@@ -413,7 +436,10 @@ class EvalLuv {
 
 	/** `encode_dirent` of a host dirent (kind index, name). **/
 	static function encodeDirent(kind:Int, name:Bytes):Value {
-		return EvalEncode.encodeObj([{name: EvalHash.key_kind, value: kind.vint()}, {name: EvalHash.key_name, value: name.vnativeString()}]);
+		return EvalEncode.encodeObj([
+			{name: EvalHash.key_kind, value: kind.vint()},
+			{name: EvalHash.key_name, value: name.vnativeString()}
+		]);
 	}
 
 	static function encodeScandir(req:Int):Value {
@@ -523,7 +549,8 @@ class EvalLuv {
 		case v: EvalExceptions.unexpectedValue(v, "eval.luv.FsPoll");
 	}
 
-	static function f(name:String, value:Value):{name:String, value:Value} return {name: name, value: value};
+	static function f(name:String, value:Value):{name:String, value:Value}
+		return {name: name, value: value};
 
 	/** Buffers as one Bytes plus their sizes, for the host's iovecs. **/
 	static function flatten(l:Array<LuvBuffer>):{data:Bytes, sizes:Array<Int>} {
@@ -550,7 +577,6 @@ class EvalLuv {
 	}
 
 	// ---- UVError
-
 	public static final uvErrorFields:Array<{name:String, value:Value}> = [
 		f("toString", EvalEncode.vfun1(v -> {
 			var e = decodeUvError(v);
@@ -568,28 +594,27 @@ class EvalLuv {
 			var cb = EvalMisc.prepareCallback(v, 1);
 			exceptionHandler = ex -> {
 				var msg = if (Std.isOfType(ex, core.Error.TypingError)) {
-					var err = (ex : core.Error.TypingError).error;
-					switch err.errMessage {
-						case Custom(msg):
-							// Eval interpreter rethrows runtime exceptions as `Custom "Exception message\nException stack"`
-							var i = msg.indexOf("\n");
-							i < 0 ? msg : msg.substr(0, i);
-						case _:
-							var messages = [];
-							core.Error.recurseError((depth, err) -> {
-								var cm = core.Message.makeMessage(EvalContext.getCtx().isMacro, core.Error.errorMsg(err.errMessage), err.errPos, depth,
-									MKError);
-								var ectx = compiler.MessageReporting.createErrorContext(false);
-								switch compiler.MessageReporting.messageString(ectx, cm) {
-									case null:
-									case str: messages.unshift(str);
-								}
-							}, err);
-							messages.reverse();
-							messages.join("\n");
-					}
-				} else
-					Std.string(ex);
+						var err = (ex : core.Error.TypingError).error;
+						switch err.errMessage {
+							case Custom(msg):
+								// Eval interpreter rethrows runtime exceptions as `Custom "Exception message\nException stack"`
+								var i = msg.indexOf("\n");
+								i < 0 ? msg : msg.substr(0, i);
+							case _:
+								var messages = [];
+								core.Error.recurseError((depth, err) -> {
+									var cm = core.Message.makeMessage(EvalContext.getCtx().isMacro, core.Error.errorMsg(err.errMessage),
+										err.errPos, depth, MKError);
+									var ectx = compiler.MessageReporting.createErrorContext(false);
+									switch compiler.MessageReporting.messageString(ectx, cm) {
+										case null:
+										case str: messages.unshift(str);
+									}
+								}, err);
+								messages.reverse();
+								messages.join("\n");
+						}
+					} else Std.string(ex);
 				var e = EvalMisc.createHaxeException(msg, EvalContext.getEval(EvalContext.getCtx()).exceptionStack);
 				cb([e]);
 			};
@@ -598,16 +623,15 @@ class EvalLuv {
 	];
 
 	// ---- Loop
-
 	public static final loopFields:Array<{name:String, value:Value}> = [
 		f("run", EvalEncode.vfun2((v1, v2) -> {
 			var loop = decodeLoop(v1);
 			var mode = switch EvalDecode.decodeInt(v2) {
-				case 0: 0; // DEFAULT
-				case 1: 1; // ONCE
-				case 2: 2; // NOWAIT
-				case _: EvalExceptions.unexpectedValue(v2, "valid loop run mode");
-			}
+					case 0: 0; // DEFAULT
+					case 1: 1; // ONCE
+					case 2: 2; // NOWAIT
+					case _: EvalExceptions.unexpectedValue(v2, "valid loop run mode");
+				}
 			loopRun(loop, mode).vbool();
 		})),
 		f("stop", EvalEncode.vfun1(v -> {
@@ -648,7 +672,6 @@ class EvalLuv {
 	public static final loopOptionFields:Array<{name:String, value:Value}> = [f("sigprof", Uv.constant(5, 9).vint())];
 
 	// ---- Handle
-
 	public static final handleFields:Array<{name:String, value:Value}> = [
 		f("close", EvalEncode.vfun2((v1, v2) -> {
 			var handle = decodeLuvHandle(v1);
@@ -726,7 +749,6 @@ class EvalLuv {
 	public static final idleFields = watcherFields(HK_IDLE, decodeIdle, i -> HIdle(i));
 
 	// ---- Timer
-
 	public static final timerFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun1(v -> {
 			var loop = decodeLoop(v);
@@ -765,7 +787,6 @@ class EvalLuv {
 	];
 
 	// ---- Async
-
 	public static final asyncFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun2((v1, v2) -> {
 			var loop = decodeLoop(v1);
@@ -857,10 +878,11 @@ class EvalLuv {
 			var count = EvalDecode.decodeInt(v2);
 			EvalEncode.encodeArray(bufferDrop(l, count).map(encodeBuffer));
 		})),
-		f("size", EvalEncode.vfun1(v -> {
-			var buffer = decodeBuffer(v);
-			buffer.length.vint();
-		})),
+		f("size",
+			EvalEncode.vfun1(v -> {
+				var buffer = decodeBuffer(v);
+				buffer.length.vint();
+			})),
 		f("get", bufferGet(true)),
 		f("unsafeGet", bufferGet(false)),
 		f("set", bufferSet(true)),
@@ -981,7 +1003,6 @@ class EvalLuv {
 	}
 
 	// ---- Tcp
-
 	public static final tcpFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun2((v1, v2) -> {
 			var loop = decodeLoop(v1);
@@ -1161,7 +1182,8 @@ class EvalLuv {
 			c.data = (nreadOrError, b) -> {
 				var maybeBuffer = lastAllocatedBuffer;
 				lastAllocatedBuffer = null;
-				if (nreadOrError < 0) callback(error(nreadOrError)) else {
+				if (nreadOrError < 0) callback(error(nreadOrError))
+				else {
 					var length = nreadOrError;
 					if (maybeBuffer == null) Globals.die("", "UDP.recv_start");
 					var buffer = maybeBuffer.length <= length ? maybeBuffer : maybeBuffer.sub(0, length);
@@ -1216,7 +1238,6 @@ class EvalLuv {
 	];
 
 	// ---- Pipe
-
 	public static final pipeFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun2((v1, v2) -> {
 			var loop = decodeLoop(v1);
@@ -1261,26 +1282,25 @@ class EvalLuv {
 		f("receiveHandle", EvalEncode.vfun1(v -> {
 			var pipe = decodePipe(v);
 			var r = switch Uv.pipePendingType(pipe) {
-				case 1: {index: 1, args: [EvalEncode.vfun1(v -> encodeUnitResult(Uv.streamAccept(pipe, decodeTcp(v))))]};
-				case 2: {index: 2, args: [EvalEncode.vfun1(v -> encodeUnitResult(Uv.streamAccept(pipe, decodePipe(v))))]};
-				case _: {index: 0, args: []};
-			}
+					case 1: {index: 1, args: [EvalEncode.vfun1(v -> encodeUnitResult(Uv.streamAccept(pipe, decodeTcp(v))))]};
+					case 2: {index: 2, args: [EvalEncode.vfun1(v -> encodeUnitResult(Uv.streamAccept(pipe, decodePipe(v))))]};
+					case _: {index: 0, args: []};
+				}
 			EvalEncode.encodeEnumValue(EvalHash.key_eval_luv_ReceiveHandle, r.index, r.args, null);
 		})),
 		f("chmod", EvalEncode.vfun2((v1, v2) -> {
 			var pipe = decodePipe(v1);
 			var mode = switch EvalDecode.decodeInt(v2) {
-				case 0: 0; // READABLE
-				case 1: 1; // WRITABLE
-				case 2: 2; // READABLE, WRITABLE
-				case _: EvalExceptions.unexpectedValue(v2, "eval.luv.Pipe.PipeMode");
-			}
+					case 0: 0; // READABLE
+					case 1: 1; // WRITABLE
+					case 2: 2; // READABLE, WRITABLE
+					case _: EvalExceptions.unexpectedValue(v2, "eval.luv.Pipe.PipeMode");
+				}
 			encodeUnitResult(Uv.pipeChmod(pipe, mode));
 		})),
 	];
 
 	// ---- Tty
-
 	public static final ttyFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun2((v1, v2) -> {
 			var loop = decodeLoop(v1);
@@ -1290,11 +1310,11 @@ class EvalLuv {
 		f("setMode", EvalEncode.vfun2((v1, v2) -> {
 			var tty = decodeTty(v1);
 			var mode = switch EvalDecode.decodeInt(v2) {
-				case 0: 0; // NORMAL
-				case 1: 1; // RAW
-				case 2: 2; // IO
-				case _: EvalExceptions.unexpectedValue(v2, "eval.luv.Tty.TtyMode");
-			}
+					case 0: 0; // NORMAL
+					case 1: 1; // RAW
+					case 2: 2; // IO
+					case _: EvalExceptions.unexpectedValue(v2, "eval.luv.Tty.TtyMode");
+				}
 			encodeUnitResult(Uv.ttySetMode(tty, mode));
 		})),
 		f("resetMode", EvalEncode.vfun0(() -> {
@@ -1304,15 +1324,18 @@ class EvalLuv {
 			var tty = decodeTty(v);
 			switch Uv.ttyGetWinSize(tty) {
 				case null: error(Uv.lastError());
-				case a: ok(EvalEncode.encodeObj([{name: EvalHash.key_width, value: a[0].vint()}, {name: EvalHash.key_height, value: a[1].vint()}]));
+				case a: ok(EvalEncode.encodeObj([
+						{name: EvalHash.key_width, value: a[0].vint()},
+						{name: EvalHash.key_height, value: a[1].vint()}
+					]));
 			}
 		})),
 		f("setVTermState", EvalEncode.vfun1(v -> {
 			var state = switch EvalDecode.decodeInt(v) {
-				case 0: 0; // SUPPORTED
-				case 1: 1; // UNSUPPORTED
-				case _: EvalExceptions.unexpectedValue(v, "eval.luv.Tty.VTermState");
-			}
+					case 0: 0; // SUPPORTED
+					case 1: 1; // UNSUPPORTED
+					case _: EvalExceptions.unexpectedValue(v, "eval.luv.Tty.VTermState");
+				}
 			Uv.ttySetVTermState(state);
 			VNull;
 		})),
@@ -1322,7 +1345,6 @@ class EvalLuv {
 	];
 
 	// ---- Stream
-
 	public static final streamFields:Array<{name:String, value:Value}> = [
 		f("shutdown", EvalEncode.vfun2((v1, v2) -> {
 			var stream = decodeStream(v1);
@@ -1359,20 +1381,20 @@ class EvalLuv {
 			};
 			c.data = (nreadOrError, data) -> {
 				var result = if (nreadOrError > 0) {
-					var length = nreadOrError;
-					var buffer = switch lastAllocatedBuffer {
-						case null: Globals.die("", "Stream.read_start");
-						case buffer: buffer;
+						var length = nreadOrError;
+						var buffer = switch lastAllocatedBuffer {
+								case null: Globals.die("", "Stream.read_start");
+								case buffer: buffer;
+							}
+						lastAllocatedBuffer = null;
+						var data:Bytes = data;
+						buffer.bytes.blit(buffer.offset, data, 0, length);
+						var buffer = buffer.length <= length ? buffer : buffer.sub(0, length);
+						ok(encodeBuffer(buffer));
+					} else {
+						lastAllocatedBuffer = null;
+						error(nreadOrError == 0 ? Uv.errCode(71) : nreadOrError); // Error.result_from_c 0 is `UNKNOWN
 					}
-					lastAllocatedBuffer = null;
-					var data:Bytes = data;
-					buffer.bytes.blit(buffer.offset, data, 0, length);
-					var buffer = buffer.length <= length ? buffer : buffer.sub(0, length);
-					ok(encodeBuffer(buffer));
-				} else {
-					lastAllocatedBuffer = null;
-					error(nreadOrError == 0 ? Uv.errCode(71) : nreadOrError); // Error.result_from_c 0 is `UNKNOWN
-				}
 				catchExceptions(callback, result);
 			};
 			var r = Uv.readStart(stream);
@@ -1431,7 +1453,8 @@ class EvalLuv {
 		var bytes = d.data.length;
 		var req = statusRequest(status -> {
 			var bytesUnwritten = Uv.streamWriteQueueSize(stream);
-			try callback(encodeUnitResult(status), bytes - bytesUnwritten) catch (e:Dynamic) unhandledException(e);
+			try callback(encodeUnitResult(status), bytes - bytesUnwritten)
+			catch (e:Dynamic) unhandledException(e);
 		});
 		var r = Uv.streamWrite(stream, req, d.data, d.sizes, sendHandle);
 		if (r < 0) {
@@ -1442,7 +1465,6 @@ class EvalLuv {
 	}
 
 	// ---- Signal
-
 	public static final signumFields:Array<{name:String, value:Value}> = [
 		f("SIGABRT", Uv.constant(5, 0).vint()),
 		f("SIGFPE", Uv.constant(5, 1).vint()),
@@ -1485,7 +1507,6 @@ class EvalLuv {
 	];
 
 	// ---- Process
-
 	public static final processFields:Array<{name:String, value:Value}> = [
 		f("stdin", 0.vint()),
 		f("stdout", 1.vint()),
@@ -1514,47 +1535,47 @@ class EvalLuv {
 			var cmd = EvalDecode.decodeNativeString(v2);
 			var args = EvalDecode.decodeArray(v3).map(EvalDecode.decodeNativeString);
 			var result = if (v4.match(VNull)) {
-				spawn(loop, cmd, args, null, null, null, null, null, null, null, null, null, null, null);
-			} else {
-				var options = EvalDecode.decodeObject(v4);
-				function get<T>(nameHash:Int, f:Value->T):Null<T> {
-					var v = EvalField.objectField(options, nameHash);
-					return EvalDecode.decodeOptional(f, v);
-				}
-				var onExit = get(EvalHash.key_onExit, v -> {
-					var cb = EvalMisc.prepareCallback(v, 3);
-					(p:Int, exitStatus:Int64, termSignal:Int) -> {
-						cb([VHandle(HProcess(p)), VInt64(exitStatus), termSignal.vint()]);
+					spawn(loop, cmd, args, null, null, null, null, null, null, null, null, null, null, null);
+				} else {
+					var options = EvalDecode.decodeObject(v4);
+					function get<T>(nameHash:Int, f:Value->T):Null<T> {
+						var v = EvalField.objectField(options, nameHash);
+						return EvalDecode.decodeOptional(f, v);
 					}
-				});
-				var environment = get(EvalHash.key_environment, v -> {
-					switch EvalDecode.decodeInstance(v) {
-						case {ikind: IStringMap(m)}:
-							m.fold((k, e, acc:Array<{name:String, value:Bytes}>) -> {
-								acc.unshift({name: k, value: EvalDecode.decodeNativeString(e.value)});
-								acc;
-							}, []);
-						case _:
-							EvalExceptions.unexpectedValue(v, "haxe.ds.Map<String,String>");
-					}
-				});
-				var redirect = get(EvalHash.key_redirect, v -> {
-					EvalDecode.decodeArray(v).map(v2 -> switch v2 {
-						case VHandle(HRedirection(r)): (r : LuvRedirection);
-						case _: EvalExceptions.unexpectedValue(v2, "eval.luv.Process.Redirection");
+					var onExit = get(EvalHash.key_onExit, v -> {
+						var cb = EvalMisc.prepareCallback(v, 3);
+						(p:Int, exitStatus:Int64, termSignal:Int) -> {
+							cb([VHandle(HProcess(p)), VInt64(exitStatus), termSignal.vint()]);
+						}
 					});
-				});
-				var workingDirectory = get(EvalHash.key_workingDirectory, EvalDecode.decodeNativeString);
-				var uid = get(EvalHash.key_uid, EvalDecode.decodeInt);
-				var gid = get(EvalHash.key_gid, EvalDecode.decodeInt);
-				var windowsVerbatimArguments = get(EvalHash.key_windowsVerbatimArguments, EvalDecode.decodeBool);
-				var detached = get(EvalHash.key_detached, EvalDecode.decodeBool);
-				var windowsHide = get(EvalHash.key_windowsHide, EvalDecode.decodeBool);
-				var windowsHideConsole = get(EvalHash.key_windowsHideConsole, EvalDecode.decodeBool);
-				var windowsHideGui = get(EvalHash.key_windowsHideGui, EvalDecode.decodeBool);
-				spawn(loop, cmd, args, onExit, environment, workingDirectory, redirect, uid, gid, windowsVerbatimArguments, detached, windowsHide,
-					windowsHideConsole, windowsHideGui);
-			}
+					var environment = get(EvalHash.key_environment, v -> {
+						switch EvalDecode.decodeInstance(v) {
+							case {ikind: IStringMap(m)}:
+								m.fold((k, e, acc:Array<{name:String, value:Bytes}>) -> {
+									acc.unshift({name: k, value: EvalDecode.decodeNativeString(e.value)});
+									acc;
+								}, []);
+							case _:
+								EvalExceptions.unexpectedValue(v, "haxe.ds.Map<String,String>");
+						}
+					});
+					var redirect = get(EvalHash.key_redirect, v -> {
+						EvalDecode.decodeArray(v).map(v2 -> switch v2 {
+							case VHandle(HRedirection(r)): (r : LuvRedirection);
+							case _: EvalExceptions.unexpectedValue(v2, "eval.luv.Process.Redirection");
+						});
+					});
+					var workingDirectory = get(EvalHash.key_workingDirectory, EvalDecode.decodeNativeString);
+					var uid = get(EvalHash.key_uid, EvalDecode.decodeInt);
+					var gid = get(EvalHash.key_gid, EvalDecode.decodeInt);
+					var windowsVerbatimArguments = get(EvalHash.key_windowsVerbatimArguments, EvalDecode.decodeBool);
+					var detached = get(EvalHash.key_detached, EvalDecode.decodeBool);
+					var windowsHide = get(EvalHash.key_windowsHide, EvalDecode.decodeBool);
+					var windowsHideConsole = get(EvalHash.key_windowsHideConsole, EvalDecode.decodeBool);
+					var windowsHideGui = get(EvalHash.key_windowsHideGui, EvalDecode.decodeBool);
+					spawn(loop, cmd, args, onExit, environment, workingDirectory, redirect, uid, gid, windowsVerbatimArguments, detached,
+						windowsHide, windowsHideConsole, windowsHideGui);
+				}
 			encodeResult(result, p -> VHandle(HProcess(p)));
 		})),
 		f("disableStdioInheritance", EvalEncode.vfun0(() -> {
@@ -1574,9 +1595,9 @@ class EvalLuv {
 
 	/** luv's `Process.spawn`. **/
 	static function spawn(loop:Int, path:Bytes, arguments:Array<Bytes>, onExit:Null<(Int, Int64, Int) -> Void>,
-			environment:Null<Array<{name:String, value:Bytes}>>, workingDirectory:Null<Bytes>, redirect:Null<Array<LuvRedirection>>, uid:Null<Int>,
-			gid:Null<Int>, windowsVerbatimArguments:Null<Bool>, detached:Null<Bool>, windowsHide:Null<Bool>, windowsHideConsole:Null<Bool>,
-			windowsHideGui:Null<Bool>):Int {
+			environment:Null<Array<{name:String, value:Bytes}>>, workingDirectory:Null<Bytes>, redirect:Null<Array<LuvRedirection>>,
+			uid:Null<Int>, gid:Null<Int>, windowsVerbatimArguments:Null<Bool>, detached:Null<Bool>, windowsHide:Null<Bool>,
+			windowsHideConsole:Null<Bool>, windowsHideGui:Null<Bool>):Int {
 		var envHasEquals = environment != null && Lambda.exists(environment, e -> e.name.indexOf("=") >= 0);
 		if (envHasEquals) return Uv.errCode(34); // EINVAL
 		var env = environment == null ? null : environment.map(e -> {
@@ -1601,18 +1622,19 @@ class EvalLuv {
 			red.push(r.flags);
 			red.push(r.value);
 		}
-		var r = Uv.processSpawn(loop, path, arguments, env, workingDirectory, flags, uid == null ? 0 : uid, gid == null ? 0 : gid, red, onExit != null);
+		var r = Uv.processSpawn(loop, path, arguments, env, workingDirectory, flags, uid == null ? 0 : uid, gid == null ? 0 : gid, red,
+			onExit != null);
 		if (r >= 0 && onExit != null) {
 			var process = r;
 			callbacks(process).exit = (exitStatus, termSignal) -> {
-				try onExit(process, exitStatus, termSignal) catch (e:Dynamic) unhandledException(e);
+				try onExit(process, exitStatus, termSignal)
+				catch (e:Dynamic) unhandledException(e);
 			};
 		}
 		return r;
 	}
 
 	// ---- Request
-
 	public static final requestFields:Array<{name:String, value:Value}> = [
 		f("cancel", EvalEncode.vfun1(v -> {
 			encodeUnitResult(switch v {
@@ -1641,27 +1663,29 @@ class EvalLuv {
 			var loop = decodeLoop(v1);
 			var node = EvalDecode.decodeOptional(EvalDecode.decodeString, v2);
 			var service = EvalDecode.decodeOptional(EvalDecode.decodeString, v3);
-			if (node == null && service == null) EvalContext.throwValue(EvalMisc.createHaxeException("Either node or service has to be not null"),
-				Globals.nullPos) else {
+			if (node == null && service == null)
+				EvalContext.throwValue(EvalMisc.createHaxeException("Either node or service has to be not null"), Globals.nullPos)
+			else {
 				var cb = EvalMisc.prepareCallback(v5, 1);
 				var callback = (req:Int, status:Int) -> {
 					var v = if (status < 0) error(status) else {
-						var a = Uv.addrInfoResult(req);
-						var infos = [];
-						var i = 0;
-						while (i < a.length) {
-							var fields = [
-								{name: EvalHash.key_family, value: encodeAddressFamily(a[i])},
-								{name: EvalHash.key_sockType, value: encodeSocketType(a[i + 1])},
-								{name: EvalHash.key_protocol, value: (a[i + 2] : Int).vint()},
-								{name: EvalHash.key_addr, value: encodeSockaddr(a[i + 3])},
-							];
-							if (a[i + 4] != null) fields.unshift({name: EvalHash.key_canonName, value: EvalString.createUnknown(a[i + 4])});
-							infos.push(EvalEncode.encodeObj(fields));
-							i += 5;
+							var a = Uv.addrInfoResult(req);
+							var infos = [];
+							var i = 0;
+							while (i < a.length) {
+								var fields = [
+									{name: EvalHash.key_family, value: encodeAddressFamily(a[i])},
+									{name: EvalHash.key_sockType, value: encodeSocketType(a[i + 1])},
+									{name: EvalHash.key_protocol, value: (a[i + 2] : Int).vint()},
+									{name: EvalHash.key_addr, value: encodeSockaddr(a[i + 3])},
+								];
+								if (a[i
+									+ 4] != null) fields.unshift({name: EvalHash.key_canonName, value: EvalString.createUnknown(a[i + 4])});
+								infos.push(EvalEncode.encodeObj(fields));
+								i += 5;
+							}
+							ok(EvalEncode.encodeArray(infos));
 						}
-						ok(EvalEncode.encodeArray(infos));
-					}
 					cb([v]);
 				};
 				var request:Null<Int> = null, family = -1, socktype = -1, protocol = -1, flags = -1, hasHints = false;
@@ -1697,7 +1721,8 @@ class EvalLuv {
 				var r = orMake(request);
 				var req = r.req;
 				requestCallbacks.set(req, status -> {
-					try callback(req, status) catch (e:Dynamic) unhandledException(e);
+					try callback(req, status)
+					catch (e:Dynamic) unhandledException(e);
 					if (r.release) Uv.reqFree(req);
 				});
 				var res = Uv.getAddrInfo(loop, req, node, service, family, socktype, protocol, flags, hasHints);
@@ -1715,12 +1740,12 @@ class EvalLuv {
 			var cb = EvalMisc.prepareCallback(v4, 1);
 			var callback = (req:Int, status:Int) -> {
 				var v = if (status < 0) error(status) else {
-					var a = Uv.nameInfoResult(req);
-					ok(EvalEncode.encodeObj([
-						{name: EvalHash.key_node, value: EvalEncode.encodeString(a[0])},
-						{name: EvalHash.key_service, value: EvalEncode.encodeString(a[1])}
-					]));
-				}
+						var a = Uv.nameInfoResult(req);
+						ok(EvalEncode.encodeObj([
+							{name: EvalHash.key_node, value: EvalEncode.encodeString(a[0])},
+							{name: EvalHash.key_service, value: EvalEncode.encodeString(a[1])}
+						]));
+					}
 				cb([v]);
 			};
 			var request:Null<Int> = null, flags = 0;
@@ -1748,7 +1773,8 @@ class EvalLuv {
 			var r = orMake(request);
 			var req = r.req;
 			requestCallbacks.set(req, status -> {
-				try callback(req, status) catch (e:Dynamic) unhandledException(e);
+				try callback(req, status)
+				catch (e:Dynamic) unhandledException(e);
 				if (r.release) Uv.reqFree(req);
 			});
 			var res = Uv.getNameInfo(loop, req, addr, flags);
@@ -1762,7 +1788,6 @@ class EvalLuv {
 	];
 
 	// ---- File (luv's file.ml: Async.async and Sync.sync over the host's uv_fs_* calls)
-
 	static inline final FS_OPEN = 0;
 	static inline final FS_CLOSE = 1;
 	static inline final FS_READ = 2;
@@ -1849,8 +1874,8 @@ class EvalLuv {
 		`clean_up_request_on_success` (false for scandir). `after` runs where luv's
 		`cleanup` does (reads copy their data out there).
 	**/
-	static function fsCall(sync:Bool, vloop:Value, vrequest:Value, vcallback:Value, op:Int, p1:Null<Bytes>, p2:Null<Bytes>, i1:Int, i2:Int, i3:Int,
-			f1:Float, f2:Float, buffers:Null<Array<LuvBuffer>>, returns:Int->Value, cleanupOnSuccess:Bool = true):Value {
+	static function fsCall(sync:Bool, vloop:Value, vrequest:Value, vcallback:Value, op:Int, p1:Null<Bytes>, p2:Null<Bytes>, i1:Int,
+			i2:Int, i3:Int, f1:Float, f2:Float, buffers:Null<Array<LuvBuffer>>, returns:Int->Value, cleanupOnSuccess:Bool = true):Value {
 		var write = op == FS_WRITE;
 		var d = buffers == null ? null : write ? flatten(buffers) : {data: null, sizes: [for (b in buffers) b.length]};
 		function cleanup(req:Int):Void {
@@ -1910,7 +1935,8 @@ class EvalLuv {
 
 	static function copyFlags(v:Value):Int {
 		var flags = decodeIntFlags(v);
-		return (flags.contains(0) ? Uv.constant(8, 0) : 0) | (flags.contains(1) ? Uv.constant(8, 1) : 0) | (flags.contains(2) ? Uv.constant(8, 2) : 0);
+		return (flags.contains(0) ? Uv.constant(8,
+			0) : 0) | (flags.contains(1) ? Uv.constant(8, 1) : 0) | (flags.contains(2) ? Uv.constant(8, 2) : 0);
 	}
 
 	static function symlinkFlags(v:Value):Int {
@@ -1940,10 +1966,10 @@ class EvalLuv {
 		f("testMode", EvalEncode.vfun2((v1, v2) -> {
 			var mask = decodeFileModeList(v1);
 			var bits = switch v2 {
-				case VHandle(HFileModeNumeric(m)): (m : Int);
-				case _: EvalExceptions.unexpectedValue(v2, "eval.luv.File.FileModeNumeric");
-			}
-			(mask & bits == mask).vbool();
+					case VHandle(HFileModeNumeric(m)): (m : Int);
+					case _: EvalExceptions.unexpectedValue(v2, "eval.luv.File.FileModeNumeric");
+				}
+				(mask & bits == mask).vbool();
 		})),
 		f("open", EvalEncode.vfun6((vloop, vpath, vflags, vmode, vrequest, vcallback) -> {
 			var flags = openFlags(vflags);
@@ -2254,8 +2280,8 @@ class EvalLuv {
 			fsCall(false, vloop, vrequest, vcallback, FS_READDIR, null, null, dir, n, 0, 0, 0, null, returnsDirectoryEntries);
 		})),
 		f("scan", EvalEncode.vfun4((vloop, vpath, vrequest, vcallback) -> {
-			fsCall(false, vloop, vrequest, vcallback, FS_SCANDIR, path(vpath), null, 0, 0, 0, 0, 0, null, req -> encodeResult(Uv.fsResult(req),
-				_ -> encodeScandir(req)), false);
+			fsCall(false, vloop, vrequest, vcallback, FS_SCANDIR, path(vpath), null, 0, 0, 0, 0, 0, null,
+				req -> encodeResult(Uv.fsResult(req), _ -> encodeScandir(req)), false);
 		})),
 	];
 
@@ -2272,13 +2298,12 @@ class EvalLuv {
 			fsCall(true, VNull, VNull, VNull, FS_READDIR, null, null, dir, n, 0, 0, 0, null, returnsDirectoryEntries);
 		})),
 		f("scan", EvalEncode.vfun1(vpath -> {
-			fsCall(true, VNull, VNull, VNull, FS_SCANDIR, path(vpath), null, 0, 0, 0, 0, 0, null, req -> encodeResult(Uv.fsResult(req),
-				_ -> encodeScandir(req)), false);
+			fsCall(true, VNull, VNull, VNull, FS_SCANDIR, path(vpath), null, 0, 0, 0, 0, 0, null,
+				req -> encodeResult(Uv.fsResult(req), _ -> encodeScandir(req)), false);
 		})),
 	];
 
 	// ---- FsEvent
-
 	public static final fsEventFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun1(v -> {
 			var loop = decodeLoop(v);
@@ -2289,22 +2314,23 @@ class EvalLuv {
 			var path = EvalDecode.decodeNativeString(v2);
 			var callback = encodeCallback(v4);
 			var flags = if (v3.match(VNull)) 0 else {
-				var flags = decodeIntFlags(v3);
-				(flags.contains(0) ? Uv.constant(12, 2) : 0) | (flags.contains(1) ? Uv.constant(12, 3) : 0) | (flags.contains(2) ? Uv.constant(12, 4) : 0);
-			}
+					var flags = decodeIntFlags(v3);
+					(flags.contains(0) ? Uv.constant(12,
+						2) : 0) | (flags.contains(1) ? Uv.constant(12, 3) : 0) | (flags.contains(2) ? Uv.constant(12, 4) : 0);
+				}
 			// FS_event.start
 			callbacks(event).data = (status, b) -> {
 				var result = if (status < 0) error(status) else {
-					var a:Array<Dynamic> = b;
-					var events:Int = a[1];
-					var vevents = [];
-					if (events & Uv.constant(12, 0) != 0) vevents.push(0.vint()); // RENAME
-					if (events & Uv.constant(12, 1) != 0) vevents.push(1.vint()); // CHANGE
-					ok(EvalEncode.encodeObj([
-						{name: EvalHash.key_file, value: EvalEncode.encodeNullable(EvalValueTools.vnativeString, (a[0] : Null<Bytes>))},
-						{name: EvalHash.key_events, value: EvalEncode.encodeArray(vevents)}
-					]));
-				}
+						var a:Array<Dynamic> = b;
+						var events:Int = a[1];
+						var vevents = [];
+						if (events & Uv.constant(12, 0) != 0) vevents.push(0.vint()); // RENAME
+						if (events & Uv.constant(12, 1) != 0) vevents.push(1.vint()); // CHANGE
+						ok(EvalEncode.encodeObj([
+							{name: EvalHash.key_file, value: EvalEncode.encodeNullable(EvalValueTools.vnativeString, (a[0] : Null<Bytes>))},
+							{name: EvalHash.key_events, value: EvalEncode.encodeArray(vevents)}
+						]));
+					}
 				catchExceptions(callback, result);
 			};
 			var r = Uv.fsEventStart(event, path, flags);
@@ -2400,10 +2426,10 @@ class EvalLuv {
 		})),
 		f("join", EvalEncode.vfun1(v -> {
 			var thread = switch v {
-				case VHandle(HThread(t)): (t : LuvThreadHandle);
-				case _: EvalExceptions.unexpectedValue(v, "eval.luv.Thread");
-			}
-			encodeIndexResult(thread.join());
+					case VHandle(HThread(t)): (t : LuvThreadHandle);
+					case _: EvalExceptions.unexpectedValue(v, "eval.luv.Thread");
+				}
+			encodeIndexResult(EvalLock.blocking(() -> thread.join()));
 		})),
 	];
 
@@ -2413,9 +2439,9 @@ class EvalLuv {
 		})),
 		f("once", EvalEncode.vfun2((v1, v2) -> {
 			var once = switch v1 {
-				case VHandle(HOnce(o)): (o : LuvOnce);
-				case _: EvalExceptions.unexpectedValue(v1, "eval.luv.Once");
-			}
+					case VHandle(HOnce(o)): (o : LuvOnce);
+					case _: EvalExceptions.unexpectedValue(v1, "eval.luv.Once");
+				}
 			var callback = EvalMisc.prepareCallback(v2, 0);
 			once.once(() -> callback([]));
 			VNull;
@@ -2543,7 +2569,6 @@ class EvalLuv {
 	];
 
 	// ---- Env, Time, Path, Random, Network
-
 	public static final envFields:Array<{name:String, value:Value}> = [
 		f("getEnv", EvalEncode.vfun1(v -> {
 			var name = EvalDecode.decodeString(v);
@@ -2566,7 +2591,8 @@ class EvalLuv {
 				case null: error(Uv.lastError());
 				case env:
 					var map = new RuntimeStringHashtbl<Value>();
-					for (i in 0...env.length >> 1) map.add(EvalString.createUnknownVstring(env[2 * i]), (env[2 * i + 1] : Bytes).vnativeString());
+					for (i in 0...env.length >> 1) map.add(EvalString.createUnknownVstring(env[2 * i]),
+						(env[2 * i + 1] : Bytes).vnativeString());
 					ok(EvalEncode.encodeStringMapDirect(map));
 			}
 		})),
@@ -2575,7 +2601,10 @@ class EvalLuv {
 	public static final timeFields:Array<{name:String, value:Value}> = [
 		f("getTimeOfDay", EvalEncode.vfun0(() -> {
 			var usec = Uv.getTimeOfDay();
-			encodeResult(usec, usec -> EvalEncode.encodeObj([{name: EvalHash.key_sec, value: VInt64(i64())}, {name: EvalHash.key_usec, value: usec.vint32()}]));
+			encodeResult(usec, usec -> EvalEncode.encodeObj([
+				{name: EvalHash.key_sec, value: VInt64(i64())},
+				{name: EvalHash.key_usec, value: usec.vint32()}
+			]));
 		})),
 		f("hrTime", EvalEncode.vfun0(() -> {
 			Uv.hrTime();
@@ -2685,7 +2714,6 @@ class EvalLuv {
 	];
 
 	// ---- FsPoll
-
 	public static final fsPollFields:Array<{name:String, value:Value}> = [
 		f("init", EvalEncode.vfun1(v -> {
 			var loop = decodeLoop(v);
@@ -2699,12 +2727,12 @@ class EvalLuv {
 			// FS_poll.start (the default interval is 2000 ms)
 			callbacks(poll).data = (status, b) -> {
 				var result = if (status < 0) error(status) else {
-					var a:Array<Dynamic> = b;
-					ok(EvalEncode.encodeObj([
-						{name: EvalHash.key_previous, value: encodeFileStat(a[0])},
-						{name: EvalHash.key_current, value: encodeFileStat(a[1])}
-					]));
-				}
+						var a:Array<Dynamic> = b;
+						ok(EvalEncode.encodeObj([
+							{name: EvalHash.key_previous, value: encodeFileStat(a[0])},
+							{name: EvalHash.key_current, value: encodeFileStat(a[1])}
+						]));
+					}
 				catchExceptions(callback, result);
 			};
 			var r = Uv.fsPollStart(poll, path, interval == null ? 2000 : interval);
@@ -2730,10 +2758,11 @@ class EvalLuv {
 			var t = Uv.uptime();
 			encodeResult(Uv.lastError(), _ -> t.vfloat());
 		})),
-		f("loadAvg", EvalEncode.vfun0(() -> {
-			var a = Uv.loadAvg();
-			EvalEncode.encodeArrayA([a[0].vfloat(), a[1].vfloat(), a[2].vfloat()]);
-		})),
+		f("loadAvg",
+			EvalEncode.vfun0(() -> {
+				var a = Uv.loadAvg();
+				EvalEncode.encodeArrayA([a[0].vfloat(), a[1].vfloat(), a[2].vfloat()]);
+			})),
 		f("freeMemory", EvalEncode.vfun0(() -> memoryValue(0))),
 		f("totalMemory", EvalEncode.vfun0(() -> memoryValue(1))),
 		f("constrainedMemory", EvalEncode.vfun0(() -> memoryValue(2))),
@@ -2756,7 +2785,10 @@ class EvalLuv {
 			var b = Bytes.alloc(144);
 			encodeResult(Uv.getRUsage(b), _ -> {
 				inline function timeval(i:Int):Value {
-					return EvalEncode.encodeObj([{name: EvalHash.key_sec, value: VInt64(b.getInt64(8 * i))}, {name: EvalHash.key_usec, value: VInt64(b.getInt64(8 * (i + 1)))}]);
+					return EvalEncode.encodeObj([
+						{name: EvalHash.key_sec, value: VInt64(b.getInt64(8 * i))},
+						{name: EvalHash.key_usec, value: VInt64(b.getInt64(8 * (i + 1)))}
+					]);
 				}
 				inline function u(i:Int):Value return VUInt64(b.getInt64(8 * i));
 				EvalEncode.encodeObjS([
@@ -2952,14 +2984,18 @@ class LuvThreadHandle {
 	public static function create(fn:Void->Void):LuvThreadHandle {
 		var finished = new sys.thread.Lock();
 		var t = new LuvThreadHandle(finished);
+		EvalLock.activate();
 		sys.thread.Thread.create(() -> {
 			current.value = t;
+			EvalLock.enter();
 			try {
 				fn();
 			} catch (e:Dynamic) {
+				EvalLock.leave();
 				finished.release();
 				throw e;
 			}
+			EvalLock.leave();
 			finished.release();
 		});
 		return t;
@@ -3043,6 +3079,7 @@ class LuvThreadPool {
 		if (size > 1024) size = 1024;
 		var q = new sys.thread.Deque<LuvWorkRequest>();
 		queue = q;
+		EvalLock.activate();
 		for (_ in 0...size) sys.thread.Thread.create(() -> worker(q));
 	}
 
@@ -3054,7 +3091,13 @@ class LuvThreadPool {
 			if (run) r.state = 2;
 			guard.release();
 			if (!run) continue; // cancelled
-			r.work();
+			EvalLock.enter();
+			try r.work()
+			catch (e:Dynamic) {
+				EvalLock.leave();
+				throw e;
+			}
+			EvalLock.leave();
 			guard.acquire();
 			r.state = 3;
 			guard.release();
@@ -3090,7 +3133,7 @@ class LuvSync {
 		var l = new sys.thread.Lock();
 		waiters.push(l);
 		guard.release();
-		var r = l.wait(timeout);
+		var r = EvalLock.blocking(() -> l.wait(timeout));
 		guard.acquire();
 		if (!r && waiters.remove(l) == false) r = true; // woken meanwhile
 		return r;
@@ -3271,7 +3314,7 @@ class LuvCondition extends LuvSync {
 		waiters.push(l);
 		guard.release();
 		mutex.unlock();
-		var r = l.wait(timeout);
+		var r = EvalLock.blocking(() -> l.wait(timeout));
 		if (!r) {
 			guard.acquire();
 			if (waiters.remove(l) == false) r = true; // signalled meanwhile
@@ -3339,8 +3382,7 @@ class LuvOnce extends LuvSync {
 	}
 }
 
-#if !(target.name == "hxc")
-/** Hosts without libuv: `EvalLuv.available()` is false and no field reaches these. **/
+#if !(target.name == "hxc") /** Hosts without libuv: `EvalLuv.available()` is false and no field reaches these. **/
 private class Uv {
 	static function no():Dynamic return throw new Failure("libuv is not available on this host");
 
@@ -3525,8 +3567,8 @@ private class Uv {
 
 	public static function udpSendQueue(handle:Int, count:Bool):Int return no();
 
-	public static function processSpawn(loop:Int, cmd:Bytes, args:Array<Bytes>, env:Null<Array<Bytes>>, cwd:Null<Bytes>, flags:Int, uid:Int, gid:Int,
-		redirect:Array<Int>, onExit:Bool):Int return no();
+	public static function processSpawn(loop:Int, cmd:Bytes, args:Array<Bytes>, env:Null<Array<Bytes>>, cwd:Null<Bytes>, flags:Int,
+			uid:Int, gid:Int, redirect:Array<Int>, onExit:Bool):Int return no();
 
 	public static function disableStdioInheritance():Void no();
 
@@ -3535,7 +3577,7 @@ private class Uv {
 	public static function processPid(handle:Int):Int return no();
 
 	public static function getAddrInfo(loop:Int, req:Int, node:Null<String>, service:Null<String>, family:Int, socktype:Int, protocol:Int,
-		flags:Int, hasHints:Bool):Int return no();
+			flags:Int, hasHints:Bool):Int return no();
 
 	public static function addrInfoResult(req:Int):Array<Dynamic> return no();
 
@@ -3544,7 +3586,7 @@ private class Uv {
 	public static function nameInfoResult(req:Int):Array<String> return no();
 
 	public static function fs(op:Int, loop:Int, req:Int, p1:Null<Bytes>, p2:Null<Bytes>, i1:Int, i2:Int, i3:Int, f1:Float, f2:Float,
-		data:Null<Bytes>, sizes:Null<Array<Int>>):Int return no();
+			data:Null<Bytes>, sizes:Null<Array<Int>>):Int return no();
 
 	public static function fsResult(req:Int):Int return no();
 

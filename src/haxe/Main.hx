@@ -89,7 +89,8 @@ class Main {
 		if (v4 != null) return {ip: V4(v4), port: -1};
 		var colon = hp.lastIndexOf(":");
 		if (colon >= 0) {
-			var v4 = parseV4(hp.substr(0, colon)), p = port(hp.substr(colon + 1));
+			var v4 = parseV4(hp.substr(0, colon)),
+				p = port(hp.substr(colon + 1));
 			if (v4 != null && p != null) return {ip: V4(v4), port: p};
 		}
 		if (StringTools.startsWith(hp, "[")) {
@@ -141,7 +142,8 @@ class Main {
 		// HAXE_STD_PATH the host may have rewritten for --run.
 		var std = Sys.getEnv("HAXE_IN_HAXE_STD_PATH");
 		if (std != null && std != "" && Sys.getEnv("HAXE_STD_PATH") != std) Sys.putEnv("HAXE_STD_PATH", std);
-		else if (Sys.getEnv("HAXE_STD_PATH") == null && sys.FileSystem.exists("haxe/std")) Sys.putEnv("HAXE_STD_PATH", sys.FileSystem.fullPath("haxe/std"));
+		else if (Sys.getEnv("HAXE_STD_PATH") == null && sys.FileSystem.exists("haxe/std")) Sys.putEnv("HAXE_STD_PATH",
+			sys.FileSystem.fullPath("haxe/std"));
 		try {
 			return runMain(args);
 		} catch (e:BadArg) {

@@ -41,24 +41,38 @@ class SymbolKind {
 	public var pos:Pos;
 	public var containerName:Null<String>;
 	public var deprecated:Bool;
-	public inline function new(name:String, kind:SymbolKindValue, pos:Pos, containerName:Null<String>, deprecated:Bool) { this.name = name; this.kind = kind; this.pos = pos; this.containerName = containerName; this.deprecated = deprecated; }
+
+	public inline function new(name:String, kind:SymbolKindValue, pos:Pos, containerName:Null<String>, deprecated:Bool) {
+		this.name = name;
+		this.kind = kind;
+		this.pos = pos;
+		this.containerName = containerName;
+		this.deprecated = deprecated;
+	}
 }
 
 class SymbolInformation {
-	public static function make(name:String, kind:SymbolKindValue, pos:Pos, containerName:Null<String>, deprecated:Bool):SymbolInformationData return {
-		name: name,
-		kind: kind,
-		pos: pos,
-		containerName: containerName,
-		deprecated: deprecated
-	};
+	public static function make(name:String, kind:SymbolKindValue, pos:Pos, containerName:Null<String>,
+			deprecated:Bool):SymbolInformationData return {
+			name: name,
+			kind: kind,
+			pos: pos,
+			containerName: containerName,
+			deprecated: deprecated
+		};
 }
 
 @:structInit class ExpectedTypeCompletion {
 	public var expectedType:CompletionTypeKind;
 	public var expectedTypeFollowed:CompletionTypeKind;
 	public var compatibleTypes:Array<CompletionTypeKind>;
-	public inline function new(expectedType:CompletionTypeKind, expectedTypeFollowed:CompletionTypeKind, compatibleTypes:Array<CompletionTypeKind>) { this.expectedType = expectedType; this.expectedTypeFollowed = expectedTypeFollowed; this.compatibleTypes = compatibleTypes; }
+
+	public inline function new(expectedType:CompletionTypeKind, expectedTypeFollowed:CompletionTypeKind,
+			compatibleTypes:Array<CompletionTypeKind>) {
+		this.expectedType = expectedType;
+		this.expectedTypeFollowed = expectedTypeFollowed;
+		this.compatibleTypes = compatibleTypes;
+	}
 }
 
 enum CompletionResultKindValue {
@@ -119,25 +133,38 @@ class CompletionResultKind {
 				if (t != null) fields = fields.concat([kv("type", t.ct), kv("moduleType", t.mt), kv("moduleTypeFollowed", t.mtFollowed)]);
 				i = 0;
 				args = Genjson.jobject(fields);
-			case CRStructureField: i = 1;
-			case CRToplevel(t): i = 2; args = Genjson.jobject(expectedTypeFields(t));
-			case CRMetadata: i = 3;
-			case CRTypeHint: i = 4;
-			case CRExtends: i = 5;
-			case CRImplements: i = 6;
+			case CRStructureField:
+				i = 1;
+			case CRToplevel(t):
+				i = 2;
+				args = Genjson.jobject(expectedTypeFields(t));
+			case CRMetadata:
+				i = 3;
+			case CRTypeHint:
+				i = 4;
+			case CRExtends:
+				i = 5;
+			case CRImplements:
+				i = 6;
 			case CRStructExtension(isIntersectionType):
 				i = 7;
 				args = Genjson.jobject([kv("isIntersectionType", Genjson.jbool(isIntersectionType))]);
-			case CRImport: i = 8;
-			case CRUsing: i = 9;
-			case CRNew: i = 10;
+			case CRImport:
+				i = 8;
+			case CRUsing:
+				i = 9;
+			case CRNew:
+				i = 10;
 			case CRPattern(t, isOutermostPattern):
 				var fields = [kv("isOutermostPattern", Genjson.jbool(isOutermostPattern))].concat(expectedTypeFields(t));
 				i = 11;
 				args = Genjson.jobject(fields);
-			case CROverride: i = 12;
-			case CRTypeRelation: i = 13;
-			case CRTypeDecl: i = 14;
+			case CROverride:
+				i = 12;
+			case CRTypeRelation:
+				i = 13;
+			case CRTypeDecl:
+				i = 14;
 		}
 		var fl = [kv("kind", Genjson.jint(i))];
 		if (args != null) fl.push(kv("args", args));
@@ -148,6 +175,7 @@ class CompletionResultKind {
 enum DisplayModeValue {
 	DMNone;
 	DMDefault;
+
 	/**
 		Find usages/references of the requested symbol.
 		@param definition - add symbol definition to the response
@@ -155,6 +183,7 @@ enum DisplayModeValue {
 		@param base - look for a base method if requested for a method with `override` accessor.
 	**/
 	DMUsage(definition:Bool, descendants:Bool, base:Bool);
+
 	DMDefinition;
 	DMTypeDefinition;
 	DMImplementation;
@@ -270,21 +299,36 @@ enum Symbol {
 	public var sName:Null<String>;
 	public var sStartPos:Pos;
 	public var sInsertPos:Pos;
-	public inline function new(sName:Null<String>, sStartPos:Pos, sInsertPos:Pos) { this.sName = sName; this.sStartPos = sStartPos; this.sInsertPos = sInsertPos; }
+
+	public inline function new(sName:Null<String>, sStartPos:Pos, sInsertPos:Pos) {
+		this.sName = sName;
+		this.sStartPos = sStartPos;
+		this.sInsertPos = sInsertPos;
+	}
 }
 
 @:structInit class HoverResult {
 	public var hitem:CompletionItemData;
 	public var hpos:Pos;
 	public var hexpected:Null<core.WithType.WithTypeValue>;
-	public inline function new(hitem:CompletionItemData, hpos:Pos, hexpected:Null<core.WithType.WithTypeValue>) { this.hitem = hitem; this.hpos = hpos; this.hexpected = hexpected; }
+
+	public inline function new(hitem:CompletionItemData, hpos:Pos, hexpected:Null<core.WithType.WithTypeValue>) {
+		this.hitem = hitem;
+		this.hpos = hpos;
+		this.hexpected = hexpected;
+	}
 }
 
 @:structInit class FieldsResult {
 	public var fitems:Array<CompletionItemData>;
 	public var fkind:CompletionResultKindValue;
 	public var fsubject:CompletionSubject;
-	public inline function new(fitems:Array<CompletionItemData>, fkind:CompletionResultKindValue, fsubject:CompletionSubject) { this.fitems = fitems; this.fkind = fkind; this.fsubject = fsubject; }
+
+	public inline function new(fitems:Array<CompletionItemData>, fkind:CompletionResultKindValue, fsubject:CompletionSubject) {
+		this.fitems = fitems;
+		this.fkind = fkind;
+		this.fsubject = fsubject;
+	}
 }
 
 enum SignatureKind {
@@ -297,8 +341,10 @@ enum SignatureKind {
 enum MissingFieldCause {
 	AbstractParent(cls:TClass, params:TParams);
 	ImplementedInterface(cls:TClass, params:TParams);
+
 	/** true = getter **/
 	PropertyAccessor(field:TClassField, getter:Bool);
+
 	FieldAccess;
 	FinalFields(fields:Array<TClassField>);
 }
@@ -308,7 +354,14 @@ enum MissingFieldCause {
 	public var mfOn:ModuleType;
 	public var mfFields:Array<{field:TClassField, type:T, completion:CompletionTypeKind}>;
 	public var mfCause:MissingFieldCause;
-	public inline function new(mfPos:Pos, mfOn:ModuleType, mfFields:Array<{field:TClassField, type:T, completion:CompletionTypeKind}>, mfCause:MissingFieldCause) { this.mfPos = mfPos; this.mfOn = mfOn; this.mfFields = mfFields; this.mfCause = mfCause; }
+
+	public inline function new(mfPos:Pos, mfOn:ModuleType, mfFields:Array<{field:TClassField, type:T, completion:CompletionTypeKind}>,
+			mfCause:MissingFieldCause) {
+		this.mfPos = mfPos;
+		this.mfOn = mfOn;
+		this.mfFields = mfFields;
+		this.mfCause = mfCause;
+	}
 }
 
 @:structInit class ReplaceableCode {
@@ -316,17 +369,33 @@ enum MissingFieldCause {
 	public var replacement:String;
 	public var displayRange:Pos;
 	public var replaceRange:Pos;
-	public inline function new(reason:String, replacement:String, displayRange:Pos, replaceRange:Pos) { this.reason = reason; this.replacement = replacement; this.displayRange = displayRange; this.replaceRange = replaceRange; }
+
+	public inline function new(reason:String, replacement:String, displayRange:Pos, replaceRange:Pos) {
+		this.reason = reason;
+		this.replacement = replacement;
+		this.displayRange = displayRange;
+		this.replaceRange = replaceRange;
+	}
 }
 
 @:structInit class DiagnosticsContext {
 	public var replaceableCode:Array<ReplaceableCode>;
+
 	/** `(pos,bool ref) PMap.t`, keyed by `ImportHandling.importPositionKey`. **/
 	public var importPositions:Map<String, {pos:Pos, used:{value:Bool}}>;
+
 	/** `(Path.UniqueKey.t,(pos * expr) list) Hashtbl.t` **/
 	public var deadBlocks:core.ds.OcamlHashtbl<String, Array<{pos:Pos, expr:Expr}>>;
+
 	public var messages:Array<core.Message.CompilerMessage>;
-	public inline function new(replaceableCode:Array<ReplaceableCode>, importPositions:Map<String, {pos:Pos, used:{value:Bool}}>, deadBlocks:core.ds.OcamlHashtbl<String, Array<{pos:Pos, expr:Expr}>>, messages:Array<core.Message.CompilerMessage>) { this.replaceableCode = replaceableCode; this.importPositions = importPositions; this.deadBlocks = deadBlocks; this.messages = messages; }
+
+	public inline function new(replaceableCode:Array<ReplaceableCode>, importPositions:Map<String, {pos:Pos, used:{value:Bool}}>,
+			deadBlocks:core.ds.OcamlHashtbl<String, Array<{pos:Pos, expr:Expr}>>, messages:Array<core.Message.CompilerMessage>) {
+		this.replaceableCode = replaceableCode;
+		this.importPositions = importPositions;
+		this.deadBlocks = deadBlocks;
+		this.messages = messages;
+	}
 }
 
 enum DisplayExceptionKind {

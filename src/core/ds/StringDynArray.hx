@@ -3,6 +3,7 @@ package core.ds;
 // Port of haxe/src/core/ds/stringDynArray.ml.
 class StringDynArray {
 	var values:Array<String>;
+
 	public var length(default, null):Int = 0;
 
 	public function new(capacity:Int) {

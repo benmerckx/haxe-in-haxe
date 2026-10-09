@@ -16,18 +16,32 @@ class OcamlInt {
 
 	public static function parse(value:String):Int64 {
 		var i = 0, sign = 1, base = 10, signed = true;
-		if (value.charAt(i) == "-") {sign = -1; i++;} else if (value.charAt(i) == "+") i++;
+		if (value.charAt(i) == "-") {
+			sign = -1;
+			i++;
+		} else if (value.charAt(i) == "+") i++;
 		if (value.charAt(i) == "0") switch value.charAt(i + 1) {
-			case "x", "X": base = 16; signed = false; i += 2;
-			case "o", "O": base = 8; signed = false; i += 2;
-			case "b", "B": base = 2; signed = false; i += 2;
-			case "u", "U": signed = false; i += 2;
+			case "x", "X":
+				base = 16;
+				signed = false;
+				i += 2;
+			case "o", "O":
+				base = 8;
+				signed = false;
+				i += 2;
+			case "b", "B":
+				base = 2;
+				signed = false;
+				i += 2;
+			case "u", "U":
+				signed = false;
+				i += 2;
 			case _:
 		}
 		if (i >= value.length) throw new IntParseFailure();
 		var d = digit(value.charCodeAt(i++));
 		if (d < 0 || d >= base) throw new IntParseFailure();
-		var limit = signed ? (sign < 0 ? Int64.make(0x40000000,0) : Int64.make(0x3fffffff,-1)) : Int64.make(0x7fffffff,-1);
+		var limit = signed ? (sign < 0 ? Int64.make(0x40000000, 0) : Int64.make(0x3fffffff, -1)) : Int64.make(0x7fffffff, -1);
 		var threshold = limit / base, remainder = (limit % base).low;
 		var result:Int64 = d;
 		while (i < value.length) {

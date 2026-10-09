@@ -41,7 +41,13 @@ import haxe.io.Bytes;
 	public var pos:Pos;
 	public var vars:Array<TVar>;
 	public var tthis:Null<T>;
-	public inline function new(tPool:Array<T>, pos:Pos, vars:Array<TVar>, tthis:Null<T>) { this.tPool = tPool; this.pos = pos; this.vars = vars; this.tthis = tthis; }
+
+	public inline function new(tPool:Array<T>, pos:Pos, vars:Array<TVar>, tthis:Null<T>) {
+		this.tPool = tPool;
+		this.pos = pos;
+		this.vars = vars;
+		this.tthis = tthis;
+	}
 }
 
 function createFieldReaderContext(p:Pos, ts:Array<T>, vars:Array<TVar>, tthis:Null<T>):FieldReaderContext return {
@@ -54,6 +60,7 @@ function createFieldReaderContext(p:Pos, ts:Array<T>, vars:Array<TVar>, tthis:Nu
 // module ClassFieldInfo
 @:structInit class ClassFieldInfo {
 	public var typeParameters:Array<TypedTypeParam>;
+
 	public inline function new(typeParameters:Array<TypedTypeParam>) this.typeParameters = typeParameters;
 
 	public static function create(params:Array<TypedTypeParam>):ClassFieldInfo return {typeParameters: params};
@@ -82,7 +89,9 @@ class ClassFieldInfos {
 		var index = infos.infos.length;
 		infos.infos.push(info);
 		var np = Globals.nullPos;
-		cf.cfMeta = [({meta: meta, exprs: [], pos: new Pos(np.pfile, index, np.pmax)} : MetadataEntry)].concat(cf.cfMeta);
+		cf.cfMeta = [
+			({meta: meta, exprs: [], pos: new Pos(np.pfile, index, np.pmax)} : MetadataEntry)
+		].concat(cf.cfMeta);
 	}
 }
 
@@ -233,7 +242,8 @@ class HxbReader {
 			return mt;
 		} catch (_:NotFound) {
 			dumpBacktrace();
-			return HxbData.error('[HXB] [${Globals.sTypePath(currentModule.mPath)}] Cannot resolve type ${Globals.sTypePath({pack: pack.concat([mname]), name: tname})}');
+			return
+				HxbData.error('[HXB] [${Globals.sTypePath(currentModule.mPath)}] Cannot resolve type ${Globals.sTypePath({pack: pack.concat([mname]), name: tname})}');
 		}
 	}
 
@@ -285,7 +295,6 @@ class HxbReader {
 	}
 
 	// Basic compounds
-
 	// inline: see core.ds.List (HashLink boxes Array<B> of a type parameter)
 	public inline function readList<A>(f:Void->A):Array<A> {
 		var l = uleb();
@@ -423,21 +432,22 @@ class HxbReader {
 		case _: OpAssignOp(getBinop(i - 30));
 	}
 
-	public function getUnop(i:Int):{op:Unop, flag:UnopFlag} return switch i {
-		case 0: {op: Increment, flag: Prefix};
-		case 1: {op: Decrement, flag: Prefix};
-		case 2: {op: Not, flag: Prefix};
-		case 3: {op: Neg, flag: Prefix};
-		case 4: {op: NegBits, flag: Prefix};
-		case 5: {op: Spread, flag: Prefix};
-		case 6: {op: Increment, flag: Postfix};
-		case 7: {op: Decrement, flag: Postfix};
-		case 8: {op: Not, flag: Postfix};
-		case 9: {op: Neg, flag: Postfix};
-		case 10: {op: NegBits, flag: Postfix};
-		case 11: {op: Spread, flag: Postfix};
-		case _: throw "assert false";
-	}
+	public function getUnop(i:Int):{op:Unop, flag:UnopFlag}
+		return switch i {
+			case 0: {op: Increment, flag: Prefix};
+			case 1: {op: Decrement, flag: Prefix};
+			case 2: {op: Not, flag: Prefix};
+			case 3: {op: Neg, flag: Prefix};
+			case 4: {op: NegBits, flag: Prefix};
+			case 5: {op: Spread, flag: Prefix};
+			case 6: {op: Increment, flag: Postfix};
+			case 7: {op: Decrement, flag: Postfix};
+			case 8: {op: Not, flag: Postfix};
+			case 9: {op: Neg, flag: Postfix};
+			case 10: {op: NegBits, flag: Postfix};
+			case 11: {op: Spread, flag: Postfix};
+			case _: throw "assert false";
+		}
 
 	public function readPlacedName():PlacedName {
 		var s = readString();
@@ -497,7 +507,13 @@ class HxbReader {
 		var meta = readMetadata();
 		var tho = readOption(readTypeHint);
 		var eo = readOption(readExpr);
-		return {name: pn, optional: b, meta: meta, type: tho, expr: eo};
+		return {
+			name: pn,
+			optional: b,
+			meta: meta,
+			type: tho,
+			expr: eo
+		};
 	}
 
 	public function readFunc():Func {
@@ -733,7 +749,12 @@ class HxbReader {
 					var eg = readOption(readExpr);
 					var eo = readOption(readExpr);
 					var p = readPos();
-					return {values: el, guard: eg, expr: eo, pos: p};
+					return {
+						values: el,
+						guard: eg,
+						expr: eo,
+						pos: p
+					};
 				});
 				var def = readOption(function():SwitchDefault {
 					var eo = readOption(readExpr);
@@ -748,7 +769,12 @@ class HxbReader {
 					var th = readOption(readTypeHint);
 					var e = readExpr();
 					var p = readPos();
-					return {name: pn, type: th, expr: e, pos: p};
+					return {
+						name: pn,
+						type: th,
+						expr: e,
+						pos: p
+					};
 				});
 				ETry(e1, catches);
 			case 24: EReturn(null);
@@ -1575,7 +1601,9 @@ class HxbReader {
 			case i:
 				Globals.die("", "hxbReader.ml read_field_type_parameters");
 		}
-		var params = [for (offset in 0...numParams) fieldTypeParameters[fieldTypeParameterOffset + offset]];
+		var params = [
+			for (offset in 0...numParams) fieldTypeParameters[fieldTypeParameterOffset + offset]
+		];
 		fieldTypeParameterOffset = fieldTypeParameterOffset + numParams;
 		return params;
 	}
@@ -1683,30 +1711,41 @@ class HxbReader {
 	}
 
 	// Module types
-
 	// read_common_module_type takes the tinfos view of a module type
 	// (Obj.magic upstream); the setters below write the corresponding fields.
 	public function readCommonModuleType(mt:ModuleType):Void {
 		var private_ = readBool();
 		switch mt {
-			case TClassDecl(c): c.clPrivate = private_;
-			case TEnumDecl(e): e.ePrivate = private_;
-			case TTypeDecl(t): t.tPrivate = private_;
-			case TAbstractDecl(a): a.aPrivate = private_;
+			case TClassDecl(c):
+				c.clPrivate = private_;
+			case TEnumDecl(e):
+				e.ePrivate = private_;
+			case TTypeDecl(t):
+				t.tPrivate = private_;
+			case TAbstractDecl(a):
+				a.aPrivate = private_;
 		}
 		var doc = readOption(readDocumentation);
 		switch mt {
-			case TClassDecl(c): c.clDoc = doc;
-			case TEnumDecl(e): e.eDoc = doc;
-			case TTypeDecl(t): t.tDoc = doc;
-			case TAbstractDecl(a): a.aDoc = doc;
+			case TClassDecl(c):
+				c.clDoc = doc;
+			case TEnumDecl(e):
+				e.eDoc = doc;
+			case TTypeDecl(t):
+				t.tDoc = doc;
+			case TAbstractDecl(a):
+				a.aDoc = doc;
 		}
 		var meta = readMetadata();
 		switch mt {
-			case TClassDecl(c): c.clMeta = meta;
-			case TEnumDecl(e): e.eMeta = meta;
-			case TTypeDecl(t): t.tMeta = meta;
-			case TAbstractDecl(a): a.aMeta = meta;
+			case TClassDecl(c):
+				c.clMeta = meta;
+			case TEnumDecl(e):
+				e.eMeta = meta;
+			case TTypeDecl(t):
+				t.tMeta = meta;
+			case TAbstractDecl(a):
+				a.aMeta = meta;
 		}
 		var params = switch mt {
 			case TClassDecl(c): c.clParams.copy();
@@ -1718,10 +1757,14 @@ class HxbReader {
 		readTypeParametersData(params);
 		var params = typeTypeParameters.copy();
 		switch mt {
-			case TClassDecl(c): c.clParams = params;
-			case TEnumDecl(e): e.eParams = params;
-			case TTypeDecl(t): t.tParams = params;
-			case TAbstractDecl(a): a.aParams = params;
+			case TClassDecl(c):
+				c.clParams = params;
+			case TEnumDecl(e):
+				e.eParams = params;
+			case TTypeDecl(t):
+				t.tParams = params;
+			case TAbstractDecl(a):
+				a.aParams = params;
 		}
 		var using_ = readList(function() {
 			var c = readClassRef();
@@ -1730,10 +1773,14 @@ class HxbReader {
 			return {cls: c, pos: p};
 		});
 		switch mt {
-			case TClassDecl(c): c.clUsing = using_;
-			case TEnumDecl(e): e.eUsing = using_;
-			case TTypeDecl(t): t.tUsing = using_;
-			case TAbstractDecl(a): a.aUsing = using_;
+			case TClassDecl(c):
+				c.clUsing = using_;
+			case TEnumDecl(e):
+				e.eUsing = using_;
+			case TTypeDecl(t):
+				t.tUsing = using_;
+			case TAbstractDecl(a):
+				a.aUsing = using_;
 		}
 	}
 
@@ -1843,7 +1890,10 @@ class HxbReader {
 		var t = readTypeInstance();
 		switch td.tType {
 			case TMono(r):
-				if (r.tmType == null) Monomorph.bind(r, t); else Globals.die('typedef ${Globals.sTypePath(td.tPath)} is already initialized to ${TPrinting.sTypeKind(r.tmType)}, but new init to ${TPrinting.sTypeKind(t)} was attempted', "hxbReader.ml read_typedef");
+				if (r.tmType == null) Monomorph.bind(r, t);
+				else
+					Globals.die('typedef ${Globals.sTypePath(td.tPath)} is already initialized to ${TPrinting.sTypeKind(r.tmType)}, but new init to ${TPrinting.sTypeKind(t)} was attempted',
+						"hxbReader.ml read_typedef");
 			case _:
 				Globals.die("", "hxbReader.ml read_typedef");
 		}
@@ -2087,7 +2137,8 @@ class HxbReader {
 						case TClassDecl(c):
 							c;
 						case _:
-							HxbData.error("Unexpected type where class was expected: " + Globals.sTypePath({pack: fp.pack, name: fp.tname}));
+							HxbData.error("Unexpected type where class was expected: "
+								+ Globals.sTypePath({pack: fp.pack, name: fp.tname}));
 					}
 				});
 			}
@@ -2104,7 +2155,8 @@ class HxbReader {
 						case TAbstractDecl(a):
 							a;
 						case _:
-							HxbData.error("Unexpected type where abstract was expected: " + Globals.sTypePath({pack: fp.pack, name: fp.tname}));
+							HxbData.error("Unexpected type where abstract was expected: "
+								+ Globals.sTypePath({pack: fp.pack, name: fp.tname}));
 					}
 				});
 			}
@@ -2138,7 +2190,8 @@ class HxbReader {
 						case TTypeDecl(tpd):
 							tpd;
 						case _:
-							HxbData.error("Unexpected type where typedef was expected: " + Globals.sTypePath({pack: fp.pack, name: fp.tname}));
+							HxbData.error("Unexpected type where typedef was expected: "
+								+ Globals.sTypePath({pack: fp.pack, name: fp.tname}));
 					}
 				});
 			}
@@ -2246,7 +2299,11 @@ class HxbReader {
 		var file = readString();
 
 		var l = uleb();
-		anons = [for (_ in 0...l) ({aFields: new haxe.ds.StringMap(), aStatus: Closed} : TAnon)];
+		anons = [
+			for (_ in 0...l) ({
+				aFields:new haxe.ds.StringMap(), aStatus:Closed
+			} : TAnon)
+		];
 		tmonos = [for (_ in 0...uleb()) mkMono()];
 		return api.makeModule(path, file);
 	}
@@ -2337,7 +2394,8 @@ class HxbReader {
 		return readChunksUntil(newApi, chunks, EOM, FullTyping).m;
 	}
 
-	public function readChunksUntil(newApi:HxbReaderApi, chunks:CachedChunks, endChunk:ChunkKind, typingMode_:TypingMode):{m:ModuleDef, remaining:CachedChunks} {
+	public function readChunksUntil(newApi:HxbReaderApi, chunks:CachedChunks, endChunk:ChunkKind,
+			typingMode_:TypingMode):{m:ModuleDef, remaining:CachedChunks} {
 		api = newApi;
 		typingMode = typingMode_;
 		var i = 0;

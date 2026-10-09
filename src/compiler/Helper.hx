@@ -54,6 +54,7 @@ class Helper {
 	}
 
 	public static function parseHxml(file:String):Array<String> {
-		try return parseHxmlData(sys.io.File.getContent(file)) catch (_:Dynamic) throw "Not_found";
+		try return parseHxmlData(sys.io.File.getContent(file))
+		catch (_:Dynamic) throw "Not_found";
 	}
 }

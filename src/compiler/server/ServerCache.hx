@@ -87,7 +87,8 @@ class ServerCache {
 										isUnusual = true;
 									} catch (e:Dynamic) {
 										// ThreadSafeHashtbl.find signals absence with the string "Not_found"
-										if (!(Std.isOfType(e, NotFound) || (Std.isOfType(e, std.String) && (e : std.String) == "Not_found"))) throw e;
+										if (!(Std.isOfType(e, NotFound)
+											|| (Std.isOfType(e, std.String) && (e : std.String) == "Not_found"))) throw e;
 										cc.cacheFile(fkey, ({file: ffile, classPath: rfile.classPath} : ResolvedFile), ftime, data, pdi);
 										info = "cached";
 										isUnusual = false;
@@ -176,7 +177,8 @@ class ServerCache {
 	}
 
 	static function getChangedDirectories(sctx:ServerCompilationContext, com:CommonContext):Array<CachedDirectory> {
-		return Timer.time(com.timerCtx, ["server", "module cache", "changed dirs"], function(com) return getChangedDirectoriesImpl(sctx, com), com);
+		return Timer.time(com.timerCtx, ["server", "module cache", "changed dirs"],
+			function(com) return getChangedDirectoriesImpl(sctx, com), com);
 	}
 
 	public static function getTypingMode(com:CommonContext, mExtra:ModuleDefExtra):TypingMode {
@@ -202,8 +204,8 @@ class ServerCache {
 				return true;
 			}
 			return switch [Type.typeof(a), Type.typeof(b)] {
-				case [TEnum(ea), TEnum(eb)]:
-					ea == eb && Type.enumIndex(a) == Type.enumIndex(b) && eq(Type.enumParameters(a), Type.enumParameters(b));
+				case [TEnum(ea), TEnum(eb)]: ea == eb && Type.enumIndex(a) == Type.enumIndex(b) && eq(Type.enumParameters(a),
+						Type.enumParameters(b));
 				case [TClass(ca), TClass(cb)]:
 					if (ca != cb) return false;
 					for (f in Type.getInstanceFields(ca)) {
@@ -226,7 +228,8 @@ class ServerCache {
 
 	/* Checks if module [m] can be reused from the cache and returns None in that case. Otherwise, returns
 		[Some m'] where [m'] is the module responsible for [m] not being reusable. */
-	public static function checkModule(sctx:ServerCompilationContext, com:CommonContext, mPath:GlobalTypePath, mExtra:ModuleDefExtra, p:Pos):Null<ModuleSkipReason> {
+	public static function checkModule(sctx:ServerCompilationContext, com:CommonContext, mPath:GlobalTypePath, mExtra:ModuleDefExtra,
+			p:Pos):Null<ModuleSkipReason> {
 		var cc = CommonCache.getCache(com);
 		function contentChanged(mPath:GlobalTypePath, file:String):Bool {
 			var fkey:String = com.partScope.fileKeys.get(file);
@@ -275,7 +278,8 @@ class ServerCache {
 									loop(l, i + 1);
 								case _:
 									if (com.partScope.fileKeys.get(file) != core.Path.UniqueKey.lazyKey(mExtra.mFile)) {
-										if (sctx.verbose) Sys.println("Library file was changed for " + Globals.sTypePath(mPath)); /* TODO */
+										if (sctx.verbose) Sys.println("Library file was changed for "
+											+ Globals.sTypePath(mPath)); /* TODO */
 										throw new Dirty(LibraryChanged);
 									}
 							}
@@ -297,8 +301,7 @@ class ServerCache {
 				return mExtra.mCheckPolicy.indexOf(policy) >= 0 || switch policy {
 					case NoFileSystemCheck if (ServerConfig.doNotCheckModules && com.display.dmsKind != DMNone): true;
 					case _: false;
-				}
-			}
+				}}
 			function checkFile() {
 				var file = core.Path.UniqueKey.lazyPath(mExtra.mFile);
 				if (Common.fileTime(file) != mExtra.mTime) {
@@ -325,18 +328,25 @@ class ServerCache {
 					var m2Extra = try {
 						findModuleExtra(sign, mpath);
 					} catch (_:NotFound) {
-						Globals.die("Could not find dependency " + Globals.sTypePath(mpath) + " of " + Globals.sTypePath(mPath) + " in the cache", "serverCache.ml");
+						Globals.die("Could not find dependency "
+							+ Globals.sTypePath(mpath)
+							+ " of "
+							+ Globals.sTypePath(mPath)
+							+ " in the cache",
+							"serverCache.ml");
 					}
 					switch check(mpath, m2Extra) {
 						case null:
-						case reason: throw new Dirty(DependencyDirty(mpath, reason));
+						case reason:
+							throw new Dirty(DependencyDirty(mpath, reason));
 					}
 				}
 			}
 			function check():Null<ModuleSkipReason> {
 				try {
 					checkModulePath();
-					if (!hasPolicy(NoFileSystemCheck) || core.Path.fileExtension(core.Path.UniqueKey.lazyPath(mExtra.mFile)) != "hx") checkFile();
+					if (!hasPolicy(NoFileSystemCheck)
+						|| core.Path.fileExtension(core.Path.UniqueKey.lazyPath(mExtra.mFile)) != "hx") checkFile();
 					if (getTypingMode(com, mExtra) == FullTyping) checkDependencies();
 					return null;
 				} catch (e:Dirty) {
@@ -435,15 +445,25 @@ class ServerCache {
 
 	/* Adds module [m] and all its dependencies (recursively) from the cache to the current compilation
 		context. */
-	public static function addModules(sctx:ServerCompilationContext, com:CommonContext, delay:TyperPass->(Void->Void)->Void, m:ModuleDef, fromBinary:Bool, p:Pos):Void {
+	public static function addModules(sctx:ServerCompilationContext, com:CommonContext, delay:TyperPass->(Void->Void)->Void, m:ModuleDef,
+			fromBinary:Bool, p:Pos):Void {
 		var ownSign = CommonCache.getCacheSign(com);
 		function addModules(tabs:String, m0:ModuleDef, m:ModuleDef) {
 			if (m.mExtra.mCacheState != MSGood) {
 				switch m.mExtra.mCacheState {
 					case MSBad(reason) if (com.display.dmsFullTyping):
-						throw new Failure("Unexpected bad module " + Globals.sTypePath(m.mPath) + " (" + Printer.sModuleSkipReason(reason) + ")");
+						throw new Failure("Unexpected bad module "
+							+ Globals.sTypePath(m.mPath)
+							+ " ("
+							+ Printer.sModuleSkipReason(reason)
+							+ ")");
 					case MSBad(reason):
-						com.warning(WIgnoredBadModule, com.warningOptions, "Ignored bad module " + Globals.sTypePath(m.mPath) + " (" + Printer.sModuleSkipReason(reason) + ")", p);
+						com.warning(WIgnoredBadModule, com.warningOptions,
+							"Ignored bad module "
+							+ Globals.sTypePath(m.mPath)
+							+ " ("
+							+ Printer.sModuleSkipReason(reason)
+							+ ")", p);
 					case _:
 				}
 				com.moduleLut.remove(m.mPath);
@@ -462,7 +482,8 @@ class ServerCache {
 							com.moduleLut.add(m.mPath, m);
 						handleCacheBoundObjects(com, m.mExtra.mCacheBoundObjects);
 						var typingMode = getTypingMode(com, m.mExtra);
-						var deps = if (typingMode == FullTyping) m.mExtra.mDeps else (m.mExtra.mDisplayDeps != null ? m.mExtra.mDisplayDeps : m.mExtra.mDeps);
+						var deps = if (typingMode == FullTyping) m.mExtra.mDeps else
+							(m.mExtra.mDisplayDeps != null ? m.mExtra.mDisplayDeps : m.mExtra.mDeps);
 						// PMap.iter: ascending module ids
 						var keys = [for (k in deps.keys()) k];
 						keys.sort((a, b) -> a - b);
@@ -477,16 +498,29 @@ class ServerCache {
 										case GoodModule(m):
 											m;
 										case BinaryModule(mc):
-											throw new Failure("Unexpectedly found unresolved binary module " + Globals.sTypePath(mpath) + " as a dependency of " + Globals.sTypePath(m0.mPath));
+											throw new Failure("Unexpectedly found unresolved binary module " + Globals.sTypePath(mpath)
+												+ " as a dependency of " + Globals.sTypePath(m0.mPath));
 										case NoModule:
-											throw new Failure("Unexpectedly could not find module " + Globals.sTypePath(mpath) + " as a dependency of " + Globals.sTypePath(m0.mPath));
+											throw new Failure("Unexpectedly could not find module " + Globals.sTypePath(mpath)
+												+ " as a dependency of " + Globals.sTypePath(m0.mPath));
 										case BadBinaryModule(_, reason) | BadModule(reason) if (typingMode == AllowPartialTyping):
-											com.warning(WIgnoredBadModule, com.warningOptions, "Ignored bad dependency " + Globals.sTypePath(m.mPath) + " (" + Printer.sModuleSkipReason(reason) + ") of " + Globals.sTypePath(m0.mPath), p);
+											com.warning(WIgnoredBadModule, com.warningOptions,
+												"Ignored bad dependency "
+												+ Globals.sTypePath(m.mPath)
+												+ " ("
+												+ Printer.sModuleSkipReason(reason)
+												+ ") of "
+												+ Globals.sTypePath(m0.mPath),
+												p);
 											null;
 										case BadBinaryModule(_, reason):
-											throw new Failure("Unexpected bad hxb module " + Globals.sTypePath(mpath) + " (" + Printer.sModuleSkipReason(reason) + ") as a dependency of " + Globals.sTypePath(m0.mPath));
+											throw new Failure("Unexpected bad hxb module " + Globals.sTypePath(mpath) + " ("
+												+ Printer.sModuleSkipReason(reason) + ") as a dependency of " +
+												Globals.sTypePath(m0.mPath));
 										case BadModule(reason):
-											throw new Failure("Unexpected bad module " + Globals.sTypePath(mpath) + " (" + Printer.sModuleSkipReason(reason) + ") as a dependency of " + Globals.sTypePath(m0.mPath));
+											throw new Failure("Unexpected bad module " + Globals.sTypePath(mpath) + " ("
+												+ Printer.sModuleSkipReason(reason) + ") as a dependency of " +
+												Globals.sTypePath(m0.mPath));
 									}
 								}
 								if (m2 != null) addModules(tabs + "  ", m0, m2);
@@ -500,7 +534,8 @@ class ServerCache {
 
 	/* Looks up the module referred to by [mpath] in the cache. If it exists, a check is made to
 		determine if it's still valid. If this function returns None, the module is re-typed. */
-	public static function typeModule(sctx:ServerCompilationContext, com:CommonContext, delay:TyperPass->(Void->Void)->Void, mpath:GlobalTypePath, p:Pos):FindModuleResult {
+	public static function typeModule(sctx:ServerCompilationContext, com:CommonContext, delay:TyperPass->(Void->Void)->Void,
+			mpath:GlobalTypePath, p:Pos):FindModuleResult {
 		var t = Timer.startTimer(com.timerCtx, ["server", "module cache"]);
 		var cc = CommonCache.getCache(com);
 		function skip(mPath:GlobalTypePath, reason:ModuleSkipReason):FindModuleResult {
@@ -515,7 +550,8 @@ class ServerCache {
 			return GoodModule(m);
 		}
 		function checkModule2(sctx:ServerCompilationContext, mPath:GlobalTypePath, mExtra:ModuleDefExtra, p:Pos):Null<ModuleSkipReason> {
-			return Timer.time(com.timerCtx, ["server", "module cache", "check"], function(p) return checkModule(sctx, com, mpath, mExtra, p), p);
+			return Timer.time(com.timerCtx, ["server", "module cache", "check"],
+				function(p) return checkModule(sctx, com, mpath, mExtra, p), p);
 		}
 		function findModuleInCache(cc:ContextCache, mPath:GlobalTypePath, p:Pos):FindModuleResult {
 			try {
@@ -556,7 +592,13 @@ class ServerCache {
 						}
 						function fNext(chunks:CachedChunks, until:ChunkKind) {
 							var macro_ = if (com.isMacroContext) " (macro)" else "";
-							return Timer.time(com.timerCtx, ["server", "module cache", "hxb read" + macro_, "until " + HxbData.stringOfChunkKind(until)], function(typingMode) return reader.readChunksUntil(api, chunks, until, typingMode), typingMode);
+							return Timer.time(com.timerCtx, [
+								"server",
+								"module cache",
+								"hxb read" + macro_,
+								"until " + HxbData.stringOfChunkKind(until)
+							],
+								function(typingMode) return reader.readChunksUntil(api, chunks, until, typingMode), typingMode);
 						}
 
 						var r = fNext(mc.mcChunks, EOT);
@@ -696,7 +738,13 @@ class HxbReaderApiServer implements HxbReaderApi {
 				var typingMode = ServerCache.getTypingMode(com, mc.mcExtra);
 				function fNext(chunks:CachedChunks, until:ChunkKind) {
 					var macro_ = if (com.isMacroContext) " (macro)" else "";
-					return Timer.time(com.timerCtx, ["server", "module cache", "hxb read" + macro_, "until " + HxbData.stringOfChunkKind(until)], function(mode) return reader.readChunksUntil(this, chunks, until, mode), typingMode);
+					return Timer.time(com.timerCtx, [
+						"server",
+						"module cache",
+						"hxb read" + macro_,
+						"until " + HxbData.stringOfChunkKind(until)
+					],
+						function(mode) return reader.readChunksUntil(this, chunks, until, mode), typingMode);
 				}
 
 				var r = fNext(mc.mcChunks, EOT);
@@ -715,7 +763,13 @@ class HxbReaderApiServer implements HxbReaderApi {
 				var typingMode = ServerCache.getTypingMode(com, mc.mcExtra);
 				function fNext(chunks:CachedChunks, until:ChunkKind) {
 					var macro_ = if (com.isMacroContext) " (macro)" else "";
-					return Timer.time(com.timerCtx, ["server", "module cache", "hxb read" + macro_, "until " + HxbData.stringOfChunkKind(until)], function(mode) return reader.readChunksUntil(this, chunks, until, mode), fullRestore);
+					return Timer.time(com.timerCtx, [
+						"server",
+						"module cache",
+						"hxb read" + macro_,
+						"until " + HxbData.stringOfChunkKind(until)
+					],
+						function(mode) return reader.readChunksUntil(this, chunks, until, mode), fullRestore);
 				}
 
 				var r = fNext(mc.mcChunks, EOT);
@@ -731,7 +785,8 @@ class HxbReaderApiServer implements HxbReaderApi {
 				com.requestScope.stats.sModulesRestored++;
 				return m;
 			case BadModule(reason):
-				return Globals.die("Unexpected BadModule " + Globals.sTypePath(path) + " (" + Printer.sModuleSkipReason(reason) + ")", "serverCache.ml");
+				return Globals.die("Unexpected BadModule " + Globals.sTypePath(path) + " (" + Printer.sModuleSkipReason(reason) + ")",
+					"serverCache.ml");
 			case NoModule:
 				return Globals.die("Unexpected NoModule " + Globals.sTypePath(path), "serverCache.ml");
 		}

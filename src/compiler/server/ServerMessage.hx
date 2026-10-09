@@ -95,7 +95,8 @@ class ServerMessage {
 	}
 
 	public static function changedDirectories(com:CommonContext, tabs:String, dirs:Array<CachedDirectory>):Void {
-		if (config.printChangedDirectories) printEndline(signString(com) + "changed directories: [" + dirs.map(dir -> "\"" + dir.cPath + "\"").join(", ") + "]");
+		if (config.printChangedDirectories) printEndline(signString(com) + "changed directories: ["
+			+ dirs.map(dir -> "\"" + dir.cPath + "\"").join(", ") + "]");
 	}
 
 	// Printf "%2.0f"
@@ -103,8 +104,11 @@ class ServerMessage {
 		return pad(Std.string(Math.fround(f)), 2);
 	}
 
-	public static function modulePathChanged(com:CommonContext, tabs:String, mPath:GlobalTypePath, mExtra:ModuleDefExtra, time:Float, file:String):Void {
-		if (config.printModulePathChanged) printEndline(signString(com) + "module path might have changed: " + Globals.sTypePath(mPath) + "\n\twas: " + float0(mExtra.mTime) + " " + core.Path.UniqueKey.lazyPath(mExtra.mFile) + "\n\tnow: " + float0(time) + " " + file);
+	public static function modulePathChanged(com:CommonContext, tabs:String, mPath:GlobalTypePath, mExtra:ModuleDefExtra, time:Float,
+			file:String):Void {
+		if (config.printModulePathChanged) printEndline(signString(com) + "module path might have changed: " + Globals.sTypePath(mPath)
+			+ "\n\twas: " + float0(mExtra.mTime) + " " + core.Path.UniqueKey.lazyPath(mExtra.mFile) + "\n\tnow: " + float0(time) + " "
+			+ file);
 	}
 
 	public static function notCached(com:CommonContext, tabs:String, mPath:GlobalTypePath):Void {
@@ -173,7 +177,8 @@ class ServerMessage {
 
 	public static function stats(stats:StatsData, time:Float):Void {
 		if (config.printStats) {
-			printEndline("Stats = " + stats.sFilesParsed + " files, " + stats.sClassesBuilt + " classes, " + stats.sMethodsTyped + " methods, " + stats.sMacrosCalled + " macros");
+			printEndline("Stats = " + stats.sFilesParsed + " files, " + stats.sClassesBuilt + " classes, " + stats.sMethodsTyped
+				+ " methods, " + stats.sMacrosCalled + " macros");
 			printEndline("Time spent : " + formatSeconds(time) + "s");
 		}
 	}
@@ -225,30 +230,54 @@ class ServerMessage {
 
 	public static function setByName(name:String, value:Bool):Void {
 		switch name {
-			case "compilerStage": config.printCompilerStage = value;
-			case "addedDirectory": config.printAddedDirectory = value;
-			case "foundDirectories": config.printFoundDirectories = value;
-			case "changedDirectories": config.printChangedDirectories = value;
-			case "modulePathChanged": config.printModulePathChanged = value;
-			case "notCached": config.printNotCached = value;
-			case "parsed": config.printParsed = value;
-			case "removedDirectory": config.printRemovedDirectory = value;
-			case "reusing": config.printReusing = value;
-			case "retyping": config.printRetyping = value;
-			case "skippingDep": config.printSkippingDep = value;
-			case "unchangedContent": config.printUnchangedContent = value;
-			case "cachedModules": config.printCachedModules = value;
-			case "arguments": config.printArguments = value;
-			case "completion": config.printCompletion = value;
-			case "defines": config.printDefines = value;
-			case "signature": config.printSignature = value;
-			case "displayPosition": config.printDisplayPosition = value;
-			case "stats": config.printStats = value;
-			case "message": config.printMessage = value;
-			case "socketMessage": config.printSocketMessage = value;
-			case "uncaughtError": config.printUncaughtError = value;
-			case "newContext": config.printNewContext = value;
-			case _: throw core.ds.NotFound.raise();
+			case "compilerStage":
+				config.printCompilerStage = value;
+			case "addedDirectory":
+				config.printAddedDirectory = value;
+			case "foundDirectories":
+				config.printFoundDirectories = value;
+			case "changedDirectories":
+				config.printChangedDirectories = value;
+			case "modulePathChanged":
+				config.printModulePathChanged = value;
+			case "notCached":
+				config.printNotCached = value;
+			case "parsed":
+				config.printParsed = value;
+			case "removedDirectory":
+				config.printRemovedDirectory = value;
+			case "reusing":
+				config.printReusing = value;
+			case "retyping":
+				config.printRetyping = value;
+			case "skippingDep":
+				config.printSkippingDep = value;
+			case "unchangedContent":
+				config.printUnchangedContent = value;
+			case "cachedModules":
+				config.printCachedModules = value;
+			case "arguments":
+				config.printArguments = value;
+			case "completion":
+				config.printCompletion = value;
+			case "defines":
+				config.printDefines = value;
+			case "signature":
+				config.printSignature = value;
+			case "displayPosition":
+				config.printDisplayPosition = value;
+			case "stats":
+				config.printStats = value;
+			case "message":
+				config.printMessage = value;
+			case "socketMessage":
+				config.printSocketMessage = value;
+			case "uncaughtError":
+				config.printUncaughtError = value;
+			case "newContext":
+				config.printNewContext = value;
+			case _:
+				throw core.ds.NotFound.raise();
 		}
 	}
 }

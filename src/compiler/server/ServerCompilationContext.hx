@@ -33,7 +33,10 @@ import compiler.CompilationCache;
 	/* The server's domain pool. */
 	public var pool:ManagedPoolData;
 
-	public inline function new(isServer:Bool, version:core.Globals.CompilerVersion, verbose:Bool, changedDirectories:Hashtbl<String, Array<CachedDirectory>>, cs:Cache, classPaths:Hashtbl<String, Array<String>>, compilationStep:Int, delays:Array<Void->Void>, wasCompilation:Bool, macroContextSetup:Bool, currentStdin:Null<String>, persistentCwd:Null<String>, pool:ManagedPoolData) {
+	public inline function new(isServer:Bool, version:core.Globals.CompilerVersion, verbose:Bool,
+			changedDirectories:Hashtbl<String, Array<CachedDirectory>>, cs:Cache, classPaths:Hashtbl<String, Array<String>>,
+			compilationStep:Int, delays:Array<Void->Void>, wasCompilation:Bool, macroContextSetup:Bool, currentStdin:Null<String>,
+			persistentCwd:Null<String>, pool:ManagedPoolData) {
 		this.isServer = isServer;
 		this.version = version;
 		this.verbose = verbose;

@@ -7,7 +7,8 @@ class StringError {
 		var n = first.length, m = second.length;
 		if (n == 0) return m;
 		if (m == 0) return n;
-		var prev = new haxe.ds.Vector<Int>(m + 1), cur = new haxe.ds.Vector<Int>(m + 1);
+		var prev = new haxe.ds.Vector<Int>(m + 1),
+			cur = new haxe.ds.Vector<Int>(m + 1);
 		for (column in 0...m + 1) prev[column] = column;
 		for (row in 1...n + 1) {
 			cur[0] = row;
@@ -16,7 +17,9 @@ class StringError {
 				var cost = c1 == StringTools.fastCodeAt(second, column - 1) ? 0 : 1;
 				cur[column] = minimum(prev[column] + 1, cur[column - 1] + 1, prev[column - 1] + cost);
 			}
-			var t = prev; prev = cur; cur = t;
+			var t = prev;
+			prev = cur;
+			cur = t;
 		}
 		return prev[m];
 	}
@@ -27,7 +30,8 @@ class StringError {
 		distances.sort(function(a, b) return a.distance - b.distance);
 		var similar:Array<String> = [];
 		for (entry in distances) {
-			if (entry.distance <= Std.int((input.length < entry.candidate.length ? input.length : entry.candidate.length) / 3)) similar.push(entry.candidate);
+			if (entry.distance <= Std.int((input.length < entry.candidate.length ? input.length : entry.candidate.length) / 3))
+				similar.push(entry.candidate);
 			else break;
 		}
 		return similar;

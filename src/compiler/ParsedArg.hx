@@ -24,9 +24,16 @@ enum NativeLibKind {
 	public var libFile:String;
 	public var libKind:NativeLibKind;
 	public var libExtern:Bool;
-	public inline function new(libFile:String, libKind:NativeLibKind, libExtern:Bool) { this.libFile = libFile; this.libKind = libKind; this.libExtern = libExtern; }
+
+	public inline function new(libFile:String, libKind:NativeLibKind, libExtern:Bool) {
+		this.libFile = libFile;
+		this.libKind = libKind;
+		this.libExtern = libExtern;
+	}
+
 	public inline function clone():NativeLibArg return new NativeLibArg(libFile, libKind, libExtern);
 }
+
 enum ExpandingArgFunction {
 	AddLibs(libs:Array<String>, cwd:String);
 }
@@ -39,7 +46,11 @@ enum ExpandingArgState {
 class ExpandingArg {
 	public final original:Array<ParsedArg>;
 	public var state:ExpandingArgState;
-	public function new(original:Array<ParsedArg>, state:ExpandingArgState) { this.original = original; this.state = state; }
+
+	public function new(original:Array<ParsedArg>, state:ExpandingArgState) {
+		this.original = original;
+		this.state = state;
+	}
 }
 
 /** The CLI representation is intentionally separate from compiler context mutation. */

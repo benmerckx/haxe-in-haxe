@@ -52,9 +52,9 @@ class EvalStdLibA {
 	}
 
 	public static final lineEnd:String = switch Sys.systemName() {
-		case "Windows": "\r\n";
-		case _: "\n";
-	}
+			case "Windows": "\r\n";
+			case _: "\n";
+		}
 
 	/** Sys_error message: "<path>: <reason>". **/
 	public static function sysErrorMessage(path:String, e:Dynamic):String {
@@ -147,7 +147,8 @@ class StdEvalVector {
 	}
 
 	public static final blit = EvalEncode.vifun4((vthis, srcPos, dest, destPos, len) -> {
-		arrayBlit(thisValue(vthis), EvalDecode.decodeInt(srcPos), EvalDecode.decodeVector(dest), EvalDecode.decodeInt(destPos), EvalDecode.decodeInt(len));
+		arrayBlit(thisValue(vthis), EvalDecode.decodeInt(srcPos), EvalDecode.decodeVector(dest), EvalDecode.decodeInt(destPos),
+			EvalDecode.decodeInt(len));
 		return VNull;
 	});
 
@@ -174,12 +175,12 @@ class StdEvalVector {
 	public static final map = EvalEncode.vifun1((vthis, f) -> {
 		var self = thisValue(vthis);
 		var a = switch f {
-			case VFunction(f, _):
-				self.map(v -> f([v]));
-			case VFieldClosure(v1, f):
-				self.map(v -> f([v1, v]));
-			case _: EvalContext.excString("Cannot call " + EvalPrinting.valueString(f));
-		}
+				case VFunction(f, _):
+					self.map(v -> f([v]));
+				case VFieldClosure(v1, f):
+					self.map(v -> f([v1, v]));
+				case _: EvalContext.excString("Cannot call " + EvalPrinting.valueString(f));
+			}
 		return EvalEncode.encodeVectorInstance(a);
 	});
 }
@@ -264,12 +265,12 @@ class StdArray {
 	public static final map = EvalEncode.vifun1((vthis, f) -> {
 		var self = thisValue(vthis);
 		var a = switch f {
-			case VFunction(f, _):
-				EvalArray.map(self, v -> f([v]));
-			case VFieldClosure(v1, f):
-				EvalArray.map(self, v -> f([v1, v]));
-			case _: EvalContext.excString("Cannot call " + EvalPrinting.valueString(f));
-		}
+				case VFunction(f, _):
+					EvalArray.map(self, v -> f([v]));
+				case VFieldClosure(v1, f):
+					EvalArray.map(self, v -> f([v1, v]));
+				case _: EvalContext.excString("Cannot call " + EvalPrinting.valueString(f));
+			}
 		return EvalEncode.encodeArrayInstance(a);
 	});
 
@@ -393,7 +394,8 @@ class StdBytes {
 		var srcpos = EvalDecode.decodeInt(srcpos);
 		var len = EvalDecode.decodeInt(len);
 		if (len < 0 || srcpos < 0 || srcpos > src.length - len || pos < 0 || pos > s.length - len) outsideBounds();
-		try s.blit(pos, src, srcpos, len) catch (_:Dynamic) outsideBounds();
+		try s.blit(pos, src, srcpos, len)
+		catch (_:Dynamic) outsideBounds();
 		return VNull;
 	});
 
@@ -448,7 +450,8 @@ class StdBytes {
 	});
 
 	public static final getFloat = EvalEncode.vifun1((vthis, pos) -> {
-		return try VFloat(haxe.io.FPHelper.i32ToFloat(BytesIo.readI32(thisValue(vthis), EvalDecode.decodeInt(pos)))) catch (_:InvalidArgument) outsideBounds();
+		return try VFloat(haxe.io.FPHelper.i32ToFloat(BytesIo.readI32(thisValue(vthis),
+			EvalDecode.decodeInt(pos)))) catch (_:InvalidArgument) outsideBounds();
 	});
 
 	public static final getInt32 = EvalEncode.vifun1((vthis, pos) -> {
@@ -506,12 +509,14 @@ class StdBytes {
 		var self = thisValue(vthis);
 		var pos = EvalDecode.decodeInt(pos);
 		var v = EvalDecode.decodeInt(v);
-		try BytesIo.writeByte(self, pos, v) catch (_:InvalidArgument) {}
+		try BytesIo.writeByte(self, pos, v)
+		catch (_:InvalidArgument) {}
 		return VNull;
 	});
 
 	public static final setDouble = EvalEncode.vifun2((vthis, pos, v) -> {
-		try BytesIo.writeI64(thisValue(vthis), EvalDecode.decodeInt(pos), haxe.io.FPHelper.doubleToI64(EvalDecode.num(v))) catch (_:InvalidArgument) outsideBounds();
+		try BytesIo.writeI64(thisValue(vthis), EvalDecode.decodeInt(pos), haxe.io.FPHelper.doubleToI64(EvalDecode.num(v)))
+		catch (_:InvalidArgument) outsideBounds();
 		return VNull;
 	});
 
@@ -525,7 +530,8 @@ class StdBytes {
 	});
 
 	public static final setInt32 = EvalEncode.vifun2((vthis, pos, v) -> {
-		try BytesIo.writeI32(thisValue(vthis), EvalDecode.decodeInt(pos), EvalDecode.decodeI32(v)) catch (_:InvalidArgument) outsideBounds();
+		try BytesIo.writeI32(thisValue(vthis), EvalDecode.decodeInt(pos), EvalDecode.decodeI32(v))
+		catch (_:InvalidArgument) outsideBounds();
 		return VNull;
 	});
 
@@ -545,7 +551,8 @@ class StdBytes {
 	});
 
 	public static final setUInt16 = EvalEncode.vifun2((vthis, pos, v) -> {
-		try BytesIo.writeUi16(thisValue(vthis), EvalDecode.decodeInt(pos), EvalDecode.decodeInt(v) & 0xFFFF) catch (_:InvalidArgument) outsideBounds();
+		try BytesIo.writeUi16(thisValue(vthis), EvalDecode.decodeInt(pos), EvalDecode.decodeInt(v) & 0xFFFF)
+		catch (_:InvalidArgument) outsideBounds();
 		return VNull;
 	});
 
@@ -752,7 +759,6 @@ class StdCompress {
 		}
 	}
 
-
 	/** Extc.zlib_deflate on a host `haxe.zip.Compress` stream (the host deflates the rest of `src`). **/
 	public static function zlibDeflate(z:Dynamic, src:Bytes, spos:Int, slen:Int, dst:Bytes, dpos:Int, dlen:Int, flush:Int):Zresult {
 		#if (hl || eval || neko || cpp)
@@ -778,7 +784,8 @@ class StdCompress {
 		var srcPos = EvalDecode.decodeInt(srcPos);
 		var dst = EvalDecode.decodeBytes(dst);
 		var dstPos = EvalDecode.decodeInt(dstPos);
-		var r = try f(self.z, src, srcPos, src.length - srcPos, dst, dstPos, dst.length - dstPos, self.zFlush) catch (_:Dynamic) EvalContext.excString("oops");
+		var r = try f(self.z, src, srcPos, src.length - srcPos, dst, dstPos, dst.length - dstPos,
+			self.zFlush) catch (_:Dynamic) EvalContext.excString("oops");
 		return EvalEncode.encodeObj([
 			{name: EvalHash.key_done, value: r.zFinish.vbool()},
 			{name: EvalHash.key_read, value: VInt32(r.zRead)},
@@ -813,13 +820,13 @@ class StdCompress {
 
 	public static final setFlushMode = EvalEncode.vifun1((vthis, f) -> {
 		var mode = switch EvalDecode.decodeEnum(f).index {
-			case 0: Z_NO_FLUSH;
-			case 1: Z_SYNC_FLUSH;
-			case 2: Z_FULL_FLUSH;
-			case 3: Z_FINISH;
-			case 4: Z_PARTIAL_FLUSH;
-			case _: Globals.die("", "StdCompress.setFlushMode");
-		}
+				case 0: Z_NO_FLUSH;
+				case 1: Z_SYNC_FLUSH;
+				case 2: Z_FULL_FLUSH;
+				case 3: Z_FINISH;
+				case 4: Z_PARTIAL_FLUSH;
+				case _: Globals.die("", "StdCompress.setFlushMode");
+			}
 		thisValue(vthis).zFlush = mode;
 		return VNull;
 	});
@@ -1070,7 +1077,8 @@ class StdEReg {
 	}
 
 	static function maybeRun(rex:Vregex, n:Int, f:(first:Int, last:Int, sub:String) -> Value):Value {
-		var substrings = if (rex.rGroups.length == 0) EvalContext.excString("Invalid regex operation because no match was made") else rex.rGroups[0];
+		var substrings = if (rex.rGroups.length == 0) EvalContext.excString("Invalid regex operation because no match was made") else
+			rex.rGroups[0];
 		if (n < 0 || n >= substrings.groups.length) return EvalContext.excString("Invalid group");
 		var sub = substrings.groups[n];
 		if (sub == null) return VNull;
@@ -1187,7 +1195,10 @@ class StdEReg {
 		return maybeRun(self, 0, (first, last, _) -> {
 			var first = charOffset(self.rString, first);
 			var last = charOffset(self.rString, last);
-			EvalEncode.encodeObj([{name: EvalHash.key_pos, value: VInt32(first)}, {name: EvalHash.key_len, value: VInt32(last - first)}]);
+			EvalEncode.encodeObj([
+				{name: EvalHash.key_pos, value: VInt32(first)},
+				{name: EvalHash.key_len, value: VInt32(last - first)}
+			]);
 		});
 	});
 
@@ -1478,9 +1489,9 @@ class StdFile {
 	public static final read = EvalEncode.vfun2((path, binary) -> {
 		var path = EvalDecode.decodeString(path);
 		var binary = switch binary {
-			case VTrue | VNull: true;
-			case _: false;
-		}
+				case VTrue | VNull: true;
+				case _: false;
+			}
 		var ch = try sys.io.File.read(path, binary) catch (e:Dynamic) EvalContext.excString(EvalStdLibA.sysErrorMessage(path, e));
 		return EvalEncode.encodeInstance(EvalHash.key_sys_io_FileInput, IInChannel(ch, {v: false}));
 	});
@@ -1547,7 +1558,7 @@ class StdFileInput {
 	public static final readByte = EvalEncode.vifun0(vthis -> {
 		var t = thisValue(vthis);
 		var i = try {
-			t.ch.readByte();
+			EvalLock.blocking(() -> t.ch.readByte());
 		} catch (_:Dynamic) {
 			t.eof.v = true;
 			raiseEof();
@@ -1562,7 +1573,7 @@ class StdFileInput {
 		var len = EvalDecode.decodeInt(len);
 		if (pos < 0 || len < 0 || pos > bytes.length - len) throw new InvalidArgument("input");
 		// `input` returns 0 at end of file; the host raises Eof
-		var i = if (len == 0) 0 else try t.ch.readBytes(bytes, pos, len) catch (_:haxe.io.Eof) 0;
+		var i = if (len == 0) 0 else try EvalLock.blocking(() -> t.ch.readBytes(bytes, pos, len)) catch (_:haxe.io.Eof) 0;
 		if (i == 0) {
 			t.eof.v = true;
 			raiseEof();
@@ -1670,7 +1681,8 @@ class StdFileSystem {
 	}
 
 	public static function patchPath(s:String):String {
-		return if (s.length > 1 && s.length <= 3 && s.charAt(1) == ":") core.Path.addTrailingSlash(s) else if (s == "/") "/" else removeTrailingSlash(s);
+		return if (s.length > 1 && s.length <= 3 && s.charAt(1) == ":") core.Path.addTrailingSlash(s) else if (s == "/") "/" else
+			removeTrailingSlash(s);
 	}
 
 	public static final createDirectory = EvalEncode.vfun1(path -> {
@@ -1691,7 +1703,8 @@ class StdFileSystem {
 
 	public static final deleteFile = EvalEncode.vfun1(path -> {
 		var path = EvalDecode.decodeString(path);
-		try sys.FileSystem.deleteFile(path) catch (e:Dynamic) EvalContext.excString(EvalStdLibA.sysErrorMessage(path, e));
+		try sys.FileSystem.deleteFile(path)
+		catch (e:Dynamic) EvalContext.excString(EvalStdLibA.sysErrorMessage(path, e));
 		return VNull;
 	});
 
@@ -1726,7 +1739,8 @@ class StdFileSystem {
 	public static final rename = EvalEncode.vfun2((path, newPath) -> {
 		var path = EvalDecode.decodeString(path);
 		var newPath = EvalDecode.decodeString(newPath);
-		try sys.FileSystem.rename(path, newPath) catch (e:Dynamic) EvalContext.excString(EvalStdLibA.sysErrorMessage(path, e));
+		try sys.FileSystem.rename(path, newPath)
+		catch (e:Dynamic) EvalContext.excString(EvalStdLibA.sysErrorMessage(path, e));
 		return VNull;
 	});
 
@@ -1908,7 +1922,7 @@ class StdHost {
 /*
 	Yield between spin-loop iterations when waiting on a lock with a timeout
 	(Unix.sleepf 0.0 upstream, releasing the runtime lock).
-*/
+ */
 class StdLock {
 	static function thisValue(vthis:Value):Vlock {
 		return switch vthis {
@@ -1930,11 +1944,14 @@ class StdLock {
 		var lock = thisValue(vthis);
 		switch timeout {
 			case VNull:
-				lock.lcond.acquire();
-				while (lock.lcount == 0)
-					lock.lcond.wait();
-				lock.lcount = lock.lcount - 1;
-				lock.lcond.release();
+				EvalLock.blocking(() -> {
+					lock.lcond.acquire();
+					while (lock.lcount == 0)
+						lock.lcond.wait();
+					lock.lcount = lock.lcount - 1;
+					lock.lcond.release();
+					true;
+				});
 				return VTrue;
 			case _:
 				var timeout = EvalDecode.num(timeout);
@@ -1949,7 +1966,7 @@ class StdLock {
 						} else {
 							lock.lcond.release();
 							if (Sys.time() >= deadline) return VFalse;
-							else Sys.sleep(0.0);
+							else EvalLock.yieldNow();
 						}
 					}
 				}

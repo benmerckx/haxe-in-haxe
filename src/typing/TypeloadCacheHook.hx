@@ -20,7 +20,8 @@ enum FindModuleResult {
 }
 
 class TypeloadCacheHook {
-	public static var typeModuleHook:(com:CommonContext, delay:(TyperPass, Void->Void)->Void, path:GlobalTypePath, p:Pos)->FindModuleResult = function(_, _, _, _) return NoModule;
+	public static var typeModuleHook:(com:CommonContext, delay:(TyperPass, Void->Void) -> Void, path:GlobalTypePath,
+		p:Pos) -> FindModuleResult = function(_, _, _, _) return NoModule;
 
 	public static final fakeModules:Map<String, ModuleDef> = new Map();
 

@@ -83,7 +83,8 @@ class ExprPreprocessing {
 					// could be on the left side of the `=`. I don't think there's a reason for requesting
 					// completion there though.
 					{expr: EBinop(op, e1, annotateMarked(e2)), pos: e.pos};
-				case EBinop(OpOr, e1, {expr: EIf(_, {expr: EConst(Ident("null"))}, null), pos: p1}) if (isAnnotated(e.pos) && isCompletion && inPattern):
+				case EBinop(OpOr, e1, {expr: EIf(_, {expr: EConst(Ident("null"))}, null), pos: p1})
+					if (isAnnotated(e.pos) && isCompletion && inPattern):
 					// This HAS TO come from an attempted `case pattern | guard:` completion (issue #7068).
 					var p:Pos = {pfile: p1.pfile, pmin: e1.pos.pmax, pmax: p1.pmin};
 					{expr: EBinop(OpOr, e1, mkNull(p)), pos: e.pos};
@@ -93,7 +94,12 @@ class ExprPreprocessing {
 				case EBlock([]) if (isAnnotated(e.pos)):
 					annotate(e, DKStructure);
 				case EBlock([{expr: EDisplay({expr: EConst(Ident(s)), pos: pn}, DKMarked)}]) if (isCompletion):
-					var e:Expr = {expr: EObjectDecl([{key: {name: s, pos: pn, quote: NoQuotes}, expr: {expr: EConst(Ident("null")), pos: Globals.nullPos}}]), pos: e.pos};
+					var e:Expr = {
+						expr: EObjectDecl([
+							{key: {name: s, pos: pn, quote: NoQuotes}, expr: {expr: EConst(Ident("null")), pos: Globals.nullPos}}
+						]),
+						pos: e.pos
+					};
 					annotate(e, DKStructure);
 				case EBlock(el) if (isAnnotated(e.pos) && isCompletion):
 					var el = loopEl(el);
@@ -102,7 +108,8 @@ class ExprPreprocessing {
 					var el = loopEl(el);
 					{expr: ECall(e1, el), pos: e.pos};
 				case ENew(ptp, el) if (isAnnotated(e.pos) && isCompletion):
-					if (isAnnotated(ptp.posFull) || ptp.posFull.pmax >= DisplayPosition.displayPosition.get().pmax) annotateMarked(e) else {
+					if (isAnnotated(ptp.posFull)
+						|| ptp.posFull.pmax >= DisplayPosition.displayPosition.get().pmax) annotateMarked(e) else {
 						var el = loopEl(el);
 						{expr: ENew(ptp, el), pos: e.pos};
 					}
@@ -138,24 +145,41 @@ class ExprPreprocessing {
 								else c1.expr;
 							} else {
 								var p2 = def.pos;
-								if (p1.pmax <= displayPos.pmin && p2.pmin >= displayPos.pmax) markCase(c1.expr, p1) // default is beyond display position, mark
+								if (p1.pmax <= displayPos.pmin && p2.pmin >= displayPos.pmax) markCase(c1.expr,
+									p1) // default is beyond display position, mark
 								else c1.expr; // default contains display position, don't mark
 							};
-							return [({values: c1.values, guard: c1.guard, expr: ec, pos: p1} : SwitchCase)];
+							return [
+								({
+									values: c1.values,
+									guard: c1.guard,
+									expr: ec,
+									pos: p1
+								} : SwitchCase)
+							];
 						}
 						var c2 = cases[i + 1];
 						var p1 = c1.pos, p2 = c2.pos;
-						if (p1.pmax <= displayPos.pmin && p2.pmin >= displayPos.pmax) return [({values: c1.values, guard: c1.guard, expr: markCase(c1.expr, p1), pos: p1} : SwitchCase)].concat(cases.slice(i + 1));
+						if (p1.pmax <= displayPos.pmin && p2.pmin >= displayPos.pmax) return [
+							({
+								values: c1.values,
+								guard: c1.guard,
+								expr: markCase(c1.expr, p1),
+								pos: p1
+							} : SwitchCase)
+						].concat(cases.slice(i + 1));
 						return [c1].concat(loop(i + 1));
 					}
 					var cases = loop(0);
 					var def = if (didMark) def else {
-						if (def != null && e.pos.pmax > displayPos.pmin) ({expr: markCase(def.expr, def.pos), pos: def.pos} : SwitchDefault) else def;
+						if (def != null && e.pos.pmax > displayPos.pmin) ({expr: markCase(def.expr, def.pos), pos: def.pos} : SwitchDefault)
+						else def;
 					};
 					{expr: ESwitch(e1, cases, def), pos: e.pos};
 				case EDisplay(_):
 					throw core.ds.Exit.raise();
-				case EMeta({meta: m}, {expr: EConst(String(_)), pos: p}) if (core.Meta.metaEq(core.MetaList.StrictMeta.Markup, m) && isAnnotated(p)):
+				case EMeta({meta: m}, {expr: EConst(String(_)), pos: p})
+					if (core.Meta.metaEq(core.MetaList.StrictMeta.Markup, m) && isAnnotated(p)):
 					annotateMarked(e);
 				case EConst(String(_, q)) if ((q != SSingleQuotes || wasAutoTriggered) && isAnnotated(e.pos) && isCompletion):
 					// TODO: check if this makes any sense
@@ -180,7 +204,12 @@ class ExprPreprocessing {
 						inPattern = old;
 						var eg = c.guard == null ? null : map(c.guard);
 						var e = c.expr == null ? null : map(c.expr);
-						return ({values: el, guard: eg, expr: e, pos: c.pos} : SwitchCase);
+						return ({
+							values: el,
+							guard: eg,
+							expr: e,
+							pos: c.pos
+						} : SwitchCase);
 					});
 					var def = def == null ? null : ({expr: def.expr == null ? null : map(def.expr), pos: def.pos} : SwitchDefault);
 					loop({expr: ESwitch(e1, cases, def), pos: e.pos});

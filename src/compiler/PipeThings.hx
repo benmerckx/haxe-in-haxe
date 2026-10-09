@@ -20,7 +20,8 @@ class PipeThings {
 	public static function readContent(channel:Input, buf:Bytes, f:String->Void):Void {
 		while (true) {
 			var i = try channel.readBytes(buf, 0, 1024) catch (_:Dynamic) 0;
-			if (i > 0) f(buf.sub(0, i).toString()) else break;
+			if (i > 0) f(buf.sub(0, i).toString())
+			else break;
 		}
 	}
 
@@ -52,12 +53,14 @@ class PipeThings {
 							}
 						}
 					} catch (_:Dynamic) {}
-					try pin.close() catch (_:Dynamic) {}
+					try pin.close()
+					catch (_:Dynamic) {}
 					done.release();
 				});
 				done;
 			case _:
-				try pin.close() catch (_:Dynamic) {}
+				try pin.close()
+				catch (_:Dynamic) {}
 				null;
 		}
 		var toutDone = new sys.thread.Lock(), terrDone = new sys.thread.Lock();
@@ -119,7 +122,8 @@ class PipeThings {
 				while (!stopStdin) {
 					var n = RawStdin.read(stdinBuf, 0.05);
 					if (n == 0) {
-						try sock.shutdown(false, true) catch (_:Dynamic) {}
+						try sock.shutdown(false, true)
+						catch (_:Dynamic) {}
 						break;
 					}
 					if (n > 0) ssend(sock, stdinBuf.sub(0, n));
@@ -190,9 +194,12 @@ class RawStdin {
 		return n <= 0 ? 0 : n;
 	}
 
-	@:hlNative("std", "socket_select") static function socketSelect(read:hl.NativeArray<hl.Abstract<"hl_socket">>, write:hl.NativeArray<hl.Abstract<"hl_socket">>,
-		other:hl.NativeArray<hl.Abstract<"hl_socket">>, tmpData:hl.Bytes, tmpSize:Int, timeout:Float):Bool return false;
-	@:hlNative("std", "process_stdout_read") static function processRead(p:hl.Abstract<"hl_process">, bytes:hl.Bytes, pos:Int, len:Int):Int return 0;
+	@:hlNative("std", "socket_select") static function socketSelect(read:hl.NativeArray<hl.Abstract<"hl_socket">>,
+			write:hl.NativeArray<hl.Abstract<"hl_socket">>, other:hl.NativeArray<hl.Abstract<"hl_socket">>, tmpData:hl.Bytes, tmpSize:Int,
+			timeout:Float):Bool return false;
+
+	@:hlNative("std", "process_stdout_read") static function processRead(p:hl.Abstract<"hl_process">, bytes:hl.Bytes, pos:Int,
+			len:Int):Int return 0;
 	#else
 	public static inline final interruptible = false;
 

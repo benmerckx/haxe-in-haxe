@@ -16,7 +16,8 @@ enum MemoryRequest {
 class Memory {
 	public static function clearDescendants(md:ModuleDef):Void {
 		for (t in md.mTypes) switch t {
-			case TClassDecl(c): c.clDescendants = [];
+			case TClassDecl(c):
+				c.clDescendants = [];
 			case _:
 		}
 	}
@@ -30,7 +31,8 @@ class Memory {
 	}
 
 	/** `Common.mem_size` / `Objsize.objsize` **/
-	public static function memSize(v:Dynamic):Int throw new core.ds.Failure("Memory statistics need object-size measurement, which is not supported by haxe-in-haxe");
+	public static function memSize(v:Dynamic):Int
+		throw new core.ds.Failure("Memory statistics need object-size measurement, which is not supported by haxe-in-haxe");
 
 	public static function size(v:Dynamic):String return fmtSize(memSize(v));
 }

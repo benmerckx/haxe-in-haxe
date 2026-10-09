@@ -2,6 +2,45 @@
 
 Earlier checkpoints are in the Git history of this file.
 
+## Eval lock: OCaml's runtime lock for Eval threads — 2026-10-09
+
+Upstream's Eval threads are OCaml threads sharing one runtime lock; the port
+ran them truly in parallel on host threads, so the interpreter's shared state
+raced (hxcoro crashed with SIGSEGV at `EvalAtomic` `AtomicInt.load` or hung in
+`issues.hf.Issue37` in about 1 of 4 runs). `src/macros/eval/EvalLock.hx` (a
+documented deviation, no upstream module) reproduces the runtime lock:
+
+- Inactive until an Eval native starts a second host thread running Eval code
+  (`EvalThread.spawn`, eval.luv `Thread.create`, the eval.luv thread pool);
+  until then `tick` reads one static and `blocking` calls straight through.
+- Once active, every thread running Eval code holds it (the compiler thread
+  from activation on). Natives release it around host calls that block:
+  sys.thread Mutex/Lock/Semaphore/Condition/Deque waits, thread messages,
+  joins, sleeps, `Thread.yield` (FIFO hand-off), socket/process/file input,
+  `Sys.getChar`, the eval.luv primitives and joins, uv_run (callbacks take it
+  again), and the compilation server's idle wait.
+- Fairness: a waiter that waited 2 ms sets `yieldRequested`; the holder gives
+  way at its next function entry or loop iteration (`EvalLock.tick`), handing
+  the lock over in FIFO order.
+- Lock order: never block on a host primitive while holding the Eval lock;
+  the lock's guard mutex is held only for list updates (nothing allocated).
+
+| Check (HashLink build unless noted) | Result |
+| --- | --- |
+| `upstream.py party-hxcoro` (3 steps), 20 runs in a row | 20/20 (60/60 steps) |
+| party-tink_core | pass |
+| threads | 141/142 (unchanged: `testNative` needs libuv) |
+| threads, connect-stdin, party (hxc build, tcc, libuv + mbedtls) | 144/144, pass, pass |
+| full `upstream.py` | as before (unit-macro 11367/11371 with the 4 `Gc.finalise` errors, threads 141/142, the rest pass) |
+| conformance / `--cases` macro / upstream `--hxb-lib` / party | 279 + 7, 66/66, 135 + 60, 2/2 |
+| `server.py` (both cache modes; macro cases) | 595/595, 595/595; 132/132 |
+| `bench/interp.py -n 5`, HL JIT, two alternating rounds before/after | Empty 0.78/0.76 → 0.73/0.72 s, Fib 1.97/2.01 → 1.97/1.88, NBody 2.97/2.79 → 2.83/2.85, Strings 1.44/1.35 → 1.34/1.34, Objects 5.65/5.68 → 5.59/5.62, Json 1.20/1.29 → 1.30/1.24 (noise) |
+| macro cases summed time (`-j 1`, two rounds) | 91.4/90.5 s before, 89.7/91.1 s after |
+
+HL/C was not benchmarked (no patched hl2c or HashLink headers in this
+environment); `bench/interp.py` now reports a port build that is missing as
+"not built" instead of failing.
+
 ## Wider upstream coverage: third-party projects and more suites — 2026-10-09
 
 ### Third-party projects (Macro.hx `party`)
@@ -83,7 +122,8 @@ pass), and the party steps pass, except for an intermittent crash:
   crashed, and 3 of 8 with the port as it was before this work, so these
   changes did not cause it; the reference passed 4/4. The port runs Eval
   threads truly in parallel on HashLink threads; a stand-alone HashLink test
-  of the same locked `{v:Int}` cell pattern does not crash. Not fixed here.
+  of the same locked `{v:Int}` cell pattern does not crash. Fixed by the Eval
+  lock (see "Eval lock" above).
 
 Root causes of the port failures:
 
@@ -280,6 +320,60 @@ tcc, gcc -O2 and HashLink builds; `test/server.py` with the tcc build
 15 minutes in misc on `eval/projects/Issue10871/Compiler/compile1.hxml`
 (the child compiler spinning); it did not recur in the three full misc runs
 since (tcc twice, gcc -O2) nor when run alone.
+
+## C build of the port (hxc): OS threads and parallel mode — 2026-10-09, late
+
+gcc, clang and cosmocc builds now run Haxe threads on OS threads with a
+stop-the-world collector (backend/README.md, "OS threads (1:1)"); tcc keeps
+the green threads below. The port runs its parallel passes (filters,
+analyzer, DCE marking, HXB writing) when `-D disable-parallelism` is not
+given. `test/conformance.py --parallel N` checks parallel-mode archives: each
+run must succeed, the reference must load the archive, and after normalizing
+variable IDs (the reference reads the archive with `--hxb-lib` and writes it
+again sequentially) it must equal the sequential reference archive.
+
+```sh
+CC="clang -O2" BIN=hih_clang RT_NO= RT_LIBS="-lmbedtls -lmbedx509 -lmbedcrypto -luv" sh backend/build.sh port
+HAXE_REFERENCE=haxe/haxe HAXE_IN_HAXE_PORT=$PWD/bin/backend/hih/hih_clang python3 test/conformance.py -j 3 --parallel 3
+HAXE_REFERENCE=haxe/haxe HAXE_IN_HAXE_PORT=$PWD/bin/backend/hih/hih_clang python3 test/conformance.py -j 2 --parallel 3 --cases test/conformance-macro-cases.txt
+# the self-compile as a case: "direct self <abs path of a src snapshot> haxe.Main" in a case file
+HAXE_REFERENCE=haxe/haxe HAXE_IN_HAXE_PORT=$PWD/bin/backend/hih/hih_clang python3 test/conformance.py -j 1 --parallel 4 --parallel-reference --cases self-case.txt
+```
+
+| Check (clang -O2 build with mbedtls/libuv unless noted) | Result |
+| --- | --- |
+| Conformance, sequential (tcc, green threads; clang) | 279 PASS + 7 expected failures / same |
+| Conformance, macro cases, sequential (tcc; clang) | 66/66 / 66/66 |
+| `test/upstream.py threads` (clang; 4 runs) | 144/144 assertions each |
+| Conformance `--parallel 3` (837 parallel runs; two rounds, before and after the `Inline.hx` fix) | 279 PASS + 7 expected failures; every run of every case identical to the sequential reference after normalizing (raw-identical: 3/3 runs in 31 cases, 0/3 in 174) |
+| Macro cases `--parallel 3` | 66/66 pass; 54 normalized-identical in 3/3 runs, 12 cannot be normalized because the reference cannot reload its own archive without the sources (macro-built types; runs succeed) |
+| Self-compile `--parallel 4 --parallel-reference` | port 4/4 and reference 4/4 identical after normalizing (434 members), 0 raw-identical for either |
+| `backend/bench/threads` (clang -O2, OS threads; 10 runs, loaded machine) | all |
+| ThreadSanitizer, runtime instrumented (backend/README.md): self-compile ×2, stdlib, hello in parallel mode; `backend/bench/threads` fully instrumented | after the fixes below: 0 reports on the port runs; bench: only races of the test program's own unsynchronized Haxe variables and arrays |
+
+No run crashed or hung. Found and fixed:
+
+- `Inline.hx`: parallel filter workers inlining into classes of the same
+  module unshifted into that module's `mInlineCalls` array at the same time
+  (TSan: `Array_insert` vs `hx_apush_slow`/`hx_arr_grow`). Upstream conses
+  onto an immutable list; the port's push now takes a mutex.
+- hxc std: `EReg.escape` shared one static `EReg`; `Regex` published its
+  case-set map before filling it (both by review).
+- `rt_nthreads` was read plainly while updated atomically (TSan): relaxed
+  atomic loads (`RT_NTHREADS`).
+- `backend/bench/threads` semaphore test: an unguarded counter and a fixed
+  10 ms sleep failed on a loaded machine (1 run in 5) with OS threads.
+- Earlier on this branch: `RenameVars`/`AnalyzerTexpr` shared static
+  `EReg`s, which corrupted generated variable names in parallel mode.
+
+Benign races left (TSan, plain stores): `sys.thread.Thread.create` (std,
+as on HashLink) stores the thread's id and name from both the parent and the
+child; new expressions published to other filter workers without a fence
+(upstream's documented races, x86-64 store order).
+
+Not run in this pass (by request, the full matrix runs at merge): gcc -O2
+and cosmocc conformance, the wasm build, `test/server.py`, the other
+`test/upstream.py` steps, `--parallel` on tcc.
 
 ## C build of the port (hxc): green threads — 2026-10-09
 

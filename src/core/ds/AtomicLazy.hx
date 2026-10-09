@@ -12,7 +12,8 @@ private enum AtomicLazyState<T> {
 class AtomicLazy<T> {
 	var state:AtomicLazyState<T>;
 	var mutex:AtomicLazyMutex = new AtomicLazyMutex();
-	var ready = false;
+	// published with release order after `value` (upstream: Atomic.t); read without the mutex
+	final ready = new haxe.atomic.AtomicBool(false);
 	var value:Null<T> = null;
 
 	function new(state:AtomicLazyState<T>) {
@@ -20,7 +21,7 @@ class AtomicLazy<T> {
 		switch state {
 			case Set(v):
 				value = v;
-				ready = true;
+				ready.store(true);
 			case _:
 		}
 	}
@@ -45,7 +46,7 @@ class AtomicLazy<T> {
 
 	public function force():T {
 		// Lock-free fast path, like upstream's Atomic.get: Set is final once published.
-		if (ready) return value;
+		if (ready.load()) return value;
 		while (true) {
 			mutex.acquire();
 			switch (state) {
@@ -62,7 +63,7 @@ class AtomicLazy<T> {
 					mutex.acquire();
 					state = Set(v);
 					value = v;
-					ready = true;
+					ready.store(true);
 					mutex.release();
 					return v;
 			}

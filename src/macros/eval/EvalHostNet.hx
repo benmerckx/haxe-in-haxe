@@ -100,7 +100,7 @@ class EvalHostNet {
 		return try {
 			var s = get(h);
 			var a = peer ? s.peer() : s.host();
-			[ipOf(a.host), a.port];
+				[ipOf(a.host), a.port];
 		} catch (e:Dynamic) {
 			fail(e);
 			null;
@@ -118,7 +118,8 @@ class EvalHostNet {
 	/** Unix.select: sets the entries of handles that are not ready to -1. **/
 	public static function select(read:Array<Int>, write:Array<Int>, others:Array<Int>, timeout:Float):Int {
 		return try {
-			var r = Socket.select([for (h in read) get(h)], [for (h in write) get(h)], [for (h in others) get(h)], timeout < 0 ? null : timeout);
+			var r = Socket.select([for (h in read) get(h)], [for (h in write) get(h)], [for (h in others) get(h)],
+				timeout < 0 ? null : timeout);
 			function keep(handles:Array<Int>, ready:Array<Socket>) {
 				for (i in 0...handles.length) if (ready.indexOf(get(handles[i])) < 0) handles[i] = -1;
 			}

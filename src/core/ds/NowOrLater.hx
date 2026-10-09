@@ -18,10 +18,11 @@ class NowOrLater {
 				callback();
 				running = false;
 				now.release();
-			} catch(error:haxe.Exception){
+			} catch (error:haxe.Exception) {
 				running = false;
 				now.release();
-				throw error;}
+				throw error;
+			}
 		} else {
 			laterMutex.acquire();
 			later.push(callback);

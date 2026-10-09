@@ -396,16 +396,19 @@ class Regex {
 	static var caseSets:Null<Map<Int, Array<Int>>>;
 
 	static function caseSet(c:Int):Null<Array<Int>> {
-		if (caseSets == null) {
-			caseSets = new Map();
+		// built aside and published whole: another thread may look at it meanwhile
+		var sets = caseSets;
+		if (sets == null) {
+			sets = new Map();
 			var src = RegexUnicode.FOLD_SRC, rep = RegexUnicode.FOLD_REP;
 			for (i in 0...src.length) {
-				var a = caseSets.get(rep[i]);
-				if (a == null) caseSets.set(rep[i], a = []);
+				var a = sets.get(rep[i]);
+				if (a == null) sets.set(rep[i], a = []);
 				a.push(src[i]);
 			}
+			caseSets = sets;
 		}
-		return caseSets.get(lower(c));
+		return sets.get(lower(c));
 	}
 
 	static function isWord(c:Int):Bool

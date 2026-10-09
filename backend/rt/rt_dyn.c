@@ -1,6 +1,6 @@
 // EXPERIMENTAL runtime for backend/: field names, structural access,
 // Dynamic operations, type tests, reflection intrinsics (hxc.Native).
-#include "rt.h"
+#include "rt_gc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -11,10 +11,17 @@ void hx_arr_to_ptr(void **slot);
 
 // ---- field names: the generated table is sorted; names seen only at run time are appended
 
-static char **extra_names;
-static int nextra, capextra;
+// Names added at run time live in chunks that never move, so a reader needs no
+// lock for a name it got an id for; adding (and searching the added names)
+// holds extra_lock.
+#define EXTRA_CHUNK 1024
+static char **extra_chunks[4096];
+static int nextra;
+static rt_lock_t extra_lock = RT_LOCK_INIT;
 
-int32_t hx_fid_c(const char *name) {
+static const char *extra_name(int i) { return extra_chunks[i / EXTRA_CHUNK][i % EXTRA_CHUNK]; }
+
+static int32_t find_static_name(const char *name) {
 	int lo = 0, hi = rt_nfield_names - 1;
 	while (lo <= hi) {
 		int mid = (lo + hi) / 2;
@@ -23,20 +30,37 @@ int32_t hx_fid_c(const char *name) {
 		if (c < 0) lo = mid + 1;
 		else hi = mid - 1;
 	}
-	for (int i = 0; i < nextra; i++)
-		if (strcmp(extra_names[i], name) == 0) return rt_nfield_names + i;
 	return -1;
 }
 
-static int32_t intern(const char *name) {
-	int32_t f = hx_fid_c(name);
+static int32_t find_extra(const char *name) {
+	for (int i = 0; i < nextra; i++)
+		if (strcmp(extra_name(i), name) == 0) return rt_nfield_names + i;
+	return -1;
+}
+
+int32_t hx_fid_c(const char *name) {
+	int32_t f = find_static_name(name);
 	if (f >= 0) return f;
-	if (nextra == capextra) {
-		capextra = capextra ? capextra * 2 : 64;
-		extra_names = (char **)realloc(extra_names, capextra * sizeof(char *));
+	rt_lock(&extra_lock);
+	f = find_extra(name);
+	rt_unlock(&extra_lock);
+	return f;
+}
+
+static int32_t intern(const char *name) {
+	int32_t f = find_static_name(name);
+	if (f >= 0) return f;
+	rt_lock(&extra_lock);
+	f = find_extra(name);
+	if (f < 0) {
+		int c = nextra / EXTRA_CHUNK;
+		if (!extra_chunks[c]) extra_chunks[c] = (char **)malloc(EXTRA_CHUNK * sizeof(char *));
+		extra_chunks[c][nextra % EXTRA_CHUNK] = strdup(name);
+		f = rt_nfield_names + nextra++;
 	}
-	extra_names[nextra] = strdup(name);
-	return rt_nfield_names + nextra++;
+	rt_unlock(&extra_lock);
+	return f;
 }
 
 int32_t hx_fid(void *name) {
@@ -49,7 +73,7 @@ int32_t hx_fid(void *name) {
 }
 
 static const char *fid_name(int32_t f) {
-	return f < rt_nfield_names ? rt_field_names[f] : extra_names[f - rt_nfield_names];
+	return f < rt_nfield_names ? rt_field_names[f] : extra_name(f - rt_nfield_names);
 }
 
 static void *fid_str(int32_t f) {
@@ -80,28 +104,102 @@ static const rt_method *find_method(const rt_type *t, int32_t fid) {
 	return 0;
 }
 
-void rt_icache_fill(void *o, int32_t fid, rt_icache *c) {
+static void icache_fill(void *o, int32_t fid, rt_icache *c) {
 	uint32_t t = TINDEX(o);
 	const rt_type *ty = &rt_types[t];
-	c->t = t;
 	c->fn = 0;
 	c->sig = -1;
 	const rt_field *f = find_field(ty, fid);
 	if (f) {
 		c->slot = f->slot + 1;
 		c->kind = f->kind;
-		return;
+	} else {
+		const rt_method *m = find_method(ty, fid);
+		if (m) {
+			c->slot = 0;
+			c->fn = m->fn;
+			c->sig = m->sig;
+			c->kind = 'm';
+		} else {
+			c->slot = -1;
+			c->kind = 0;
+		}
 	}
-	const rt_method *m = find_method(ty, fid);
-	if (m) {
-		c->slot = 0;
-		c->fn = m->fn;
-		c->sig = m->sig;
-		c->kind = 'm';
-		return;
+}
+
+#if RT_MT
+// Misses on entries filled for another type, with several threads: per
+// thread, a table of immutable entries by (type, field id). A generated
+// access may read its entry after evaluating arguments that miss again, so
+// an entry, once returned, never changes.
+typedef struct {
+	uint64_t *keys; // type << 32 | fid, 0: free
+	rt_icache **vals;
+	uint32_t cap, n;
+} ic_table;
+static RT_TLS ic_table ic_local;
+
+static rt_icache *ic_local_get(void *o, int32_t fid) {
+	ic_table *tb = &ic_local;
+	uint64_t key = (uint64_t)TINDEX(o) << 32 | (uint32_t)fid;
+	if (tb->n * 2 >= tb->cap) {
+		uint32_t ncap = tb->cap ? tb->cap * 2 : 256;
+		uint64_t *nk = (uint64_t *)calloc(ncap, sizeof(uint64_t));
+		rt_icache **nv = (rt_icache **)calloc(ncap, sizeof(rt_icache *));
+		for (uint32_t i = 0; i < tb->cap; i++)
+			if (tb->keys[i]) {
+				uint32_t j = (uint32_t)((tb->keys[i] * 0x9E3779B97F4A7C15ull) >> 32) & (ncap - 1);
+				while (nk[j]) j = (j + 1) & (ncap - 1);
+				nk[j] = tb->keys[i];
+				nv[j] = tb->vals[i];
+			}
+		free(tb->keys);
+		free(tb->vals);
+		tb->keys = nk;
+		tb->vals = nv;
+		tb->cap = ncap;
 	}
-	c->slot = -1;
-	c->kind = 0;
+	uint32_t j = (uint32_t)((key * 0x9E3779B97F4A7C15ull) >> 32) & (tb->cap - 1);
+	while (tb->keys[j]) {
+		if (tb->keys[j] == key) return tb->vals[j];
+		j = (j + 1) & (tb->cap - 1);
+	}
+	rt_icache *e = (rt_icache *)malloc(sizeof(rt_icache));
+	icache_fill(o, fid, e);
+	e->t = TINDEX(o);
+	tb->keys[j] = key;
+	tb->vals[j] = e;
+	tb->n++;
+	return e;
+}
+#endif
+
+void rt_dyn_thread_exit(void) {
+#if RT_MT
+	ic_table *tb = &ic_local;
+	for (uint32_t i = 0; i < tb->cap; i++)
+		if (tb->keys[i]) free(tb->vals[i]);
+	free(tb->keys);
+	free(tb->vals);
+	memset(tb, 0, sizeof *tb);
+#endif
+}
+
+rt_icache *rt_icache_miss(void *o, int32_t fid, rt_icache *c) {
+#if RT_MT
+	if (rt_mt) {
+		uint32_t z = 0;
+		if (__atomic_compare_exchange_n(&c->t, &z, RT_IC_BUSY, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+			icache_fill(o, fid, c);
+			__atomic_store_n(&c->t, TINDEX(o), __ATOMIC_RELEASE);
+			return c;
+		}
+		return ic_local_get(o, fid);
+	}
+#endif
+	icache_fill(o, fid, c);
+	c->t = TINDEX(o);
+	return c;
 }
 
 static void *box_slot(void *o, int32_t slot, char kind) {
@@ -668,15 +766,25 @@ void *hx_cast(void *v, void *type) {
 
 // ---- hxc.Native
 
+// identity hash in the header's top 16 bits, set once (a CAS: another thread
+// may set it at the same time; the collector only runs with every thread stopped)
+static RT_TLS uint32_t hash_seed;
+int32_t hxc_NativeThread_current(void);
 int32_t hxc_Native_objHash(void *o) {
 	if (!o) return 0;
-	static uint32_t next = 0x9E37;
 	uint32_t h = (uint32_t)(HDR(o) >> 48);
 	if (h == 0) {
-		next = next * 1103515245u + 12345u;
-		h = (next >> 16) & 0xFFFF;
+		if (hash_seed == 0) hash_seed = 0x9E37 + 0x10000u * (uint32_t)(hxc_NativeThread_current() - 1); // the main thread's sequence is the single-threaded one
+		hash_seed = hash_seed * 1103515245u + 12345u;
+		h = (hash_seed >> 16) & 0xFFFF;
 		if (h == 0) h = 1;
+#if RT_MT
+		uint64_t old = __atomic_load_n(&HDR(o), __ATOMIC_RELAXED);
+		while ((old >> 48) == 0 && !__atomic_compare_exchange_n(&HDR(o), &old, old | (uint64_t)h << 48, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {}
+		h = (uint32_t)(old >> 48) ? (uint32_t)(old >> 48) : h;
+#else
 		HDR(o) |= (uint64_t)h << 48;
+#endif
 	}
 	return (int32_t)(h * 2654435761u);
 }

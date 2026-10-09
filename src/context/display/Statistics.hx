@@ -86,7 +86,8 @@ class Statistics {
 				var key = Globals.sTypePath(c1.clPath);
 				if (!memo.exists(key)) {
 					memo.set(key, true);
-					if (hasClassFlag(c1, CInterface)) addRelation(c.clNamePos, {r: Extended, p: c1.clNamePos}) else {
+					if (hasClassFlag(c1, CInterface)) addRelation(c.clNamePos, {r: Extended, p: c1.clNamePos})
+					else {
 						addRelation(c.clNamePos, {r: Implemented, p: c1.clNamePos});
 						for (cf in c.clOrderedFields) {
 							var cf_ = c1.clFields.get(cf.cfName);
@@ -100,7 +101,9 @@ class Statistics {
 		}
 		function findRealConstructor(c:TClass):TClassField {
 			// The pos comparison might be a bit weak, not sure...
-			if (c.clConstructor != null && !Meta.has(MetaTag.CompilerGenerated, c.clConstructor.cfMeta) && !posEq(c.clPos, c.clConstructor.cfPos)) return c.clConstructor;
+			if (c.clConstructor != null
+				&& !Meta.has(MetaTag.CompilerGenerated, c.clConstructor.cfMeta)
+				&& !posEq(c.clPos, c.clConstructor.cfPos)) return c.clConstructor;
 			if (c.clSuper != null) return findRealConstructor(c.clSuper.cls);
 			throw core.ds.NotFound.raise();
 		}
@@ -171,11 +174,13 @@ class Statistics {
 						addRelation(tinfos.mtNamePos, {r: Referenced, p: Globals.patchStringPos(e.epos, tinfos.mtPath.name)});
 					case TNew(c, _, el):
 						for (e in el) loop(e);
-						try addRelation(findRealConstructor(c).cfNamePos, {r: Referenced, p: e.epos}) catch (_:core.ds.NotFound) {}
+						try addRelation(findRealConstructor(c).cfNamePos, {r: Referenced, p: e.epos})
+						catch (_:core.ds.NotFound) {}
 					case TCall({eexpr: TConst(TSuper)}, el):
 						for (e in el) loop(e);
 						if (c.clSuper != null) {
-							try addRelation(findRealConstructor(c.clSuper.cls).cfNamePos, {r: Referenced, p: e.epos}) catch (_:core.ds.NotFound) {}
+							try addRelation(findRealConstructor(c.clSuper.cls).cfNamePos, {r: Referenced, p: e.epos})
+							catch (_:core.ds.NotFound) {}
 						}
 					case TVar(v, eo):
 						if (eo != null) loop(eo);
@@ -294,16 +299,21 @@ class StatisticsPrinter {
 		relations.iter(function(p, rl) {
 			var file = core.Path.getRealPath(p.pfile);
 			var l = files.findOpt(file);
-			if (l != null) files.replace(file, [{p: p, rl: rl}].concat(l)) else files.add(file, [{p: p, rl: rl}]);
+			if (l != null) files.replace(file, [{p: p, rl: rl}].concat(l))
+			else files.add(file, [{p: p, rl: rl}]);
 		});
 		var ja = files.fold(function(file, relations:Array<{p:Pos, rl:Array<{r:Relation, p:Pos}>}>, acc:Array<JsonValue>) {
 			var l = relations.map(function(e) {
 				var h = new OcamlHashtbl<String, Array<JsonValue>>(OcamlHash.hashString, (a, b) -> a == b, 0);
 				for (x in e.rl) {
 					var s = relationToString(x.r);
-					var jo = JObject([kv("range", core.json.Genjson.generatePosAsRange(x.p)), kv("file", JString(core.Path.getRealPath(x.p.pfile)))]);
+					var jo = JObject([
+						kv("range", core.json.Genjson.generatePosAsRange(x.p)),
+						kv("file", JString(core.Path.getRealPath(x.p.pfile)))
+					]);
 					var cur = h.findOpt(s);
-					if (cur != null) h.replace(s, [jo].concat(cur)) else h.add(s, [jo]);
+					if (cur != null) h.replace(s, [jo].concat(cur))
+					else h.add(s, [jo]);
 				}
 				var l = h.fold(function(s, js, acc:Array<JsonField>) {
 					acc.unshift(kv(s, JArray(js)));

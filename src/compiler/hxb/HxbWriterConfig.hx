@@ -28,7 +28,8 @@ class HxbWriterConfig {
 		var config = new HxbWriterConfig();
 		if (extension(file) == "json") {
 			var content:String;
-			try content = sys.io.File.getContent(file) catch (error:Dynamic) throw 'Could not open file $file: ${Std.string(error)}';
+			try content = sys.io.File.getContent(file)
+			catch (error:Dynamic) throw 'Could not open file $file: ${Std.string(error)}';
 			parse(config, content);
 		} else {
 			config.archivePath = file;
@@ -48,22 +49,32 @@ class HxbWriterConfig {
 		if (data == null) return;
 		var fields:DynamicAccess<Dynamic> = cast data;
 		for (name in fields.keys()) switch (name) {
-			case "archivePath": config.archivePath = string(fields[name]);
-			case "targetConfig": if (fields[name] != null) readTargetConfig(config.targetConfig, fields[name]);
-			case "macroConfig": if (fields[name] != null) readTargetConfig(config.macroConfig, fields[name]);
-			case _: fail('Unknown key for writer config: $name');
+			case "archivePath":
+				config.archivePath = string(fields[name]);
+			case "targetConfig":
+				if (fields[name] != null) readTargetConfig(config.targetConfig, fields[name]);
+			case "macroConfig":
+				if (fields[name] != null) readTargetConfig(config.macroConfig, fields[name]);
+			case _:
+				fail('Unknown key for writer config: $name');
 		}
 	}
 
 	static function readTargetConfig(config:WriterTargetConfig, data:Dynamic):Void {
 		var fields:DynamicAccess<Dynamic> = cast data;
 		for (name in fields.keys()) switch (name) {
-			case "generate": config.generate = bool(fields[name]);
-			case "exclude": if (fields[name] != null) config.exclude = paths(fields[name]);
-			case "include": if (fields[name] != null) config.include = paths(fields[name]);
-			case "hxbVersion": config.hxbVersion = integer(fields[name]);
-			case "generateDocumentation": config.generateDocumentation = bool(fields[name]);
-			case _: fail('Unknown key for target config: $name');
+			case "generate":
+				config.generate = bool(fields[name]);
+			case "exclude":
+				if (fields[name] != null) config.exclude = paths(fields[name]);
+			case "include":
+				if (fields[name] != null) config.include = paths(fields[name]);
+			case "hxbVersion":
+				config.hxbVersion = integer(fields[name]);
+			case "generateDocumentation":
+				config.generateDocumentation = bool(fields[name]);
+			case _:
+				fail('Unknown key for target config: $name');
 		}
 	}
 

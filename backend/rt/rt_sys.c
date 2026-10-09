@@ -92,7 +92,7 @@ void *hxc_NativeSys_environ(void) {
 // are always ready. Writes to stdout/stderr (print), Sys.command and the
 // rest of the file system calls still block the process.
 void hxc_NativeSys_sleep(double seconds) {
-	if (rt_nthreads > 1) {
+	if (RT_NTHREADS() > 1) {
 		rt_sleep(seconds); // 0: give way to the other runnable threads
 		return;
 	}
@@ -136,7 +136,8 @@ void *hxc_NativeSys_systemName(void) {
 int32_t hxc_NativeSys_command(void *cmd) {
 	char *c = hx_str_to_utf8(cmd);
 	fflush(stdout);
-	int r = system(c);
+	int r;
+	RT_BLOCKING(r = system(c)); // c is malloc'ed: no heap pointer
 	free(c);
 	if (r == -1) return -1;
 	return WIFEXITED(r) ? WEXITSTATUS(r) : 128 + WTERMSIG(r);
@@ -184,7 +185,7 @@ int32_t hxc_NativeSys_getChar(int32_t echo) {
 		tcsetattr(0, TCSANOW, &raw);
 	}
 	unsigned char c;
-	if (rt_nthreads > 1) rt_wait_fd(0, 0, -1);
+	if (RT_NTHREADS() > 1) rt_wait_fd(0, 0, -1);
 	ssize_t r = read(0, &c, 1);
 	if (tty) tcsetattr(0, TCSANOW, &old);
 	if (r <= 0) hx_throw_str("Eof");
@@ -204,7 +205,7 @@ int32_t hxc_NativeSys_fileOpen(void *path, int32_t mode) {
 
 int32_t hxc_NativeSys_fileRead(int32_t fd, void *b, int32_t pos, int32_t len) {
 	if (pos < 0 || len < 0 || pos + len > BYTES_LEN(b)) hx_throw_str("OutsideBounds");
-	if (rt_nthreads > 1) {
+	if (RT_NTHREADS() > 1) {
 		RT_ROOT(b);
 		int w = rt_wait_fd(fd, 0, -1);
 		RT_RELOAD(b);
@@ -220,7 +221,7 @@ int32_t hxc_NativeSys_fileRead(int32_t fd, void *b, int32_t pos, int32_t len) {
 
 int32_t hxc_NativeSys_fileWrite(int32_t fd, void *b, int32_t pos, int32_t len) {
 	if (pos < 0 || len < 0 || pos + len > BYTES_LEN(b)) hx_throw_str("OutsideBounds");
-	if (rt_nthreads > 1) {
+	if (RT_NTHREADS() > 1) {
 		RT_ROOT(b);
 		int w = rt_wait_fd(fd, 1, -1);
 		RT_RELOAD(b);
@@ -420,9 +421,19 @@ int32_t hxc_NativeSys_processRun(void *cmd, void *args, void *fds) {
 
 int32_t hxc_NativeSys_processWait(int32_t pid, int32_t block) {
 	int st;
+#if RT_MT
+	// OS threads: wait in a safe region
+	for (;;) {
+		pid_t r;
+		RT_BLOCKING(r = waitpid(pid, &st, block ? 0 : WNOHANG));
+		if (r < 0 && errno == EINTR) continue;
+		if (r <= 0) return -1;
+		break;
+	}
+#else
 	double pause = 0.001;
 	for (;;) {
-		int coop = block && rt_nthreads > 1; // poll the child, sleeping in between
+		int coop = block && RT_NTHREADS() > 1; // green threads: poll the child, sleeping in between
 		pid_t r = waitpid(pid, &st, block && !coop ? 0 : WNOHANG);
 		if (r < 0 && errno == EINTR) continue;
 		if (r == 0 && coop) {
@@ -434,6 +445,7 @@ int32_t hxc_NativeSys_processWait(int32_t pid, int32_t block) {
 		if (r < 0) return -1;
 		break;
 	}
+#endif
 	if (WIFEXITED(st)) return WEXITSTATUS(st);
 	if (WIFSIGNALED(st)) return 128 + WTERMSIG(st);
 	return -1;

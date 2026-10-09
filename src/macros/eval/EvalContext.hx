@@ -78,7 +78,8 @@ enum EnvKind {
 	// The number of capture variables.
 	public var numCaptures:Int;
 
-	public inline function new(isStatic:Bool, pfile:Int, pfileUnique:Int, kind:EnvKind, captureInfos:Map<Int, VarInfo>, numLocals:Int, numCaptures:Int) {
+	public inline function new(isStatic:Bool, pfile:Int, pfileUnique:Int, kind:EnvKind, captureInfos:Map<Int, VarInfo>, numLocals:Int,
+			numCaptures:Int) {
 		this.isStatic = isStatic;
 		this.pfile = pfile;
 		this.pfileUnique = pfileUnique;
@@ -90,7 +91,6 @@ enum EnvKind {
 }
 
 /** Per-environment debug information. These values are only modified while debugging. **/
-
 // Environment slots: a bare native array on HashLink (haxe.ds.Vector is an Array there).
 typedef ValueSlots = #if hl hl.NativeArray<Value> #else haxe.ds.Vector<Value> #end;
 
@@ -140,8 +140,8 @@ class Env {
 	public final envStackDepth:Int;
 	public final envEval:Eval;
 
-	public function new(envInfo:EnvInfo, envDebug:EnvDebug, envLocals:ValueSlots, envCaptures:ValueSlots, envExtraLocals:GlobalsIntMap<Value>,
-			envParent:Null<Env>, envStackDepth:Int, envEval:Eval) {
+	public function new(envInfo:EnvInfo, envDebug:EnvDebug, envLocals:ValueSlots, envCaptures:ValueSlots,
+			envExtraLocals:GlobalsIntMap<Value>, envParent:Null<Env>, envStackDepth:Int, envEval:Eval) {
 		this.envInfo = envInfo;
 		this.envDebug = envDebug;
 		this.envLocals = envLocals;
@@ -203,7 +203,8 @@ class Breakpoint {
 	public final bpcondition:Null<core.Ast.Expr>;
 	public var bpstate:BreakpointState;
 
-	public function new(bpid:Int, bpfile:Int, bpline:Int, bpcolumn:BreakpointColumn, bpcondition:Null<core.Ast.Expr>, bpstate:BreakpointState) {
+	public function new(bpid:Int, bpfile:Int, bpline:Int, bpcolumn:BreakpointColumn, bpcondition:Null<core.Ast.Expr>,
+			bpstate:BreakpointState) {
 		this.bpid = bpid;
 		this.bpfile = bpfile;
 		this.bpline = bpline;
@@ -242,7 +243,8 @@ class StaticPrototypes {
 
 	public function reset():Void inits.iter((_, e) -> for (f in e.delays) f(e.proto));
 
-	public function addInit(proto:Vprototype, delays:Array<Vprototype->Void>):Void inits = inits.add(proto.ppath, {proto: proto, delays: delays});
+	public function addInit(proto:Vprototype,
+			delays:Array<Vprototype->Void>):Void inits = inits.add(proto.ppath, {proto: proto, delays: delays});
 
 	public function get(path:Int):Vprototype return prototypes.find(path);
 }
@@ -296,8 +298,8 @@ class Context {
 	public final maxPrintDepth:Int;
 	public final printIndentation:Null<String>;
 
-	public function new(ctxId, isMacro, detailTimes, builtins, debug, curapi, timerCtx, arrayPrototype, stringPrototype, vectorPrototype, fileKeys,
-			getObjectPrototype, toplevel, maxStackDepth, maxPrintDepth, printIndentation) {
+	public function new(ctxId, isMacro, detailTimes, builtins, debug, curapi, timerCtx, arrayPrototype, stringPrototype, vectorPrototype,
+			fileKeys, getObjectPrototype, toplevel, maxStackDepth, maxPrintDepth, printIndentation) {
 		this.ctxId = ctxId;
 		this.isMacro = isMacro;
 		this.detailTimes = detailTimes;
@@ -358,7 +360,6 @@ class EvalContext {
 	}
 
 	// Misc
-
 	static final currentEval = new sys.thread.Tls<Eval>();
 
 	/** The current thread's eval state (Thread_local_storage.get_exn upstream). **/
@@ -366,6 +367,7 @@ class EvalContext {
 	// thread has set an eval, it is also kept in a static; a second thread switches
 	// to the thread-local value for good (which is always set).
 	static var singleEval:Null<Eval> = null;
+
 	static var singleThread:Null<sys.thread.Thread> = null;
 	static var multiThreaded = false;
 
@@ -383,7 +385,8 @@ class EvalContext {
 		if (!multiThreaded) {
 			var t = sys.thread.Thread.current();
 			if (singleThread == null) singleThread = t;
-			if (singleThread == t) singleEval = e else multiThreaded = true;
+			if (singleThread == t) singleEval = e
+			else multiThreaded = true;
 		}
 	}
 
@@ -470,7 +473,6 @@ class EvalContext {
 	public static function errorMessage(str:String):Dynamic return excString(str);
 
 	// Environment handling
-
 	public static final noTimer:Void->Void = () -> {};
 	public static final emptyArray:Array<Value> = [];
 	static final emptyVector = new ValueSlots(0);
@@ -499,13 +501,16 @@ class EvalContext {
 
 	public static function pushEnvironment(ctx:Context, info:EnvInfo):Env {
 		core.ds.GcPolicy.tick(); // macro code allocates without typing anything
+		EvalLock.tick();
 		var eval = getEval(ctx);
-		var timer = if (ctx.detailTimes) core.Timer.startTimer(ctx.timerCtx, ["macro", "execution", kindName(eval, info.kind)]) else noTimer;
+		var timer = if (ctx.detailTimes) core.Timer.startTimer(ctx.timerCtx,
+			["macro", "execution", kindName(eval, info.kind)]) else noTimer;
 		var debug = if (ctx.debug.supportDebugger || ctx.detailTimes) new EnvDebug(timer, [], 0, noExpr, Globals.nullPos) else noDebug;
 		var locals = info.numLocals == 0 ? emptyVector : makeNullArray(info.numLocals);
 		var captures = info.numCaptures == 0 ? emptyVector : makeNullArray(info.numCaptures);
 		var stackDepth = eval.env == null ? 1 : eval.env.envStackDepth + 1;
-		var env = new Env(info, debug, locals, captures, GlobalsIntMap.empty(), info.kind == EKEntrypoint ? null : eval.env, stackDepth, eval);
+		var env = new Env(info, debug, locals, captures, GlobalsIntMap.empty(), info.kind == EKEntrypoint ? null : eval.env, stackDepth,
+			eval);
 		eval.env = env;
 		// function breakpoints need the debugger socket, which is not ported
 		return env;
@@ -560,8 +565,9 @@ class EvalContext {
 		try
 			return getProtoFieldIndexRaise(proto, name)
 		catch (_:NotFound)
-			return core.Error.raiseTypingError('Field index for ${EvalHash.revHash(name)} not found on prototype ${EvalHash.revHash(proto.ppath)}',
-				Globals.nullPos);
+			return
+				core.Error.raiseTypingError('Field index for ${EvalHash.revHash(name)} not found on prototype ${EvalHash.revHash(proto.ppath)}',
+					Globals.nullPos);
 	}
 
 	public static function getInstanceFieldIndexRaise(proto:Vprototype, name:Int):Int return proto.pinstanceNames.find(name);
@@ -570,7 +576,9 @@ class EvalContext {
 		try
 			return getInstanceFieldIndexRaise(proto, name)
 		catch (_:NotFound)
-			return core.Error.raiseTypingError('Field index for ${EvalHash.revHash(name)} not found on prototype ${EvalHash.revHash(proto.ppath)}', p);
+			return
+				core.Error.raiseTypingError('Field index for ${EvalHash.revHash(name)} not found on prototype ${EvalHash.revHash(proto.ppath)}',
+					p);
 	}
 
 	public static function is(v:Value, path:Int):Bool {
@@ -578,7 +586,8 @@ class EvalContext {
 		return switch v {
 			case VInt32(_): path == EvalHash.key_Int || path == EvalHash.key_Float;
 			case VInt64(_): path == EvalHash.key_eval_integers_Int64;
-			case VFloat(f): path == EvalHash.key_Float || (path == EvalHash.key_Int && f == Std.int(f) && f <= 2147483647. && f >= -2147483648.);
+			case VFloat(f): path == EvalHash.key_Float || (path == EvalHash.key_Int && f == Std.int(f)
+					&& f <= 2147483647. && f >= -2147483648.);
 			case VTrue | VFalse: path == EvalHash.key_Bool;
 			case VPrototype({pkind: PClass(_)}): path == EvalHash.key_Class;
 			case VPrototype({pkind: PEnum(_)}): path == EvalHash.key_Enum;

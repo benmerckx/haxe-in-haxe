@@ -24,19 +24,36 @@ import syntax.Parser.ParserDisplayInformation;
 	public var cDecls:Array<TypeDecl>;
 	public var cModuleName:Null<String>;
 	public var cPdi:ParserDisplayInformation;
-	public inline function new(cFilePath:ResolvedFile, cTime:Float, cPackage:Array<String>, cDecls:Array<TypeDecl>, cModuleName:Null<String>, cPdi:ParserDisplayInformation) { this.cFilePath = cFilePath; this.cTime = cTime; this.cPackage = cPackage; this.cDecls = cDecls; this.cModuleName = cModuleName; this.cPdi = cPdi; }
+
+	public inline function new(cFilePath:ResolvedFile, cTime:Float, cPackage:Array<String>, cDecls:Array<TypeDecl>,
+			cModuleName:Null<String>, cPdi:ParserDisplayInformation) {
+		this.cFilePath = cFilePath;
+		this.cTime = cTime;
+		this.cPackage = cPackage;
+		this.cDecls = cDecls;
+		this.cModuleName = cModuleName;
+		this.cPdi = cPdi;
+	}
 }
 
 @:structInit class CachedDirectory {
 	public var cPath:String;
 	public var cMtime:Float;
-	public inline function new(cPath:String, cMtime:Float) { this.cPath = cPath; this.cMtime = cMtime; }
+
+	public inline function new(cPath:String, cMtime:Float) {
+		this.cPath = cPath;
+		this.cMtime = cMtime;
+	}
 }
 
 @:structInit class CachedNativeLib {
 	public var cNlMtime:Float;
 	public var cNlFiles:Hashtbl<GlobalTypePath, Package>;
-	public inline function new(cNlMtime:Float, cNlFiles:Hashtbl<GlobalTypePath, Package>) { this.cNlMtime = cNlMtime; this.cNlFiles = cNlFiles; }
+
+	public inline function new(cNlMtime:Float, cNlFiles:Hashtbl<GlobalTypePath, Package>) {
+		this.cNlMtime = cNlMtime;
+		this.cNlFiles = cNlFiles;
+	}
 }
 
 typedef HaxelibKey = {libs:Array<String>, cwd:Null<String>};
@@ -60,7 +77,8 @@ class CompilationCache {
 	public static function pathTable<V>():OcamlHashtbl<GlobalTypePath, V> return new OcamlHashtbl(OcamlHash.hashPath, pathEq, 0);
 
 	/** OCaml structural equality on type paths. **/
-	public static function pathEq(a:GlobalTypePath, b:GlobalTypePath):Bool return a.name == b.name && a.pack.length == b.pack.length && a.pack.join(".") == b.pack.join(".");
+	public static function pathEq(a:GlobalTypePath,
+			b:GlobalTypePath):Bool return a.name == b.name && a.pack.length == b.pack.length && a.pack.join(".") == b.pack.join(".");
 
 	public static function createDirectory(path:String, mtime:Float):CachedDirectory {
 		return {cPath: path, cMtime: mtime};
@@ -87,13 +105,19 @@ class ContextCache {
 	}
 
 	/* files */
-
 	public function findFile(key:String):CachedFile {
 		return files.find(key);
 	}
 
 	public function cacheFile(key:String, path:ResolvedFile, time:Float, data:Package, pdi:ParserDisplayInformation):Void {
-		files.replace(key, {cFilePath: path, cTime: time, cPackage: data.pack, cDecls: data.declarations, cModuleName: null, cPdi: pdi});
+		files.replace(key, {
+			cFilePath: path,
+			cTime: time,
+			cPackage: data.pack,
+			cDecls: data.declarations,
+			cModuleName: null,
+			cPdi: pdi
+		});
 	}
 
 	public function removeFile(key:String):Void {
@@ -110,7 +134,6 @@ class ContextCache {
 	}
 
 	/* modules */
-
 	public function findModule(path:GlobalTypePath):ModuleDef {
 		return modules.find(path);
 	}
@@ -128,7 +151,12 @@ class ContextCache {
 				var mc = binaryCache.find(path);
 				var mExtra = mc.mcExtra.clone(); // { mc.mc_extra with m_deps = mc.mc_extra.m_deps }
 				mExtra.mDeps = mc.mcExtra.mDeps.copy(); // m_deps is a persistent map upstream
-				var mc:ModuleCache = {mcPath: mc.mcPath, mcId: mc.mcId, mcChunks: mc.mcChunks, mcExtra: mExtra};
+				var mc:ModuleCache = {
+					mcPath: mc.mcPath,
+					mcId: mc.mcId,
+					mcChunks: mc.mcChunks,
+					mcExtra: mExtra
+				};
 				tmpBinaryCache.add(path, mc);
 				mc;
 			}
@@ -157,7 +185,9 @@ class ContextCache {
 		});
 	}
 
-	public function cacheHxbModule(config:compiler.hxb.HxbWriterConfig.WriterTargetConfig, warn:core.Message.WarningCode->String->core.Globals.Pos->Void, anonIdentification:typing.TanonIdentification<Dynamic>, m:ModuleDef):Null<Void->CachedChunks> {
+	public function cacheHxbModule(config:compiler.hxb.HxbWriterConfig.WriterTargetConfig,
+			warn:core.Message.WarningCode->String->core.Globals.Pos->Void, anonIdentification:typing.TanonIdentification<Dynamic>,
+			m:ModuleDef):Null<Void->CachedChunks> {
 		return switch m.mExtra.mKind {
 			case MImport:
 				modules.add(m.mPath, m);
@@ -192,7 +222,8 @@ class ContextCache {
 		removedFiles.clear();
 		var removed = files.fold(function(key, cfile:CachedFile, acc:Array<String>) {
 			switch cfile.cFilePath.classPath.scope {
-				case User: acc.push(key);
+				case User:
+					acc.push(key);
 				case Std | StdTarget | Lib:
 			}
 			return acc;
@@ -201,13 +232,16 @@ class ContextCache {
 	}
 
 	/* initialization */
-
 	public function isInitialized():Bool return initialized;
+
 	public function setInitialized(value:Bool):Void initialized = value;
 
 	public function getSign():String return sign;
+
 	public function getIndex():Int return index;
+
 	public function getFiles():OcamlHashtbl<String, CachedFile> return files;
+
 	public function getModules():OcamlHashtbl<GlobalTypePath, ModuleDef> return modules;
 
 	public function getHxb():OcamlHashtbl<GlobalTypePath, ModuleCache> return binaryCache;
@@ -216,16 +250,17 @@ class ContextCache {
 	public function getRemovedFiles():OcamlHashtbl<String, ResolvedFile> return removedFiles;
 
 	public function getJson():JsonValue return json;
+
 	public function setJson(j:JsonValue):Void json = j;
 
 	/* access tracking */
-
 	public function updateAccessTime():Void lastAccessTime = Sys.time();
+
 	public function getLastAccessTime():Float return lastAccessTime;
 
 	/* child contexts */
-
 	public function addChild(childSign:String):Void children.replace(childSign, true);
+
 	public function getChildren():OcamlHashtbl<String, Bool> return children;
 }
 
@@ -245,6 +280,7 @@ abstract class ServerTask {
 	}
 
 	public function getPriority():Int return priority;
+
 	public function getId():Array<String> return id;
 }
 
@@ -290,7 +326,6 @@ class Cache {
 	}
 
 	/* contexts */
-
 	public function clearTempCache():Void {
 		contexts.iter((_, ctx) -> ctx.clearTempCache());
 	}
@@ -315,7 +350,8 @@ class Cache {
 		}
 	}
 
-	public function addInfo(sign:String, desc:String, platform:core.Globals.Platform, classPaths:core.ClassPaths, defines:core.Define.DefineContext):Int {
+	public function addInfo(sign:String, desc:String, platform:core.Globals.Platform, classPaths:core.ClassPaths,
+			defines:core.Define.DefineContext):Int {
 		var cc = getContext(sign);
 		// PMap.foldi with a cons accumulator: descending key order
 		var keys = [for (k in defines.values.keys()) k];
@@ -327,10 +363,15 @@ class Cache {
 			{name: "platform", value: JString(Globals.platformName(platform))},
 			{name: "classPaths", value: JArray(classPaths.asStringList().map(s -> JString(s)))},
 			{name: "signature", value: JString(sign)},
-			{name: "defines", value: JArray([for (k in keys) JObject([
-				{name: "key", value: JString(k)},
-				{name: "value", value: JString(defines.values.get(k))}
-			])])}
+			{
+				name: "defines",
+				value: JArray([
+					for (k in keys) JObject([
+						{name: "key", value: JString(k)},
+						{name: "value", value: JString(defines.values.get(k))}
+					])
+				])
+			}
 		]);
 		cc.setJson(jo);
 		return cc.getIndex();
@@ -339,7 +380,6 @@ class Cache {
 	public function getContexts():Array<ContextCache> return contextList;
 
 	/* files */
-
 	public function removeFiles(file:String):Void {
 		contexts.iter((_, cc) -> cc.removeFile(file));
 	}
@@ -364,7 +404,6 @@ class Cache {
 	}
 
 	/* modules */
-
 	public function iterModules(f:ModuleDef->Void):Void {
 		contexts.iter(function(_, cc) {
 			cc.getModules().iter(function(_, m) {
@@ -413,7 +452,6 @@ class Cache {
 	}
 
 	/* haxelibs */
-
 	public function findHaxelib(key:HaxelibKey):Array<String> {
 		return haxelib.find(key);
 	}
@@ -423,7 +461,6 @@ class Cache {
 	}
 
 	/* directories */
-
 	public function findDirectories(key:String):Array<CachedDirectory> {
 		return directories.find(key);
 	}
@@ -457,7 +494,6 @@ class Cache {
 	}
 
 	/* native lib */
-
 	public function addNativeLib(key:String, files:Hashtbl<GlobalTypePath, Package>, timestamp:Float):Void {
 		nativeLibs.replace(key, {cNlFiles: files, cNlMtime: timestamp});
 	}
@@ -467,7 +503,6 @@ class Cache {
 	}
 
 	/* tasks */
-
 	public function addTask(task:ServerTask):Void {
 		tasks = PriorityQueues.insert(tasks, task.getPriority(), task);
 	}
@@ -501,7 +536,6 @@ class Cache {
 	}
 
 	/* context lifecycle */
-
 	/* Remove context caches that haven't been accessed for [max_age_seconds] seconds.
 		This prevents unbounded accumulation of stale contexts when defines change between
 		compilations, creating new signatures each time.
@@ -535,7 +569,8 @@ class Cache {
 						kept.replace(targetSign, true);
 						switch contexts.findOpt(targetSign) {
 							case null:
-							case targetCc: worklist.unshift(targetCc);
+							case targetCc:
+								worklist.unshift(targetCc);
 						}
 					}
 				});

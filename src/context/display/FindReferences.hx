@@ -19,7 +19,8 @@ class FindReferences {
 	}
 
 	static function findReferences_(com:CommonContext, withDefinition:Bool, posFilters:Array<StatisticsFilter>):Array<Pos> {
-		var r = core.Timer.time(com.timerCtx, ["display", "references", "collect"], function(withExpressions:Bool) return Statistics.collectStatistics(com, posFilters, withExpressions), true);
+		var r = core.Timer.time(com.timerCtx, ["display", "references", "collect"],
+			function(withExpressions:Bool) return Statistics.collectStatistics(com, posFilters, withExpressions), true);
 		var symbols = r.symbols, relations = r.relations;
 		function loop(acc:Array<Pos>, relations:Array<{r:Relation, p:Pos}>):Array<Pos> {
 			for (rel in relations) {
@@ -44,7 +45,8 @@ class FindReferences {
 		case Var(_): true;
 	};
 
-	public static function collectReferencePositions(com:CommonContext, ref:{name:String, pos:Pos, kind:Symbol}):Array<{name:String, pos:Pos, kind:Symbol}> {
+	public static function collectReferencePositions(com:CommonContext,
+			ref:{name:String, pos:Pos, kind:Symbol}):Array<{name:String, pos:Pos, kind:Symbol}> {
 		var name = ref.name, pos = ref.pos, kind = ref.kind;
 		switch [kind, com.display.dmsKind] {
 			case [SKField(cf, c), DMUsage(_, findDescendants, _)] if (c != null && findDescendants && isVarField(cf)):
@@ -59,7 +61,11 @@ class FindReferences {
 									switch typing.FieldAccess.findAccessorForField(host, cf, cf.cfType, mode) {
 										case AccessorFound(found):
 											var cHost = typing.FieldAccess.getHostClassRaise(found.host);
-											var newRef = {name: found.field.cfName, pos: found.field.cfNamePos, kind: SKField(found.field, cHost)};
+											var newRef = {
+												name: found.field.cfName,
+												pos: found.field.cfNamePos,
+												kind: SKField(found.field, cHost)
+											};
 											d.push(newRef);
 											for (x in collectReferencePositions(com, newRef)) d.push(x);
 										case _:
@@ -72,7 +78,8 @@ class FindReferences {
 					case _:
 				}
 				return d;
-			case [SKField(cf, c), DMUsage(_, findDescendants, findBase)] if (c != null && (findDescendants || findBase) && !hasClassFieldFlag(cf, CfStatic)):
+			case [SKField(cf, c), DMUsage(_, findDescendants, findBase)]
+				if (c != null && (findDescendants || findBase) && !hasClassFieldFlag(cf, CfStatic)):
 				function collect():Array<{name:String, pos:Pos, kind:Symbol}> {
 					var c = {
 						var found:Null<TClass> = null;
@@ -96,12 +103,14 @@ class FindReferences {
 									return {cf: core.ds.PMap.find(cf.cfName, c.clFields), c: c};
 								}
 							}
-							try loop(c) catch (_:core.ds.NotFound) {cf: cf, c: c};
+							try loop(c)
+							catch (_:core.ds.NotFound) {cf: cf, c: c};
 						} else {cf: cf, c: c};
 						var cf = r.cf, c = r.c;
 						// check interfaces of the found base class
 						var loop:TClass->Array<{cf:TClassField, c:TClass}> = null;
-						function foldInterface(acc:Array<{cf:TClassField, c:TClass}>, i:{cls:TClass, params:TParams}):Array<{cf:TClassField, c:TClass}> {
+						function foldInterface(acc:Array<{cf:TClassField, c:TClass}>,
+								i:{cls:TClass, params:TParams}):Array<{cf:TClassField, c:TClass}> {
 							try {
 								return loop(i.cls).concat(acc);
 							} catch (_:core.ds.NotFound) {
@@ -117,7 +126,8 @@ class FindReferences {
 						for (i in c.clImplements) pairs = foldInterface(pairs, i);
 						pairs.length == 0 ? [{cf: cf, c: c}] : pairs;
 					};
-					function fullPos(p:Pos):Pos return Statistics.posEq(p, Globals.nullPos) ? Globals.nullPos : {pfile: core.Path.getFullPath(p.pfile), pmin: p.pmin, pmax: p.pmax};
+					function fullPos(p:Pos):Pos return Statistics.posEq(p,
+						Globals.nullPos) ? Globals.nullPos : {pfile: core.Path.getFullPath(p.pfile), pmin: p.pmin, pmax: p.pmax};
 					if (findDescendants) {
 						function extends_(childCls:TClass, pair:{cf:TClassField, c:TClass}):Bool return extendsClass(childCls, pair.c);
 						var acc = [];
@@ -128,7 +138,11 @@ class FindReferences {
 							case _:
 						}
 						return acc;
-					} else return fieldClassPairs.map(pair -> {name: name, pos: fullPos(pair.cf.cfNamePos), kind: SKField(pair.cf, pair.c)});
+					} else return fieldClassPairs.map(pair -> {
+						name: name,
+						pos: fullPos(pair.cf.cfNamePos),
+						kind: SKField(pair.cf, pair.c)
+					});
 				}
 				return try collect() catch (_:core.ds.Exit) [ref];
 			case _:
@@ -153,11 +167,13 @@ class FindReferences {
 	}
 
 	static function findImplementations_(com:CommonContext, name:String, pos:Pos, kind:Symbol):Void {
-		var r = core.Timer.time(com.timerCtx, ["display", "implementations", "collect"], function(withExpressions:Bool) return Statistics.collectStatistics(com, [SFPos(pos)], withExpressions), false);
+		var r = core.Timer.time(com.timerCtx, ["display", "implementations", "collect"],
+			function(withExpressions:Bool) return Statistics.collectStatistics(com, [SFPos(pos)], withExpressions), false);
 		var symbols = r.symbols, relations = r.relations;
 		function loop(acc:Array<Pos>, relations:Array<{r:Relation, p:Pos}>):Array<Pos> {
 			for (rel in relations) switch rel.r {
-				case Implemented | Overridden | Extended: acc.unshift(rel.p);
+				case Implemented | Overridden | Extended:
+					acc.unshift(rel.p);
 				case _:
 			}
 			return acc;
@@ -176,6 +192,7 @@ class FindReferences {
 
 	public static function findImplementations(com:CommonContext):Void {
 		var r = ReferencePosition.get();
-		if (!Statistics.posEq(r.pos, Globals.nullPos)) findImplementations_(com, r.name, r.pos, r.kind) else DisplayException.sendPositionsRaise(com, []);
+		if (!Statistics.posEq(r.pos, Globals.nullPos)) findImplementations_(com, r.name, r.pos, r.kind)
+		else DisplayException.sendPositionsRaise(com, []);
 	}
 }

@@ -28,12 +28,15 @@ class DisplayFields {
 		return tl;
 	}
 
-	static function makeClassFieldItem(ctx:Typer, cf:TClassField, scope:ClassFieldScope, origin:ClassFieldOrigin, ?make:CompletionClassField->TPair->CompletionItemData):CompletionItemData {
+	static function makeClassFieldItem(ctx:Typer, cf:TClassField, scope:ClassFieldScope, origin:ClassFieldOrigin,
+			?make:CompletionClassField->TPair->CompletionItemData):CompletionItemData {
 		var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), Ast.getValueMeta(cf.cfMeta), cf.cfType);
-		return (make == null ? CompletionItem.makeCiClassField : make)(CompletionClassField.make(cf, scope, origin, true), {t: cf.cfType, ct: ct});
+		return (make == null ? CompletionItem.makeCiClassField : make)(CompletionClassField.make(cf, scope, origin,
+			true), {t: cf.cfType, ct: ct});
 	}
 
-	public static function collectStaticExtensions(ctx:Typer, blockedItems:StringMap<Bool>, items:StringMap<CompletionItemData>, e:TExpr, p:Pos):StringMap<CompletionItemData> {
+	public static function collectStaticExtensions(ctx:Typer, blockedItems:StringMap<Bool>, items:StringMap<CompletionItemData>, e:TExpr,
+			p:Pos):StringMap<CompletionItemData> {
 		function optType(t:T):T {
 			return switch t {
 				case TLazy(f):
@@ -97,8 +100,10 @@ class DisplayFields {
 				return PMap.add(f.cfName, item, acc);
 			} catch (err:core.Error.TypingError) {
 				switch err.error.errMessage {
-					case Unify(_): return acc;
-					case _: throw err;
+					case Unify(_):
+						return acc;
+					case _:
+						throw err;
 				}
 			} catch (_:core.TUnification.Unify_error) {
 				return acc;
@@ -112,7 +117,10 @@ class DisplayFields {
 			for (u in l) {
 				var c = u.cls;
 				for (f in c.clOrderedStatics) {
-					if (Meta.has(MetaTag.NoUsing, f.cfMeta) || Meta.has(MetaTag.NoCompletion, f.cfMeta) || hasClassFieldFlag(f, CfImpl) || PMap.mem(f.cfName, acc)) {} else {
+					if (Meta.has(MetaTag.NoUsing, f.cfMeta)
+						|| Meta.has(MetaTag.NoCompletion, f.cfMeta)
+						|| hasClassFieldFlag(f, CfImpl)
+						|| PMap.mem(f.cfName, acc)) {} else {
 						for (f in [f].concat(f.cfOverloads)) acc = handleField(c, f, acc);
 					}
 				}
@@ -153,7 +161,8 @@ class DisplayFields {
 	}
 
 	public static function collect(ctx:Typer, eAst:Expr, e:TExpr, dk:DisplayKind, withType:WithTypeValue, p:Pos):Array<CompletionItemData> {
-		function optArgs(args:Array<{name:String, optional:Bool, type:T}>, ret:T):T return TFun({args: args.map(a -> {name: a.name, optional: true, type: a.type}), ret: ret});
+		function optArgs(args:Array<{name:String, optional:Bool, type:T}>,
+				ret:T):T return TFun({args: args.map(a -> {name: a.name, optional: true, type: a.type}), ret: ret});
 		function shouldAccess_(c:TClass, cf:TClassField, stat:Bool):Bool {
 			if (Meta.has(MetaTag.NoCompletion, cf.cfMeta)) return false;
 			if (c != ctx.c.curclass && !hasClassFieldFlag(cf, CfPublic) && cf.cfName.length > 4) {
@@ -234,7 +243,12 @@ class DisplayFields {
 					var acc = if (hasClassFlag(c0, CExtern) && Meta.has(MetaTag.LibType, c0.clMeta)) browseInterfaces(c0, acc) else acc;
 					acc;
 				case TEnum(_):
-					var t = ctx.g.doLoadTypeDef(ctx, p, {tpackage: [], tname: "EnumValue", tsub: null, tparams: []});
+					var t = ctx.g.doLoadTypeDef(ctx, p, {
+						tpackage: [],
+						tname: "EnumValue",
+						tsub: null,
+						tparams: []
+					});
 					switch t {
 						case TAbstractDecl(a = {aImpl: c}) if (c != null):
 							var cf = c.clStatics.get("match");
@@ -250,7 +264,8 @@ class DisplayFields {
 					// Abstracts should show all their @:impl fields minus the constructor.
 					var items = items;
 					for (cf in c.clOrderedStatics) {
-						if (hasClassFieldFlag(cf, CfImpl) && !hasClassFieldFlag(cf, CfEnum) && shouldAccess(c, cf, false) && isNewItem(items, cf.cfName)) {
+						if (hasClassFieldFlag(cf, CfImpl) && !hasClassFieldFlag(cf, CfEnum) && shouldAccess(c, cf, false)
+							&& isNewItem(items, cf.cfName)) {
 							var origin = Self(TAbstractDecl(a));
 							var cf = Typecore.prepareUsingField(cf);
 							var cf = if (tl.length == 0) cf else {
@@ -271,9 +286,11 @@ class DisplayFields {
 							case _:
 						}
 						var forwardedFields = loop(PMap.empty(), applyParams(a.aParams, tl, a.aThis));
-						function abstractHasOwnField(fieldName:String):Bool return c.clFields.exists(fieldName) || c.clStatics.exists(fieldName);
+						function abstractHasOwnField(fieldName:String):Bool return c.clFields.exists(fieldName)
+							|| c.clStatics.exists(fieldName);
 						PMap.foldi(function(name:String, item:CompletionItemData, acc:StringMap<CompletionItemData>) {
-							if ((sl.length == 0 || sl.contains(name) && isNewItem(acc, name)) && !abstractHasOwnField(name)) return PMap.add(name, item, acc);
+							if ((sl.length == 0 || sl.contains(name) && isNewItem(acc, name))
+								&& !abstractHasOwnField(name)) return PMap.add(name, item, acc);
 							return acc;
 						}, forwardedFields, items);
 					} catch (_:core.ds.NotFound) {
@@ -301,11 +318,13 @@ class DisplayFields {
 							}
 						case _: items;
 					};
-					function iterFields(origin:ClassFieldOrigin, fields:StringMap<TClassField>, fAllow:TClassField->Bool, fMake:CompletionClassField->TPair->CompletionItemData):StringMap<CompletionItemData> {
+					function iterFields(origin:ClassFieldOrigin, fields:StringMap<TClassField>, fAllow:TClassField->Bool,
+							fMake:CompletionClassField->TPair->CompletionItemData):StringMap<CompletionItemData> {
 						var items = PMap.fold(function(cf:TClassField, acc:StringMap<CompletionItemData>) {
 							if (isNewItem(acc, cf.cfName) && fAllow(cf)) {
 								var ct = CompletionType.fromType(Display.getImportStatus.bind(ctx), Ast.getValueMeta(cf.cfMeta), cf.cfType);
-								return PMap.add(cf.cfName, fMake(CompletionClassField.make(cf, CFSMember, origin, true), {t: cf.cfType, ct: ct}), acc);
+								return PMap.add(cf.cfName,
+									fMake(CompletionClassField.make(cf, CFSMember, origin, true), {t: cf.cfType, ct: ct}), acc);
 							}
 							return acc;
 						}, fields, items);
@@ -314,9 +333,11 @@ class DisplayFields {
 					switch an.aStatus {
 						case ClassStatics(c = {clKind: KAbstractImpl(a)}):
 							Display.mergeCoreDoc(ctx, TClassDecl(c));
-							function fAllow(cf:TClassField):Bool return shouldAccess(c, cf, false) && (!hasClassFieldFlag(cf, CfImpl) || hasClassFieldFlag(cf, CfEnum));
+							function fAllow(cf:TClassField):Bool return shouldAccess(c, cf, false)
+								&& (!hasClassFieldFlag(cf, CfImpl) || hasClassFieldFlag(cf, CfEnum));
 							function fMake(ccf:CompletionClassField, t:TPair):CompletionItemData {
-								return if (hasClassFieldFlag(ccf.field, CfEnum)) CompletionItem.makeCiEnumAbstractField(a, ccf, t) else CompletionItem.makeCiClassField(ccf, t);
+								return if (hasClassFieldFlag(ccf.field,
+									CfEnum)) CompletionItem.makeCiEnumAbstractField(a, ccf, t) else CompletionItem.makeCiClassField(ccf, t);
 							}
 							iterFields(Self(TClassDecl(c)), c.clStatics, fAllow, fMake);
 						case ClassStatics(c):
@@ -437,7 +458,10 @@ class DisplayFields {
 		};
 		var t = r.t;
 		var cf = mkField(i, t, pfield, Globals.nullPos, false);
-		cf.cfMeta = [{meta: MetaTag.CompilerGenerated, exprs: [], pos: Globals.nullPos}, {meta: MetaTag.NoCompletion, exprs: [], pos: Globals.nullPos}];
+		cf.cfMeta = [
+			{meta: MetaTag.CompilerGenerated, exprs: [], pos: Globals.nullPos},
+			{meta: MetaTag.NoCompletion, exprs: [], pos: Globals.nullPos}
+		];
 		cf.cfKind = r.kind;
 		var r = switch follow(tthis) {
 			case TInst(c, _): {mt: TClassDecl(c), scope: CFSMember, pub: !Typecore.canAccess(ctx, c, cf, false)};
@@ -455,13 +479,16 @@ class DisplayFields {
 		};
 		if (r.pub) addClassFieldFlag(cf, CfPublic);
 		switch r.scope {
-			case CFSStatic: addClassFieldFlag(cf, CfStatic);
+			case CFSStatic:
+				addClassFieldFlag(cf, CfStatic);
 			case _:
 		}
 		var diag:MissingFieldsDiagnostics = {
 			mfPos: pfield,
 			mfOn: r.mt,
-			mfFields: [{field: cf, type: t, completion: CompletionType.fromType(Display.getImportStatus.bind(ctx), t)}],
+			mfFields: [
+				{field: cf, type: t, completion: CompletionType.fromType(Display.getImportStatus.bind(ctx), t)}
+			],
 			mfCause: FieldAccess
 		};
 		var cm = DiagnosticsPrinter.makeMissingFieldsMessage(diag);
@@ -472,9 +499,11 @@ class DisplayFields {
 		switch ctx.e.curfun {
 			case FunStatic:
 				var eSelf = core.Texpr.Builder.makeStaticThis(ctx.c.curclass, p);
-				try handleMissingFieldRaise(ctx, eSelf.etype, i, mode, withType, p) catch (_:core.ds.Exit) {}
+				try handleMissingFieldRaise(ctx, eSelf.etype, i, mode, withType, p)
+				catch (_:core.ds.Exit) {}
 			case _:
-				try handleMissingFieldRaise(ctx, ctx.c.tthis, i, mode, withType, p) catch (_:core.ds.Exit) {}
+				try handleMissingFieldRaise(ctx, ctx.c.tthis, i, mode, withType, p)
+				catch (_:core.ds.Exit) {}
 		}
 	}
 }

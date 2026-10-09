@@ -1,8 +1,8 @@
 package typing;
+
 import core.WithType as WithTypeTools;
 import core.WithType.WithTypeValue;
 import core.MetaList.StrictMeta as MetaTag;
-
 import core.TType;
 import core.Ast;
 import core.Ast.Expr;
@@ -30,34 +30,61 @@ import typing.matcher.MatcherGlobals;
 	public var guard:Null<Expr>;
 	public var expr:Null<Expr>;
 	public var pos:Pos;
-	public inline function new(patterns:Array<Expr>, guard:Null<Expr>, expr:Null<Expr>, pos:Pos) { this.patterns = patterns; this.guard = guard; this.expr = expr; this.pos = pos; }
+
+	public inline function new(patterns:Array<Expr>, guard:Null<Expr>, expr:Null<Expr>, pos:Pos) {
+		this.patterns = patterns;
+		this.guard = guard;
+		this.expr = expr;
+		this.pos = pos;
+	}
+
 	public inline function clone():MatchCase return new MatchCase(patterns, guard, expr, pos);
 }
+
 typedef MatchDefault = core.Ast.SwitchDefault;
+
 class Matcher {
-	static function matchExprImpl(ctx:context.Typecore.Typer, e:Expr, cases:Array<MatchCase>, def:Null<MatchDefault>, withType:WithTypeValue, postfixMatch:Bool, p:Pos):TExpr {
+	static function matchExprImpl(ctx:context.Typecore.Typer, e:Expr, cases:Array<MatchCase>, def:Null<MatchDefault>,
+			withType:WithTypeValue, postfixMatch:Bool, p:Pos):TExpr {
 		var matchDebug = Meta.has(MetaTag.Custom(":debug.match"), ctx.f.curfield.cfMeta);
 		function loop(e:Expr):{type:T, subjects:Array<TExpr>} {
 			return switch e.expr {
-				case EArrayDecl(el) if (!(el.length == 1 && switch el[0].expr {case EFor(_, _) | EWhile(_, _, _): true; case _: false;})):
+				case EArrayDecl(el) if (!(el.length == 1 && switch el[0].expr {
+					case EFor(_, _) | EWhile(_, _, _): true;
+					case _: false;
+				})):
 					var typed = el.map(function(e) return typeExpr(ctx, e, WithTypeTools.value));
-					{type:ExprToPattern.tupleType(typed.map(function(e) return e.etype)), subjects:typed};
+					{type: ExprToPattern.tupleType(typed.map(function(e) return e.etype)), subjects: typed};
 				case EParenthesis(e): loop(e);
 				case _:
 					var e = typeExpr(ctx, e, WithTypeTools.value);
-					{type:e.etype, subjects:[e]};
+					{type: e.etype, subjects: [e]};
 			};
 		}
 		var subject = loop(e);
-		if (def != null) cases = cases.concat([{patterns:[{expr:EConst(Ident("_")), pos:def.pos}], guard:null, expr:def.expr, pos:def.pos}]);
+		if (def != null) cases = cases.concat([
+			{
+				patterns: [{expr: EConst(Ident("_")), pos: def.pos}],
+				guard: null,
+				expr: def.expr,
+				pos: def.pos
+			}
+		]);
 		var tmono:Null<T> = null, allowMinVoid = false;
 		switch withType {
 			case WithType(t, source):
 				switch [follow(t), source] {
-					case [TMono(_), ImplicitReturn]: tmono = t; withType = Value(source); allowMinVoid = true;
+					case [TMono(_), ImplicitReturn]:
+						tmono = t;
+						withType = Value(source);
+						allowMinVoid = true;
 					case [TAbstract(a, _), ImplicitReturn] if (a.aPath.pack.length == 0 && a.aPath.name == "Void"):
-						tmono = t; withType = Value(source); allowMinVoid = true;
-					case [TMono(_), _]: tmono = t; withType = WithTypeTools.value;
+						tmono = t;
+						withType = Value(source);
+						allowMinVoid = true;
+					case [TMono(_), _]:
+						tmono = t;
+						withType = WithTypeTools.value;
 					case _:
 				}
 			case _:
@@ -65,9 +92,13 @@ class Matcher {
 		// collect_free_monos is disabled in the pinned upstream entry point too.
 		var rows:Array<CaseRow> = cases.map(function(c):CaseRow {
 			var cp = c.pos;
-			if (c.expr != null && cp.pfile == Globals.nullPos.pfile && cp.pmin == Globals.nullPos.pmin && cp.pmax == Globals.nullPos.pmax) cp = c.expr.pos;
+			if (c.expr != null
+				&& cp.pfile == Globals.nullPos.pfile
+				&& cp.pmin == Globals.nullPos.pmin
+				&& cp.pmax == Globals.nullPos.pmax)
+				cp = c.expr.pos;
 			var row = Case.make(ctx, subject.type, [], c.patterns, c.guard, c.expr, withType, postfixMatch, cp);
-			return {caseData:row.caseData, bindings:row.bindings, patterns:[row.pattern]};
+			return {caseData: row.caseData, bindings: row.bindings, patterns: [row.pattern]};
 		});
 		inline function inferSwitchType():T return switch withType {
 			case NoValue: ctx.t.tvoid;
@@ -85,17 +116,29 @@ class Matcher {
 			case WithType(t, _): t;
 		};
 		if (matchDebug) {
-			Sys.println("CASES BEGIN"); for (row in rows) Sys.println(row.patterns.map(Pattern.toString).join("")); Sys.println("CASES END");
+			Sys.println("CASES BEGIN");
+			for (row in rows) Sys.println(row.patterns.map(Pattern.toString).join(""));
+			Sys.println("CASES END");
 		}
 		var dt = Compile.compile(ctx, matchDebug, subject.subjects, rows, p);
-		if (matchDebug) {Sys.println("DECISION TREE BEGIN"); Sys.println(DecisionTree.toString(dt)); Sys.println("DECISION TREE END");}
+		if (matchDebug) {
+			Sys.println("DECISION TREE BEGIN");
+			Sys.println(DecisionTree.toString(dt));
+			Sys.println("DECISION TREE END");
+		}
 		var tSwitch = inferSwitchType();
 		if (tmono != null && !(allowMinVoid && ExtType.isVoid(follow(tmono)))) unify(ctx, tSwitch, tmono, p);
 		var result = TexprConverter.toTexpr(ctx, tSwitch, withType, dt);
-		if (matchDebug) {Sys.println("TEXPR BEGIN"); Sys.println(MatcherGlobals.sExprPretty(result)); Sys.println("TEXPR END");}
-		return {eexpr:result.eexpr, etype:result.etype, epos:p};
+		if (matchDebug) {
+			Sys.println("TEXPR BEGIN");
+			Sys.println(MatcherGlobals.sExprPretty(result));
+			Sys.println("TEXPR END");
+		}
+		return {eexpr: result.eexpr, etype: result.etype, epos: p};
 	}
-	public static function matchExpr(ctx:context.Typecore.Typer, e:Expr, cases:Array<MatchCase>, def:Null<MatchDefault>, withType:WithTypeValue, postfixMatch:Bool, p:Pos):TExpr {
+
+	public static function matchExpr(ctx:context.Typecore.Typer, e:Expr, cases:Array<MatchCase>, def:Null<MatchDefault>,
+			withType:WithTypeValue, postfixMatch:Bool, p:Pos):TExpr {
 		if (cases.length == 0 && def == null && withType == NoValue) return typeExpr(ctx, e, WithTypeTools.value);
 		return matchExprImpl(ctx, e, cases, def, withType, postfixMatch, p);
 	}

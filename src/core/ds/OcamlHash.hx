@@ -58,7 +58,8 @@ class OcamlHash {
 	}
 
 	/** `Globals.path`: `(string list * string)`. **/
-	public static function ofPath(pack:Array<String>, name:String):OcamlValue return OBlock(0, [ofList([for (s in pack) OString(s)]), OString(name)]);
+	public static function ofPath(pack:Array<String>,
+			name:String):OcamlValue return OBlock(0, [ofList([for (s in pack) OString(s)]), OString(name)]);
 
 	/** `Globals.pos`: `{pfile; pmin; pmax}`. **/
 	public static function ofPos(p:core.Globals.Pos):OcamlValue return OBlock(0, [OString(p.pfile), OInt(p.pmin), OInt(p.pmax)]);

@@ -44,7 +44,8 @@ class LibBuildTask extends ServerTask {
 				try {
 					switch lib.build(path, p) {
 						case null:
-						case r: h.add(path, r);
+						case r:
+							h.add(path, r);
 					}
 				} catch (_:Dynamic) {}
 			}
@@ -101,7 +102,6 @@ class CommonCache {
 	}
 
 	/* context */
-
 	public static function getCache(com:CommonContext):ContextCache {
 		return switch com.cache {
 			case null:

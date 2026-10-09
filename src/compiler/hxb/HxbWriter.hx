@@ -76,7 +76,8 @@ function compareOcamlString(a:String, b:String):Int {
 	var la = a.length, lb = b.length;
 	var n = la < lb ? la : lb;
 	for (i in 0...n) {
-		var ca = StringTools.fastCodeAt(a, i), cb = StringTools.fastCodeAt(b, i);
+		var ca = StringTools.fastCodeAt(a, i),
+			cb = StringTools.fastCodeAt(b, i);
 		if (ca != cb) return ca < cb ? -1 : 1;
 	}
 	return la == lb ? 0 : (la < lb ? -1 : 1);
@@ -93,7 +94,9 @@ function pathKey(path:GlobalTypePath):String return path.hashKey();
 
 class Pool<K, V> {
 	final lut:Map<String, Int> = new Map();
+
 	public final items:Array<V> = [];
+
 	var closed = false;
 	final key:K->String;
 
@@ -133,6 +136,7 @@ class Pool<K, V> {
 
 class IdentityPool<K, V> {
 	public final items:Array<{key:K, value:V}> = [];
+
 	var closed = false;
 
 	public function new() {}
@@ -167,7 +171,9 @@ class IdentityPool<K, V> {
 
 class HashedIdentityPool<K, V> {
 	final lut:Map<String, Array<{key:K, index:Int}>> = new Map();
+
 	public final items:Array<{key:K, value:V}> = [];
+
 	var closed = false;
 
 	public function new() {}
@@ -200,6 +206,7 @@ class HashedIdentityPool<K, V> {
 // twice per lookup).
 class BytesPool {
 	final lut:Map<Int, Array<Int>> = new Map();
+
 	public final items:Array<Bytes> = [];
 
 	public function new() {}
@@ -223,6 +230,7 @@ class BytesPool {
 // SimnBuffer equivalent: a growable byte buffer whose contents can be read repeatedly.
 class ByteBuffer {
 	var buffer:Bytes;
+
 	public var length(default, null):Int = 0;
 
 	public function new(size:Int) buffer = Bytes.alloc(size < 16 ? 16 : size);
@@ -256,6 +264,7 @@ class ByteBuffer {
 class Chunk {
 	public final kind:ChunkKind;
 	public final cp:StringPool;
+
 	final ch:ByteBuffer;
 
 	public function new(kind:ChunkKind, cp:StringPool, initialSize:Int) {
@@ -282,7 +291,8 @@ class Chunk {
 	public function writeUleb128(v:Int):Void {
 		var b = v & 0x7F;
 		var rest = v >>> 7;
-		if (rest == 0) writeU8(b) else {
+		if (rest == 0) writeU8(b)
+		else {
 			writeU8(b | 0x80);
 			writeUleb128(rest);
 		}
@@ -291,7 +301,8 @@ class Chunk {
 	public function writeLeb128(v:Int):Void {
 		var b = v & 0x7F;
 		var rest = v >> 7;
-		if ((rest == 0 && (b & 0x40 == 0)) || (rest == -1 && (b & 0x40 == 0x40))) writeU8(b) else {
+		if ((rest == 0 && (b & 0x40 == 0)) || (rest == -1 && (b & 0x40 == 0x40))) writeU8(b)
+		else {
 			writeU8(b | 0x80);
 			writeLeb128(rest);
 		}
@@ -319,7 +330,8 @@ class Chunk {
 	}
 
 	public function writeOption<B>(v:Null<B>, f:B->Void):Void {
-		if (v == null) writeU8(0) else {
+		if (v == null) writeU8(0)
+		else {
 			writeU8(1);
 			f(v);
 		}
@@ -388,9 +400,17 @@ class PosWriter {
 	public var posWriter:PosWriter;
 	public var texprThis:Null<TExpr>;
 	public var vars:Array<{v:TVar, id:Int}>;
-	public inline function new(tPool:BytesPool, posWriter:PosWriter, texprThis:Null<TExpr>, vars:Array<{v:TVar, id:Int}>) { this.tPool = tPool; this.posWriter = posWriter; this.texprThis = texprThis; this.vars = vars; }
+
+	public inline function new(tPool:BytesPool, posWriter:PosWriter, texprThis:Null<TExpr>, vars:Array<{v:TVar, id:Int}>) {
+		this.tPool = tPool;
+		this.posWriter = posWriter;
+		this.texprThis = texprThis;
+		this.vars = vars;
+	}
+
 	public inline function clone():FieldWriterContext return new FieldWriterContext(tPool, posWriter, texprThis, vars);
 }
+
 typedef ExprChunks = {pre:Chunk, e:Chunk};
 
 // A class rather than a structure: HashLink accesses structures through
@@ -398,6 +418,7 @@ typedef ExprChunks = {pre:Chunk, e:Chunk};
 @:structInit private class UnboundFrame {
 	public final source:Void->String;
 	public final p:Null<Pos>;
+
 	public inline function new(source:Void->String, p:Null<Pos>) {
 		this.source = source;
 		this.p = p;
@@ -429,7 +450,9 @@ class HxbWriter {
 	final ownAbstracts:Pool<GlobalTypePath, TAbstract> = new Pool(pathKey);
 	final typeParamLut:Pool<GlobalTypePath, Pool<String, TypedTypeParam>> = new Pool(pathKey);
 	final classFields:HashedIdentityPool<TClassField, {c:TClass, kind:ClassFieldRefKind, depth:Int}> = new HashedIdentityPool();
-	final enumFields:Pool<{path:GlobalTypePath, name:String}, {en:TEnum, ef:TEnumField}> = new Pool(function(k:{path:GlobalTypePath, name:String}) return pathKey(k.path) + "#" + k.name);
+	final enumFields:Pool<{path:GlobalTypePath, name:String},
+		{en:TEnum, ef:TEnumField}> = new Pool(function(k:{path:GlobalTypePath, name:String}) return pathKey(k.path)
+		+ "#" + k.name);
 	var typeTypeParameters:Pool<String, TypedTypeParam> = new Pool(function(s) return s);
 	var fieldTypeParameters:IdentityPool<TypedTypeParam, Bool> = new IdentityPool();
 	var localTypeParameters:IdentityPool<TypedTypeParam, Bool> = new IdentityPool();
@@ -441,7 +464,8 @@ class HxbWriter {
 	final tInstanceChunk:Chunk;
 	final unboundFrames:Array<UnboundFrame> = [];
 
-	public function new(generateDocumentation:Bool = true, ?warn:(warning:core.Message.WarningCode, msg:String, p:Pos) -> Void, ?anonId:TanonIdentification<Dynamic>) {
+	public function new(generateDocumentation:Bool = true, ?warn:(warning:core.Message.WarningCode, msg:String, p:Pos) -> Void,
+			?anonId:TanonIdentification<Dynamic>) {
 		this.generateDocs = generateDocumentation;
 		this.warn = warn != null ? warn : function(_, _, _) {};
 		this.anonId = anonId != null ? anonId : new TanonIdentification();
@@ -465,9 +489,11 @@ class HxbWriter {
 	function catchUnboundTtp<R>(f:Void->R, source:Void->String, p:Null<Pos>):R {
 		unboundFrames.push({source: source, p: p});
 		var r;
-		try r = f() catch(e:haxe.Exception){
+		try r = f()
+		catch (e:haxe.Exception) {
 			unboundFrames.pop();
-			throw e;}
+			throw e;
+		}
 		unboundFrames.pop();
 		return r;
 	}
@@ -475,9 +501,11 @@ class HxbWriter {
 	// catchUnboundTtp(() -> writeTexprTypeInstance(fctx, e.etype), () -> "texpr type", e.epos)
 	// without a closure per expression node.
 	static function texprTypeSource():String return "texpr type";
+
 	function writeTexprTypeInstanceCatching(fctx:FieldWriterContext, e:TExpr):Void {
 		unboundFrames.push({source: texprTypeSource, p: e.epos});
-		try writeTexprTypeInstance(fctx, e.etype) catch (ex:haxe.Exception) {
+		try writeTexprTypeInstance(fctx, e.etype)
+		catch (ex:haxe.Exception) {
 			unboundFrames.pop();
 			throw ex;
 		}
@@ -595,8 +623,10 @@ class HxbWriter {
 		chunk.writeString(k.name);
 		writePos(k.pos);
 		switch k.quote {
-			case NoQuotes: chunk.writeU8(0);
-			case DoubleQuotes: chunk.writeU8(1);
+			case NoQuotes:
+				chunk.writeU8(0);
+			case DoubleQuotes:
+				chunk.writeU8(1);
 		}
 	}
 
@@ -974,7 +1004,8 @@ class HxbWriter {
 
 	function writeEnumFieldRef(en:TEnum, ef:TEnumField):Void {
 		var key = {path: en.ePath, name: ef.efName};
-		try chunk.writeUleb128(enumFields.get(key)) catch (_:NotFound) {
+		try chunk.writeUleb128(enumFields.get(key))
+		catch (_:NotFound) {
 			enums.getOrAdd(en.ePath, en);
 			chunk.writeUleb128(enumFields.add(key, {en: en, ef: ef}));
 		}
@@ -983,17 +1014,29 @@ class HxbWriter {
 	function writeVarKind(vk:TVarKind):Void {
 		var b = 0, sl:Array<String> = [];
 		switch vk {
-			case VUser(TVOLocalVariable): b = 0;
-			case VUser(TVOArgument): b = 1;
-			case VUser(TVOForVariable): b = 2;
-			case VUser(TVOPatternVariable): b = 3;
-			case VUser(TVOCatchVariable): b = 4;
-			case VUser(TVOLocalFunction): b = 5;
-			case VGenerated: b = 6;
-			case VInlined: b = 7;
-			case VInlinedConstructorVariable(l): b = 8; sl = l;
-			case VExtractorVariable: b = 9;
-			case VAbstractThis: b = 10;
+			case VUser(TVOLocalVariable):
+				b = 0;
+			case VUser(TVOArgument):
+				b = 1;
+			case VUser(TVOForVariable):
+				b = 2;
+			case VUser(TVOPatternVariable):
+				b = 3;
+			case VUser(TVOCatchVariable):
+				b = 4;
+			case VUser(TVOLocalFunction):
+				b = 5;
+			case VGenerated:
+				b = 6;
+			case VInlined:
+				b = 7;
+			case VInlinedConstructorVariable(l):
+				b = 8;
+				sl = l;
+			case VExtractorVariable:
+				b = 9;
+			case VAbstractThis:
+				b = 10;
 		}
 		chunk.writeU8(b);
 		if (b == 8) chunk.writeList(sl, chunk.writeString);
@@ -1129,7 +1172,8 @@ class HxbWriter {
 		} catch (_:NotFound) {
 			var r = performUnboundTtp();
 			var msg = 'Unbound type parameter ${core.Globals.sTypePath(ttp.ttpClass.clPath)} while writing ${r.source}';
-			try unboundTtp.get(ttp) catch (_:NotFound) {
+			try unboundTtp.get(ttp)
+			catch (_:NotFound) {
 				unboundTtp.add(ttp, true);
 				warn(core.Message.WarningCode.WUnboundTypeParameter, msg, r.p);
 			}
@@ -1148,9 +1192,11 @@ class HxbWriter {
 			return null;
 		}, function() return 'function arg `${a.name}`', null);
 	}
+
 	inline function inlinedList<A>(offset:Int, max:Int, fFirst:Void->Void, fElt:A->Void, l:Array<A>) {
 		writeInlinedList(offset, max, chunk.writeU8, fFirst, fElt, l);
 	}
+
 	function writeTypeInstance(t:T):Void {
 		switch t {
 			case TAbstract({aPath: {pack: [], name: "Void"}}, []):
@@ -1164,12 +1210,17 @@ class HxbWriter {
 			case TInst({clPath: {pack: [], name: "String"}}, []):
 				chunk.writeU8(104);
 			case TMono(r):
-				try Monomorph.close(r) catch (e:Unify_error) {
-					try unclosedMono.get(r) catch (_:NotFound) {
+				try Monomorph.close(r)
+				catch (e:Unify_error) {
+					try unclosedMono.get(r)
+					catch (_:NotFound) {
 						unclosedMono.add(r, true);
 						var p = moduleFilePos();
-						var msg = "Error while handling unclosed monomorph:\n" + core.Error.errorMsg(Unify(e.errors)) + "\n\n"
-							+ "Unclosed monomorph should not reach hxb writer, please submit an issue at https://github.com/HaxeFoundation/haxe/issues/new";
+						var msg = "Error while handling unclosed monomorph:\n"
+							+ core.Error.errorMsg(Unify(e.errors))
+							+ "\n\n"
+							+
+							"Unclosed monomorph should not reach hxb writer, please submit an issue at https://github.com/HaxeFoundation/haxe/issues/new";
 						warn(core.Message.WarningCode.WUnclosedMonomorph, msg, p);
 					}
 				}
@@ -1398,7 +1449,8 @@ class HxbWriter {
 						declareVar(a.variable);
 						chunk.writeOption(a.defaultValue, loop);
 					});
-					if (e == e1) writeTypeInstance(tf.tfType) else catchUnboundTtp(function() {
+					if (e == e1) writeTypeInstance(tf.tfType)
+					else catchUnboundTtp(function() {
 						writeTypeInstance(tf.tfType);
 						return null;
 					}, function() return "TFunction", e1.epos);
@@ -1424,8 +1476,10 @@ class HxbWriter {
 						chunk.writeString(f.key.name);
 						writePos(f.key.pos);
 						switch f.key.quote {
-							case NoQuotes: chunk.writeU8(0);
-							case DoubleQuotes: chunk.writeU8(1);
+							case NoQuotes:
+								chunk.writeU8(0);
+							case DoubleQuotes:
+								chunk.writeU8(1);
 						}
 						loop(f.expr);
 					});
@@ -1627,7 +1681,8 @@ class HxbWriter {
 			};
 			if (writeType) {
 				// Unbound TTP in top level expr type will be caught be calling site with a better position
-				if (e == e1) writeTexprTypeInstance(fctx, e.etype) else writeTexprTypeInstanceCatching(fctx, e1);
+				if (e == e1) writeTexprTypeInstance(fctx, e.etype)
+				else writeTexprTypeInstanceCatching(fctx, e1);
 			}
 			fctx.posWriter.writePos(chunk, true, 0, e1.epos);
 		}
@@ -1669,39 +1724,61 @@ class HxbWriter {
 	// Fields
 
 	function writeFieldKind(k:FieldKind):Void switch k {
-		case Method(MethNormal): chunk.writeU8(0);
-		case Method(MethInline): chunk.writeU8(1);
-		case Method(MethDynamic): chunk.writeU8(2);
-		case Method(MethMacro): chunk.writeU8(3);
+		case Method(MethNormal):
+			chunk.writeU8(0);
+		case Method(MethInline):
+			chunk.writeU8(1);
+		case Method(MethDynamic):
+			chunk.writeU8(2);
+		case Method(MethMacro):
+			chunk.writeU8(3);
 		// normal read
-		case Var({vRead: AccNormal, vWrite: AccNormal}): chunk.writeU8(10);
-		case Var({vRead: AccNormal, vWrite: AccNo}): chunk.writeU8(11);
-		case Var({vRead: AccNormal, vWrite: AccNever}): chunk.writeU8(12);
-		case Var({vRead: AccNormal, vWrite: AccCtor}): chunk.writeU8(13);
-		case Var({vRead: AccNormal, vWrite: AccCall}): chunk.writeU8(14);
+		case Var({vRead: AccNormal, vWrite: AccNormal}):
+			chunk.writeU8(10);
+		case Var({vRead: AccNormal, vWrite: AccNo}):
+			chunk.writeU8(11);
+		case Var({vRead: AccNormal, vWrite: AccNever}):
+			chunk.writeU8(12);
+		case Var({vRead: AccNormal, vWrite: AccCtor}):
+			chunk.writeU8(13);
+		case Var({vRead: AccNormal, vWrite: AccCall}):
+			chunk.writeU8(14);
 		// inline read
-		case Var({vRead: AccInline, vWrite: AccNever}): chunk.writeU8(20);
+		case Var({vRead: AccInline, vWrite: AccNever}):
+			chunk.writeU8(20);
 		// getter read
-		case Var({vRead: AccCall, vWrite: AccNormal}): chunk.writeU8(30);
-		case Var({vRead: AccCall, vWrite: AccNo}): chunk.writeU8(31);
-		case Var({vRead: AccCall, vWrite: AccNever}): chunk.writeU8(32);
-		case Var({vRead: AccCall, vWrite: AccCtor}): chunk.writeU8(33);
-		case Var({vRead: AccCall, vWrite: AccCall}): chunk.writeU8(34);
+		case Var({vRead: AccCall, vWrite: AccNormal}):
+			chunk.writeU8(30);
+		case Var({vRead: AccCall, vWrite: AccNo}):
+			chunk.writeU8(31);
+		case Var({vRead: AccCall, vWrite: AccNever}):
+			chunk.writeU8(32);
+		case Var({vRead: AccCall, vWrite: AccCtor}):
+			chunk.writeU8(33);
+		case Var({vRead: AccCall, vWrite: AccCall}):
+			chunk.writeU8(34);
 		// weird/overlooked combinations
 		case Var({vRead: r, vWrite: w}):
 			chunk.writeU8(100);
 			inline function f(a:VarAccess) switch a {
-				case AccNormal: chunk.writeU8(0);
-				case AccNo: chunk.writeU8(1);
-				case AccNever: chunk.writeU8(2);
-				case AccCtor: chunk.writeU8(3);
-				case AccCall: chunk.writeU8(4);
-				case AccInline: chunk.writeU8(5);
+				case AccNormal:
+					chunk.writeU8(0);
+				case AccNo:
+					chunk.writeU8(1);
+				case AccNever:
+					chunk.writeU8(2);
+				case AccCtor:
+					chunk.writeU8(3);
+				case AccCall:
+					chunk.writeU8(4);
+				case AccInline:
+					chunk.writeU8(5);
 				case AccRequire(s, so):
 					chunk.writeU8(6);
 					chunk.writeString(s);
 					chunk.writeOption(so, chunk.writeString);
-				case AccPrivateCall: chunk.writeU8(7);
+				case AccPrivateCall:
+					chunk.writeU8(7);
 			}
 			f(r);
 			f(w);
@@ -1744,7 +1821,8 @@ class HxbWriter {
 			close: function() {
 				return restore(function(newChunk:Chunk):ExprChunks {
 					var restore = startTemporaryChunk(512);
-					if (inNestedScope()) chunk.writeU8(0) else {
+					if (inNestedScope()) chunk.writeU8(0)
+					else {
 						chunk.writeU8(1);
 						var ltp = [for (e in localTypeParameters.toList()) e.key];
 						writeTypeParameters(ltp);
@@ -1772,7 +1850,8 @@ class HxbWriter {
 
 	function commitFieldTypeParameters(params:TypeParams):Void {
 		chunk.writeUleb128(params.length);
-		if (inNestedScope()) chunk.writeU8(0) else {
+		if (inNestedScope()) chunk.writeU8(0)
+		else {
 			chunk.writeU8(1);
 			var ftp = [for (e in fieldTypeParameters.toList()) e.key];
 			writeTypeParameters(ftp);
@@ -1909,24 +1988,28 @@ class HxbWriter {
 	}
 
 	function writeAbstract(a:TAbstract):Void {
-		try selectType(a.aPath) catch (_:NotFound) {
+		try selectType(a.aPath)
+		catch (_:NotFound) {
 			Sys.stderr().writeString("Could not select abstract " + core.Globals.sTypePath(a.aPath) + "\n");
 		}
 		writeCommonModuleType(TFunctions.tInfos(TAbstractDecl(a)));
 		chunk.writeOption(a.aImpl, writeClassRef);
-		if (core.Meta.has(StrictMeta.CoreType, a.aMeta)) chunk.writeU8(0) else {
+		if (core.Meta.has(StrictMeta.CoreType, a.aMeta)) chunk.writeU8(0)
+		else {
 			chunk.writeU8(1);
 			catchUnboundTtp(function() {
 				writeTypeInstance(a.aThis);
 				return null;
-			}, function() return 'underlying type for abstract `${core.Globals.sTypePath(a.aPath)}`', a.aPos);
+			},
+				function() return 'underlying type for abstract `${core.Globals.sTypePath(a.aPath)}`', a.aPos);
 		}
 		inline function writeFromTo(source:String, t:T) {
 			catchUnboundTtp(function() {
 				writeTypeInstance(t);
 				return null;
 			}, function() {
-				var tPath = try core.Globals.sTypePath(TFunctions.tPath(TFunctions.moduleTypeOfType(t))) catch (_:Dynamic) core.TPrinting.sType(core.TPrinting.printContext(), t);
+				var tPath = try core.Globals.sTypePath(TFunctions.tPath(TFunctions.moduleTypeOfType(t))) catch (_:Dynamic)
+					core.TPrinting.sType(core.TPrinting.printContext(), t);
 				return '`$source` type `$tPath` for abstract `${core.Globals.sTypePath(a.aPath)}`';
 			}, a.aPos);
 		}
@@ -1968,11 +2051,11 @@ class HxbWriter {
 		catchUnboundTtp(function() {
 			writeTypeInstance(td.tType);
 			return null;
-		}, function() return 'typedef `${core.Globals.sTypePath(td.tPath)}`', td.tPos);
+		},
+			function() return 'typedef `${core.Globals.sTypePath(td.tPath)}`', td.tPos);
 	}
 
 	// Module
-
 	// PMap.foldi (fun s f acc -> (s,f) :: acc) m []: descending key order.
 	static function enumConstructorsDescending(e:TEnum):Array<{name:String, ef:TEnumField}> {
 		var keys = sortedKeys(e.eConstrs);

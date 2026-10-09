@@ -13,7 +13,8 @@ import macros.eval.EvalContext;
 	  `threadLock` (upstream: an `Atomic.t` and a `ThreadSafeHashtbl`).
 	- The debugger is not ported, so no thread events are sent and the eval's
 	  breakpoint is a fresh disabled one (evalDebugMisc.ml `make_breakpoint`).
-	- OCaml domains (`spawn_domain`) and threads both become host threads.
+	- OCaml domains (`spawn_domain`) and threads both become host threads,
+	  which run Eval code holding `EvalLock` (OCaml's runtime lock).
 **/
 class Deque {
 	public static function create():Vdeque return new Vdeque();
@@ -26,6 +27,11 @@ class Deque {
 	}
 
 	public static function pop(self:Vdeque, blocking:Bool):Null<Value> {
+		// a blocking pop waits without the Eval lock (Condition.wait releases OCaml's runtime lock)
+		return if (blocking) EvalLock.blocking(() -> popHost(self, true)) else popHost(self, false);
+	}
+
+	static function popHost(self:Vdeque, blocking:Bool):Null<Value> {
 		self.dcond.acquire();
 		if (blocking) {
 			while (self.dvalues.length == 0) self.dcond.wait();
@@ -108,12 +114,17 @@ class EvalThread {
 		var tthread = createThreadInfo(ctx, null);
 		var startSem = new sys.thread.Semaphore(0);
 		var finished = new sys.thread.Lock();
+		EvalLock.activate();
 		var t = sys.thread.Thread.create(() -> {
 			startSem.acquire();
-			try run(ctx, tthread, f) catch (e:Dynamic) {
+			EvalLock.enter();
+			try run(ctx, tthread, f)
+			catch (e:Dynamic) {
+				EvalLock.leave();
 				finished.release();
 				throw e;
 			}
+			EvalLock.leave();
 			finished.release();
 		});
 		tthread.threadMode = domain ? Domain(t, finished) : Thread(t, finished);

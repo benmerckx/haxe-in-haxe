@@ -13,7 +13,8 @@ class StringPool {
 	// escape character) are escaped injectively into a NUL-free form.
 	static inline function key(value:String):String {
 		#if hl
-		return value.indexOf("\x00") < 0 && value.charCodeAt(0) != 1 ? value : "\x01" + value.split("\x01").join("\x01\x01").split("\x00").join("\x01\x02");
+		return value.indexOf("\x00") < 0
+			&& value.charCodeAt(0) != 1 ? value : "\x01" + value.split("\x01").join("\x01\x01").split("\x00").join("\x01\x02");
 		#else
 		return value;
 		#end

@@ -441,6 +441,8 @@ A scope-review entry is not a blanket exclusion of shared batch-compiler helpers
 
 - `src/core/MetaList.hx`
 - `src/core/WarningList.hx`
+- `src/macros/eval/EvalLock.hx`: OCaml's runtime lock for Eval threads on host
+  threads (no upstream module; see its comment)
 
 ## Next work
 

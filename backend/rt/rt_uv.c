@@ -173,23 +173,42 @@ int32_t hxc_NativeUv_available(void) { return 1; }
 
 // ---- object table (id 0 is unused)
 
-static void **objs;
-static int32_t nobjs = 1, capobjs;
-static int32_t last_err;
-static int64_t i64_out;
+// Threads: chunks that never move, so lookups need no lock (adding one does);
+// results passed back through globals are per thread.
+#define OBJ_CHUNK 1024
+static void **obj_chunks[65536];
+static int32_t nobjs = 1;
+static rt_lock_t objs_lock = RT_LOCK_INIT;
+#define OBJ(id) obj_chunks[(id) / OBJ_CHUNK][(id) % OBJ_CHUNK]
+static RT_TLS int32_t last_err;
+static RT_TLS int64_t i64_out;
 
 static int32_t obj_add(void *p) {
-	if (nobjs >= capobjs) {
-		capobjs = capobjs ? capobjs * 2 : 64;
-		objs = realloc(objs, sizeof(void *) * capobjs);
+	rt_lock(&objs_lock);
+	int32_t id = nobjs;
+	if (id / OBJ_CHUNK >= 65536) {
+		rt_unlock(&objs_lock);
+		hx_throw_str("eval.luv: too many handles");
 	}
-	objs[nobjs] = p;
-	return nobjs++;
+	if (!obj_chunks[id / OBJ_CHUNK]) obj_chunks[id / OBJ_CHUNK] = calloc(OBJ_CHUNK, sizeof(void *));
+	OBJ(id) = p;
+#if RT_MT
+	__atomic_store_n(&nobjs, id + 1, __ATOMIC_RELEASE);
+#else
+	nobjs = id + 1;
+#endif
+	rt_unlock(&objs_lock);
+	return id;
 }
 
 static void *obj_get(int32_t id) {
-	if (id <= 0 || id >= nobjs || !objs[id]) hx_throw_str("eval.luv: invalid or closed handle");
-	return objs[id];
+#if RT_MT
+	int32_t n = __atomic_load_n(&nobjs, __ATOMIC_ACQUIRE);
+#else
+	int32_t n = nobjs;
+#endif
+	if (id <= 0 || id >= n || !OBJ(id)) hx_throw_str("eval.luv: invalid or closed handle");
+	return OBJ(id);
 }
 
 int32_t hxc_NativeUv_lastError(void) { return last_err; }
@@ -332,9 +351,9 @@ void *hxc_NativeUv_versionSuffix(void) { return str_of_c(UV_VERSION_SUFFIX); }
 // ---- dispatching events to the port (during loopRun)
 
 enum { EV_CLOSE, EV_CB, EV_REQ, EV_CONNECTION, EV_ALLOC, EV_READ, EV_EXIT, EV_UDP_RECV, EV_FS_EVENT, EV_FS_POLL };
-static void **disp_slot; // the shadow-stack slot holding the dispatcher
+static RT_TLS void **disp_slot; // the shadow-stack slot holding the dispatcher (of the thread's running loop)
 
-static unsigned long dispatch_count; // events reported (hxc_NativeUv_loopRun, UV_RUN_ONCE)
+static RT_TLS unsigned long dispatch_count; // events reported (hxc_NativeUv_loopRun, UV_RUN_ONCE)
 
 static void dispatch(int32_t id, int32_t ev, int32_t a, void *b) {
 	if (!disp_slot) return;
@@ -366,13 +385,17 @@ static int32_t default_loop_id;
 
 static uv_loop_t *LOOP(int32_t id) { return ((hx_loop *)obj_get(id))->loop; }
 
+static rt_lock_t default_loop_lock = RT_LOCK_INIT;
 int32_t hxc_NativeUv_loopDefault(void) {
+	rt_lock(&default_loop_lock);
 	if (!default_loop_id) {
 		hx_loop *l = calloc(1, sizeof *l);
 		l->loop = uv_default_loop();
 		default_loop_id = obj_add(l);
 	}
-	return default_loop_id;
+	int32_t id = default_loop_id;
+	rt_unlock(&default_loop_lock);
+	return id;
 }
 
 int32_t hxc_NativeUv_loopInit(void) {
@@ -440,7 +463,7 @@ int32_t hxc_NativeUv_loopRun(int32_t id, int32_t mode, void *dispatcher) {
 	disp_slot = dispatcher_root;
 	uv_run_mode m = mode == 0 ? UV_RUN_DEFAULT : mode == 1 ? UV_RUN_ONCE : UV_RUN_NOWAIT;
 	int r;
-	int coop = m != UV_RUN_NOWAIT && rt_nthreads > 1;
+	int coop = m != UV_RUN_NOWAIT && RT_NTHREADS() > 1;
 	if (!coop) {
 		uv_loop_t *saved_loop = plain_loop;
 		int saved_spawned = plain_spawned;
@@ -523,7 +546,7 @@ static hx_h *new_handle(int32_t kind) {
 }
 
 static void free_handle(hx_h *h) {
-	objs[h->id] = NULL;
+	OBJ(h->id) = NULL;
 	free(h->rbuf);
 	free(h);
 }
@@ -678,7 +701,7 @@ static void req_clear(hx_r *r) {
 void hxc_NativeUv_reqFree(int32_t id) {
 	hx_r *r = R(id);
 	req_clear(r);
-	objs[id] = NULL;
+	OBJ(id) = NULL;
 	free(r);
 }
 
@@ -803,7 +826,7 @@ int32_t hxc_NativeUv_tcpCloseReset(int32_t id, int32_t rid) {
 
 // ---- streams
 
-static int32_t alloc_size;
+static RT_TLS int32_t alloc_size;
 void hxc_NativeUv_allocSize(int32_t n) { alloc_size = n; }
 
 static void alloc_cb(uv_handle_t *uh, size_t suggested, uv_buf_t *buf) {

@@ -33,32 +33,34 @@ class TypePathHandler {
 				case _: p;
 			}
 		} else p;
-		(com.classPaths : core.ClassPaths).iter(function(path) {
-			var path = path.path;
-			var dir = path + p.join("/");
-			var r = try sys.FileSystem.readDirectory(dir) catch (_:Dynamic) [];
-			for (f in r) {
-				if (try sys.FileSystem.isDirectory(dir + "/" + f) catch (_:Dynamic) false) {
-					if (StringTools.fastCodeAt(f, 0) >= "a".code && StringTools.fastCodeAt(f, 0) <= "z".code) {
-						if (p.length == 1 && p[0] == ".") {
-							var r = readTypePath(com, [f]);
-							if (r.packages.length == 0 && r.classes.length == 0) {} else {
-								switch com.packageRules.get(f) {
-									case Forbidden:
-									case Remap(f): packages.unshift(f);
-									case null: packages.unshift(f);
+			(com.classPaths : core.ClassPaths).iter(function(path) {
+				var path = path.path;
+				var dir = path + p.join("/");
+				var r = try sys.FileSystem.readDirectory(dir) catch (_:Dynamic) [];
+				for (f in r) {
+					if (try sys.FileSystem.isDirectory(dir + "/" + f) catch (_:Dynamic) false) {
+						if (StringTools.fastCodeAt(f, 0) >= "a".code && StringTools.fastCodeAt(f, 0) <= "z".code) {
+							if (p.length == 1 && p[0] == ".") {
+								var r = readTypePath(com, [f]);
+								if (r.packages.length == 0 && r.classes.length == 0) {} else {
+									switch com.packageRules.get(f) {
+										case Forbidden:
+										case Remap(f):
+											packages.unshift(f);
+										case null:
+											packages.unshift(f);
+									}
 								}
-							}
-						} else packages.unshift(f);
-					}
-				} else if (core.Path.fileExtension(f) == "hx" && f != "import.hx") {
-					var c = haxe.io.Path.withoutExtension(f);
-					if (c.indexOf(".") < 0) {
-						if (c.length < 2 || c.substr(c.length - 2, 2) != "__") classes.unshift(c);
+							} else packages.unshift(f);
+						}
+					} else if (core.Path.fileExtension(f) == "hx" && f != "import.hx") {
+						var c = haxe.io.Path.withoutExtension(f);
+						if (c.indexOf(".") < 0) {
+							if (c.length < 2 || c.substr(c.length - 2, 2) != "__") classes.unshift(c);
+						}
 					}
 				}
-			}
-		});
+			});
 		// Native libraries (SWF/JVM) are a later milestone; com.native_libs holds none.
 		return {packages: unique(packages), classes: unique(classes)};
 	}
@@ -73,9 +75,12 @@ class TypePathHandler {
 	}
 
 	/** raise field completion listing module sub-types and static fields **/
-	public static function completeTypePathInner(ctx:Typer, p:Array<String>, c:String, curPackage:Bool, isImport:Bool):Null<Array<CompletionItemData>> {
+	public static function completeTypePathInner(ctx:Typer, p:Array<String>, c:String, curPackage:Bool,
+			isImport:Bool):Null<Array<CompletionItemData>> {
 		try {
-			var r = if (p.length > 0 && StringTools.fastCodeAt(p[p.length - 1], 0) >= "A".code && StringTools.fastCodeAt(p[p.length - 1], 0) <= "Z".code) {
+			var r = if (p.length > 0
+				&& StringTools.fastCodeAt(p[p.length - 1], 0) >= "A".code
+				&& StringTools.fastCodeAt(p[p.length - 1], 0) <= "Z".code) {
 				{slPack: p.slice(0, p.length - 1), sModule: p[p.length - 1]};
 			} else {slPack: p, sModule: c};
 			var slPack = r.slPack, sModule = r.sModule;
@@ -117,7 +122,8 @@ class TypePathHandler {
 				}
 				return !tinfos.mtPrivate;
 			});
-			var types = if (c != sModule) [] else publicTypes.map(mt -> CompletionItem.makeCiType(CompletionModuleType.ofModuleType(mt), Imported, null));
+			var types = if (c != sModule) [] else publicTypes.map(mt -> CompletionItem.makeCiType(CompletionModuleType.ofModuleType(mt),
+				Imported, null));
 			function classOrigin(c:TClass):ClassFieldOrigin return switch c.clKind {
 				case KAbstractImpl(a): Self(TAbstractDecl(a));
 				case _: Self(TClassDecl(c));
@@ -133,7 +139,9 @@ class TypePathHandler {
 			var fields = if (enumStatics == null) fields else {
 				var en = enumStatics;
 				core.ds.PMap.fold(function(ef:TEnumField, acc:Array<CompletionItemData>) {
-					return [CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, Self(TEnumDecl(en)), true), tpair(ef.efType))].concat(acc);
+					return [
+						CompletionItem.makeCiEnumField(CompletionEnumField.make(ef, Self(TEnumDecl(en)), true), tpair(ef.efType))
+					].concat(acc);
 				}, en.eConstrs, fields);
 			};
 			return fields;
@@ -167,7 +175,8 @@ class DisplayPath {
 				DisplayToplevel.collectAndRaise(ctx, TKType, WithTypeTools.noValue, CRImport, s, p, p);
 			case [IDKPackage(sl), DMDefault]:
 				var p = r.pos;
-				var sl = if (sl.length > 0) sl.slice(0, sl.length - 1) else throw new core.Globals.InternalCompilerError("displayPath.ml: empty package", "");
+				var sl = if (sl.length > 0) sl.slice(0,
+					sl.length - 1) else throw new core.Globals.InternalCompilerError("displayPath.ml: empty package", "");
 				throw new syntax.Parser.TypePathCompletion(sl, null, true, p);
 			case [IDKPackage(_), _]:
 				// ?

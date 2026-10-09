@@ -91,7 +91,10 @@ class EvalAtomic {
 	];
 
 	public static final atomicBoolFields:Array<{name:String, value:Value}> = [
-		{name: "_hx_new", value: vfun1(v -> EvalEncode.encodeInstance(EvalHash.key_haxe_atomic_AtomicBool, IAtomicBool({v: decodeBool(v)})))},
+		{
+			name: "_hx_new",
+			value: vfun1(v -> EvalEncode.encodeInstance(EvalHash.key_haxe_atomic_AtomicBool, IAtomicBool({v: decodeBool(v)})))
+		},
 		{name: "load", value: vfun1(v -> EvalValueTools.vbool(get(asAtomicBool(v))))},
 		{
 			name: "store",
@@ -101,10 +104,13 @@ class EvalAtomic {
 				v;
 			})
 		},
-		{name: "exchange", value: vfun2((a, v) -> {
-			var x = decodeBool(v);
-			EvalValueTools.vbool(exchange(asAtomicBool(a), x));
-		})},
+		{
+			name: "exchange",
+			value: vfun2((a, v) -> {
+				var x = decodeBool(v);
+				EvalValueTools.vbool(exchange(asAtomicBool(a), x));
+			})
+		},
 		{
 			name: "compareExchange",
 			value: vfun3((vthis, a, b) -> {
@@ -141,10 +147,13 @@ class EvalAtomic {
 				v;
 			})
 		},
-		{name: "exchange", value: vfun2((a, v) -> {
-			var x = decodeInt(v);
-			VInt32(exchange(asAtomicInt(a), x));
-		})},
+		{
+			name: "exchange",
+			value: vfun2((a, v) -> {
+				var x = decodeInt(v);
+				VInt32(exchange(asAtomicInt(a), x));
+			})
+		},
 		{
 			name: "compareExchange",
 			value: vfun3((vthis, a, b) -> {

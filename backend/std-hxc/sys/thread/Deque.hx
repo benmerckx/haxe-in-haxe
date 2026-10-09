@@ -2,36 +2,40 @@ package sys.thread;
 
 import hxc.NativeThread;
 
-// hxc target (backend/): over green threads (rt_thread.c).
+// hxc target (backend/): an array guarded by a mutex, with a condition for
+// blocking pops (rt_thread.c).
 class Deque<T> {
+	final mutex:Dynamic = NativeThread.mutexNew();
+	final cond:Dynamic = NativeThread.condNew();
 	var items:Array<T> = [];
-	var waiters:Array<Int> = [];
 
 	public function new():Void {}
 
 	public function add(i:T):Void {
+		NativeThread.mutexAcquire(mutex);
 		items.push(i);
-		wakeOne();
+		NativeThread.condSignal(cond);
+		NativeThread.mutexRelease(mutex);
 	}
 
 	public function push(i:T):Void {
+		NativeThread.mutexAcquire(mutex);
 		items.unshift(i);
-		wakeOne();
+		NativeThread.condSignal(cond);
+		NativeThread.mutexRelease(mutex);
 	}
 
 	public function pop(block:Bool):Null<T> {
+		NativeThread.mutexAcquire(mutex);
 		while (items.length == 0) {
-			if (!block) return null;
-			var cur = NativeThread.current();
-			waiters.push(cur);
-			// items.length: an add while push was growing the array found no waiter
-			while (waiters.indexOf(cur) >= 0 && items.length == 0) NativeThread.park(-1);
-			waiters.remove(cur);
+			if (!block) {
+				NativeThread.mutexRelease(mutex);
+				return null;
+			}
+			NativeThread.condWait(cond, mutex, -1);
 		}
-		return items.shift();
-	}
-
-	inline function wakeOne() {
-		if (waiters.length > 0) NativeThread.unpark(waiters.shift());
+		var v = items.shift();
+		NativeThread.mutexRelease(mutex);
+		return v;
 	}
 }

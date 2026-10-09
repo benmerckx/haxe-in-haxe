@@ -101,7 +101,8 @@ class PrototypeBuilder {
 	public static function finalize(pctx:PrototypeContext):ProtoInit {
 		var ctx = pctx.ctx;
 		// Add builtins (from EvalStdLib).
-		var builtins = try (pctx.isStatic ? ctx.builtins.staticBuiltins : ctx.builtins.instanceBuiltins).find(pctx.key) catch (_:NotFound) [];
+		var builtins = try (pctx.isStatic ? ctx.builtins.staticBuiltins : ctx.builtins.instanceBuiltins).find(pctx.key) catch (_:NotFound)
+			[];
 		for (b in builtins) {
 			var s = b.name;
 			var v = b.value;
@@ -174,7 +175,8 @@ class PrototypeBuilder {
 			};
 		}
 		// Create the prototype.
-		var proto = new Vprototype(pctx.key, [for (_ in 0...pctx.fields.length) VNull], pnames, pinstanceFields, pinstanceNames, pctx.parent, pctx.kind, VNull);
+		var proto = new Vprototype(pctx.key, [for (_ in 0...pctx.fields.length) VNull], pnames, pinstanceFields, pinstanceNames,
+			pctx.parent, pctx.kind, VNull);
 		proto.pvalue = EvalValueTools.vprototype(proto);
 		// Register the prototype.
 		if (pctx.isStatic)
@@ -203,7 +205,8 @@ class EvalPrototype {
 			var jit = r.jit;
 			var f = r.f;
 			var numCaptures = jit.captures.length();
-			var info = EvalContext.createEnvInfo(true, e.epos.pfile, ctx.fileKeys.get(e.epos.pfile), kind, jit.captureInfos, jit.maxNumLocals, numCaptures);
+			var info = EvalContext.createEnvInfo(true, e.epos.pfile, ctx.fileKeys.get(e.epos.pfile), kind, jit.captureInfos,
+				jit.maxNumLocals, numCaptures);
 			var env = EvalContext.pushEnvironment(ctx, info);
 			var v:Value;
 			try {
@@ -228,7 +231,8 @@ class EvalPrototype {
 				case TFunction(tf):
 					var pos = cf.cfExpr.epos;
 					var key = EvalHash.pathHash(c.clPath);
-					var v = AtomicLazy.fromFun(() -> EvalValueTools.vfunction(EvalJit.jitTfunction(ctx, key, EvalHash.key_new, tf, false, pos)));
+					var v = AtomicLazy.fromFun(() -> EvalValueTools.vfunction(EvalJit.jitTfunction(ctx, key, EvalHash.key_new, tf, false,
+						pos)));
 					ctx.constructors = ctx.constructors.add(key, v);
 				case _:
 			}
@@ -284,7 +288,8 @@ class EvalPrototype {
 								var pos = cf.cfExpr.epos;
 								var name = EvalHash.hash(cf.cfName);
 								PrototypeBuilder.addProtoField(pctx, name,
-									AtomicLazy.fromFun(() -> EvalValueTools.vstaticFunction(EvalJit.jitTfunction(ctx, key, name, tf, true, pos))));
+									AtomicLazy.fromFun(() -> EvalValueTools.vstaticFunction(EvalJit.jitTfunction(ctx, key, name, tf, true,
+										pos))));
 							case [Var(_), e] if (e != null):
 								var name = EvalHash.hash(cf.cfName);
 								PrototypeBuilder.addProtoField(pctx, name, AtomicLazy.fromVal(VNull));
@@ -307,9 +312,12 @@ class EvalPrototype {
 				switch core.TOther.TClassTools.getClInit(c) {
 					case null:
 					case e:
-						delays.push({persistent: false, f: _ -> {
-							evalExpr(ctx, EKMethod(key, EvalHash.key___init__), e);
-						}});
+						delays.push({
+							persistent: false,
+							f: _ -> {
+								evalExpr(ctx, EKMethod(key, EvalHash.key___init__), e);
+							}
+						});
 				}
 				{init: PrototypeBuilder.finalize(pctx), delays: delays};
 			case TEnumDecl(en):
@@ -402,19 +410,23 @@ class EvalPrototype {
 		var l = l.copy();
 		haxe.ds.ArraySort.sort(l, (f1, f2) -> {
 			var i1 = f1.name, i2 = f2.name;
-			if (i1 == i2) 0 else if (i1 < i2) -1 else 1;
+			if (i1 == i2) 0
+			else if (i1 < i2) -1
+			else 1;
 		});
 		return l;
 	}
 
 	/** Upstream `get_object_prototype`: the prototype and the sorted fields. **/
-	public static function getObjectPrototypeSorted<T>(ctx:Context, l:Array<{name:Int, value:T}>):{proto:Vprototype, sorted:Array<{name:Int, value:T}>} {
+	public static function getObjectPrototypeSorted<T>(ctx:Context,
+			l:Array<{name:Int, value:T}>):{proto:Vprototype, sorted:Array<{name:Int, value:T}>} {
 		var l = sortObjectFields(l);
 		var name = {
 			var ids = l.map(f -> f.name);
 			var cacheKey = ids.join(",");
 			var cached = ctx.objectNameCache.get(cacheKey);
-			if (cached != null) cached else {
+			if (cached != null) cached
+			else {
 				var sfields = ids.map(i -> ":" + EvalHash.revHash(i)).join(",");
 				var name = EvalHash.hash("eval.object.Object[" + sfields + "]");
 				ctx.objectNameCache.set(cacheKey, name);
@@ -491,8 +503,7 @@ class EvalPrototype {
 					var isNativeOpaque = a.aExtern && switch TFunctions.follow(a.aThis) {
 						case TAbstract({aPath: {pack: [], name: "Any"}}, _): true;
 						case _: false;
-					}
-					if (core.Meta.has(StrictMeta.CoreType, a.aMeta) || isNativeOpaque) {
+					} if (core.Meta.has(StrictMeta.CoreType, a.aMeta) || isNativeOpaque) {
 						var c = TFunctions.nullClass.clone();
 						c.clPath = a.aPath;
 						flInstance.push(createInstancePrototype(ctx, c));

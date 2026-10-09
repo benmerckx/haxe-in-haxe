@@ -9,9 +9,15 @@ enum SemVerPart {
 @:structInit class SemVer {
 	public var release:Array<SemVerPart>;
 	public var pre:Null<Array<SemVerPart>>;
-	public inline function new(release:Array<SemVerPart>, pre:Null<Array<SemVerPart>>) { this.release = release; this.pre = pre; }
+
+	public inline function new(release:Array<SemVerPart>, pre:Null<Array<SemVerPart>>) {
+		this.release = release;
+		this.pre = pre;
+	}
+
 	public inline function clone():SemVer return new SemVer(release, pre);
 }
+
 class SemVerTools {
 	public static function stringOfVersion(version:SemVerPart):String {
 		return switch (version) {
@@ -49,7 +55,8 @@ class SemVerTools {
 		if (release.length != 3) invalid(original);
 		for (part in release) switch (part) {
 			case SVNum(_):
-			case SVStr(_): invalid(original);
+			case SVStr(_):
+				invalid(original);
 		}
 		return release;
 	}

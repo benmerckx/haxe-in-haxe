@@ -2,48 +2,24 @@ package sys.thread;
 
 import hxc.NativeThread;
 
-// hxc target (backend/): over green threads (rt_thread.c). A release with
-// waiters hands the unit to the longest waiting thread.
+// hxc target (backend/): a counting semaphore (rt_thread.c).
 class Semaphore {
-	var count:Int;
-	var waiters:Array<Int> = [];
+	final sem:Dynamic;
 
 	public function new(value:Int):Void {
-		count = value;
+		sem = NativeThread.semNew(value);
 	}
 
 	public function acquire():Void {
-		tryAcquire(-1);
+		NativeThread.semAcquire(sem, -1);
 	}
 
+	// timeout: null or 0 just tries, < 0 waits forever
 	public function tryAcquire(?timeout:Float):Bool {
-		if (count > 0) {
-			count--;
-			return true;
-		}
-		if (timeout == null || timeout == 0) return false;
-		var cur = NativeThread.current();
-		var deadline = timeout < 0 ? -1 : timeout;
-		if (deadline >= 0) deadline += Sys.time();
-		waiters.push(cur);
-		while (true) {
-			if (waiters.indexOf(cur) < 0) return true; // a release took us out
-			// a release while push was growing the array (an allocation may
-			// switch threads) found no waiter and counted
-			if (count > 0) {
-				waiters.remove(cur);
-				count--;
-				return true;
-			}
-			if (!NativeThread.park(deadline < 0 ? -1 : Math.max(0, deadline - Sys.time()))) {
-				if (waiters.remove(cur)) return false; // else a release took us out meanwhile
-				return true;
-			}
-			// unparked, or an early return of park (see NativeThread.unpark): look again
-		}
+		return NativeThread.semAcquire(sem, timeout == null ? 0 : timeout);
 	}
 
 	public function release():Void {
-		if (waiters.length > 0) NativeThread.unpark(waiters.shift()) else count++;
+		NativeThread.semRelease(sem);
 	}
 }

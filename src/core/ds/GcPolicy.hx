@@ -52,6 +52,7 @@ class GcPolicy {
 	}
 	#else
 	public static inline function init():Void {}
+
 	public static inline function tick():Void {}
 	#end
 }

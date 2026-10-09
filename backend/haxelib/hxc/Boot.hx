@@ -73,7 +73,8 @@ class Boot {
 		var keys = [for (k in d.keys()) k];
 		keys.sort(Reflect.compare);
 		for (k in keys) {
-			if (k.startsWith("target.") || k.startsWith("haxe") || k.startsWith("hxc.") || k == "true" || k == "sys" || k == "static" || k == "utf16"
+			// haxe, haxe3..haxe5, haxe_ver/haxe-ver are the compiler's; user defines such as haxe-next are passed on
+			if (k.startsWith("target.") || ~/^haxe([0-9]*|[_-]ver)$/.match(k) || k.startsWith("hxc.") || k == "true" || k == "sys" || k == "static" || k == "utf16"
 				|| k == "hxc" || k == "hxb" || k.startsWith("hxb."))
 				continue;
 			r.push(k + "=" + d[k]);

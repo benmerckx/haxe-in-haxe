@@ -1,7 +1,7 @@
 // EXPERIMENTAL runtime for the C output of backend/; see rt.h.
 // GC, startup, exceptions, boxes, arrays.
 #define _GNU_SOURCE // madvise (cosmocc)
-#include "rt.h"
+#include "rt_gc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -19,16 +19,24 @@ static inline int __builtin_ctzll(uint64_t m) {
 }
 #endif
 
-char *rt_young_start, *rt_young_ptr, *rt_young_limit;
+// Threads (rt_thread.c): each thread allocates in its own chunk of the
+// nursery (TLAB: rt_young_ptr/rt_young_limit, taken from young_next) and
+// records old-to-young stores in its own remembered set (rt_mutator); a
+// collection stops every other thread at a safepoint (an allocation slow
+// path) or in a safe region (a blocking native), see rt_world_stop. With one
+// thread a TLAB is the whole free nursery, as before threads.
+char *rt_young_start, *rt_young_end;
+static char *young_next; // free part of the nursery: TLABs are taken from here
+RT_TLS char *rt_young_ptr, *rt_young_limit;
 static char *old_start, *old_ptr, *old_end;
-void **rt_sp;
-void **rt_stack_base; // the running thread's shadow stack (rt_thread.c swaps it)
+RT_TLS void **rt_sp;
+RT_TLS void **rt_stack_base; // the running thread's shadow stack (green threads swap it)
 void **rt_globals;
 static int nglobals;
-rt_handler *rt_hcur;
-void *rt_exn;
-static void ***remembered;
-static size_t remembered_len, remembered_cap;
+RT_TLS rt_handler *rt_hcur;
+RT_TLS void *rt_exn;
+RT_TLS rt_mutator *rt_mut;
+static size_t tlab_size; // with several threads (RT_TLAB_KB; default a 16th of the nursery)
 static size_t minor_size;
 static int stats;
 static int census; // RT_CENSUS: 1 at exit, 2 also after each major collection
@@ -60,7 +68,7 @@ static char *copy_to(char *dst, void *obj) {
 }
 
 static inline int in_young(void *p) {
-	return (char *)p >= rt_young_start && (char *)p < rt_young_limit;
+	return (char *)p >= rt_young_start && (char *)p < rt_young_end;
 }
 
 static inline void forward_to(void *p, void *n) {
@@ -114,7 +122,50 @@ typedef struct {
 } rt_final;
 static rt_final *finals, *final_queue;
 static size_t nfinals, finals_cap, final_qhead, final_qlen, final_qcap;
-static int finals_running;
+static RT_TLS int finals_running;
+static rt_lock_t finals_lock = RT_LOCK_INIT; // registration and dequeuing (the collector runs with every thread stopped)
+
+// ---- native handles: freed once their T_NATIVE object is found unreachable
+typedef struct {
+	void *obj, *p;
+	void (*free_fn)(void *);
+} rt_native;
+static rt_native *natives;
+static size_t nnatives, natives_cap;
+static rt_lock_t natives_lock = RT_LOCK_INIT;
+
+void *rt_native_new(void *p, void (*free_fn)(void *)) {
+	void *o = rt_alloc(1, T_NATIVE, K_RAW);
+	FP(o, 0) = p;
+	rt_lock(&natives_lock);
+	if (nnatives == natives_cap) {
+		natives_cap = natives_cap ? natives_cap * 2 : 256;
+		natives = (rt_native *)realloc(natives, natives_cap * sizeof(rt_native));
+	}
+	natives[nnatives].obj = o;
+	natives[nnatives].p = p;
+	natives[nnatives++].free_fn = free_fn;
+	rt_unlock(&natives_lock);
+	return o;
+}
+
+// after a collection of the nursery (and of [lo, hi) for a major one)
+static void sweep_natives(char *lo, char *hi) {
+	size_t live = 0;
+	for (size_t i = 0; i < nnatives; i++) {
+		void *o = natives[i].obj;
+		if (in_young(o) || ((char *)o >= lo && (char *)o < hi)) {
+			if (KIND(o) != K_FWD) {
+				natives[i].free_fn(natives[i].p);
+				continue;
+			}
+			o = FP(o, 0);
+		}
+		natives[live] = natives[i];
+		natives[live++].obj = o;
+	}
+	nnatives = live;
+}
 
 static void scan_roots(void *(*fwd)(void *)) {
 	for (void **s = rt_stack_base; s < rt_sp; s++)
@@ -195,20 +246,41 @@ static void *fwd_root(void *p) {
 
 static void major(size_t need);
 static void run_finalisers(int propagate);
-static void forget_objs(void);
-static void **remembered_objs;
-static size_t robjs_len;
 
 static void minor_(void);
 static void minor(void) {
 	double t0 = stats ? now_secs() : 0;
 	unsigned long m0 = majors;
 	minor_();
+	if (majors == m0) sweep_natives(NULL, NULL);
 	if (stats && majors == m0) minor_secs += now_secs() - t0;
 }
 
+static void *(*rem_fwd)(void *);
+static void scan_object(void *o, void *(*fwd)(void *));
+static void forget_objs(rt_mutator *m) {
+	m->robjs_len = 0;
+	memset(m->robjs_recent, 0, sizeof m->robjs_recent);
+}
+
+static void forward_remembered(rt_mutator *m, void *arg) {
+	(void)arg;
+	for (size_t i = 0; i < m->rem_len; i++)
+		if (*m->rem[i]) *m->rem[i] = rem_fwd(*m->rem[i]);
+	m->rem_len = 0;
+	for (size_t i = 0; i < m->robjs_len; i++)
+		scan_object(m->robjs[i], rem_fwd);
+	forget_objs(m);
+}
+
+static void clear_remembered(rt_mutator *m, void *arg) {
+	(void)arg;
+	m->rem_len = 0;
+	forget_objs(m);
+}
+
 static void minor_(void) {
-	size_t young_used = rt_young_ptr - rt_young_start;
+	size_t young_used = young_next - rt_young_start;
 	if ((size_t)(old_end - old_ptr) < young_used + 64) {
 		major(0);
 		return;
@@ -221,30 +293,20 @@ static void minor_(void) {
 		scan_roots(fwd_root);
 		for (size_t i = 0; i < nfinals; i++)
 			finals[i].val = fwd_root(finals[i].val);
-		for (size_t i = 0; i < remembered_len; i++)
-			if (*remembered[i]) *remembered[i] = fwd_root(*remembered[i]);
-		remembered_len = 0;
-		for (size_t i = 0; i < robjs_len; i++)
-			scan_object(remembered_objs[i], fwd_root);
-		forget_objs();
-		rt_young_ptr = rt_young_start;
+		rem_fwd = fwd_root;
+		rt_mutators_foreach(forward_remembered, NULL);
 		return;
 	}
 	scan_roots(minor_forward);
 	for (size_t i = 0; i < nfinals; i++)
 		finals[i].val = minor_forward(finals[i].val);
-	for (size_t i = 0; i < remembered_len; i++)
-		if (*remembered[i]) *remembered[i] = minor_forward(*remembered[i]);
-	remembered_len = 0;
-	for (size_t i = 0; i < robjs_len; i++)
-		scan_object(remembered_objs[i], minor_forward);
-	forget_objs();
+	rem_fwd = minor_forward;
+	rt_mutators_foreach(forward_remembered, NULL);
 	while (scan < old_ptr) {
 		void *o = scan + 8;
 		scan += obj_bytes(o);
 		scan_object(o, minor_forward);
 	}
-	rt_young_ptr = rt_young_start;
 }
 
 // ---- major collection: copy everything live into a fresh to-space.
@@ -314,7 +376,7 @@ static void major_(size_t need) {
 	from_end = old_ptr;
 #ifdef __EMSCRIPTEN__
 	// everything in the old and young spaces may survive
-	size_t cap = 2 * ((size_t)(old_ptr - old_start) + (size_t)(rt_young_ptr - rt_young_start)) + 4 * minor_size + need;
+	size_t cap = 2 * ((size_t)(old_ptr - old_start) + (size_t)(young_next - rt_young_start)) + 4 * minor_size + need;
 	if (cap < (32u << 20)) cap = 32u << 20;
 	old_start = old_ptr = (char *)malloc(cap);
 	if (!old_start) {
@@ -338,8 +400,7 @@ static void major_(size_t need) {
 		scan_roots(fwd_root);
 	} else
 		scan_roots(major_forward);
-	remembered_len = 0;
-	forget_objs();
+	rt_mutators_foreach(clear_remembered, NULL);
 	while (gc_bfs && scan < old_ptr) {
 		void *o = scan + 8;
 		scan += obj_bytes(o);
@@ -377,7 +438,7 @@ static void major_(size_t need) {
 			scan_object(o, major_forward);
 		}
 	}
-	rt_young_ptr = rt_young_start;
+	sweep_natives(from_start, from_end);
 #ifdef __EMSCRIPTEN__
 	free(from_start);
 	old_end = old_start + cap;
@@ -400,24 +461,90 @@ static void major_(size_t need) {
 	if (census == 2) census_now("major collection");
 }
 
+// the nursery is empty again: every thread takes a new TLAB at its next allocation
+static void reset_tlab(rt_mutator *m, void *arg) {
+	(void)arg;
+	*m->yptr_ref = NULL;
+	*m->ylim_ref = NULL;
+}
+
+// a collection, with every other thread stopped (unless another thread
+// collected meanwhile: the caller then retries its allocation)
+static void collect(int full, size_t need) {
+	if (!rt_world_stop()) return;
+	if (full) major(need);
+	else minor();
+	young_next = rt_young_start;
+	rt_mutators_foreach(reset_tlab, NULL);
+	rt_world_resume();
+}
+
+// a TLAB with room for `bytes`: with one thread the whole free nursery
+static int tlab_refill(uint32_t bytes) {
+	size_t want = RT_NTHREADS() > 1 ? tlab_size : (size_t)-1;
+	if (want < bytes) want = bytes;
+#if RT_MT
+	char *p = __atomic_load_n(&young_next, __ATOMIC_RELAXED);
+	for (;;) {
+		size_t avail = (size_t)(rt_young_end - p);
+		if (avail < bytes) return 0;
+		size_t take = want < avail ? want : avail;
+		if (__atomic_compare_exchange_n(&young_next, &p, p + take, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+			rt_young_ptr = p;
+			rt_young_limit = p + take;
+			return 1;
+		}
+	}
+#else
+	char *p = young_next;
+	size_t avail = (size_t)(rt_young_end - p);
+	if (avail < bytes) return 0;
+	size_t take = want < avail ? want : avail;
+	young_next = p + take;
+	rt_young_ptr = p;
+	rt_young_limit = p + take;
+	return 1;
+#endif
+}
+
 void *rt_alloc_slow(uint64_t header, uint32_t bytes) {
+#if RT_GREEN
 	// a green thread that only computes gives way at each minor collection
 	// (before allocating: the caller's live references are rooted here)
-	if (rt_nthreads > 1) rt_preempt();
+	if (RT_NTHREADS() > 1) rt_preempt();
+#endif
+	// a safepoint: the caller's live references are rooted here
+	rt_safepoint();
 	// likewise for finaliser calls queued by an earlier major collection
+#if RT_MT
+	if (__atomic_load_n(&final_qlen, __ATOMIC_RELAXED) && !finals_running) run_finalisers(0);
+#else
 	if (final_qhead < final_qlen && !finals_running) run_finalisers(0);
+#endif
+	char *p;
 	if (bytes > minor_size / 4) {
 		// large objects go straight to the old space
-		if ((size_t)(old_end - old_ptr) < bytes) major(bytes);
-		char *p = old_ptr;
+#if RT_MT
+		p = __atomic_load_n(&old_ptr, __ATOMIC_RELAXED);
+		for (;;) {
+			if ((size_t)(old_end - p) < bytes) {
+				collect(1, bytes);
+				p = __atomic_load_n(&old_ptr, __ATOMIC_RELAXED);
+				continue;
+			}
+			if (__atomic_compare_exchange_n(&old_ptr, &p, p + bytes, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) break;
+		}
+#else
+		if ((size_t)(old_end - old_ptr) < bytes) collect(1, bytes);
+		p = old_ptr;
 		old_ptr += bytes;
-		*(uint64_t *)p = header;
-		memset(p + 8, 0, bytes - 8);
-		return p + 8;
+#endif
+	} else {
+		if (rt_young_limit - rt_young_ptr < (intptr_t)bytes) // else another thread collected meanwhile
+			while (!tlab_refill(bytes)) collect(0, 0);
+		p = rt_young_ptr;
+		rt_young_ptr += bytes;
 	}
-	minor();
-	char *p = rt_young_ptr;
-	rt_young_ptr += bytes;
 	*(uint64_t *)p = header;
 	memset(p + 8, 0, bytes - 8);
 	return p + 8;
@@ -427,18 +554,19 @@ void *rt_alloc_slow(uint64_t header, uint32_t bytes) {
 // collected, so their finalisers never run
 void rt_gc_finalise(void *fn, void *val) {
 	if (!val || !(in_young(val) || ((char *)val >= old_start && (char *)val < old_ptr))) return;
+	rt_lock(&finals_lock);
 	if (nfinals == finals_cap) {
 		finals_cap = finals_cap ? finals_cap * 2 : 64;
 		finals = (rt_final *)realloc(finals, finals_cap * sizeof(rt_final));
 	}
 	finals[nfinals].fn = fn;
 	finals[nfinals++].val = val;
+	rt_unlock(&finals_lock);
 }
 
 // a collection now: minor (0) or major (1), as OCaml's Gc.minor/full_major
 void rt_gc_collect(int full) {
-	if (full) major(0);
-	else minor();
+	collect(full, 0);
 }
 
 // calls the queued finalisers (an exception escapes when propagate is set,
@@ -448,12 +576,18 @@ void rt_gc_run_finalisers(int propagate) { run_finalisers(propagate); }
 static void run_finalisers(int propagate) {
 	if (finals_running) return;
 	finals_running = 1;
-	while (final_qhead < final_qlen) {
+	for (;;) {
+		rt_lock(&finals_lock);
+		if (final_qhead >= final_qlen) {
+			rt_unlock(&finals_lock);
+			break;
+		}
 		void **r = rt_sp;
 		rt_sp += 2;
 		r[0] = final_queue[final_qhead].fn;
 		r[1] = final_queue[final_qhead].val;
 		if (++final_qhead == final_qlen) final_qhead = final_qlen = 0;
+		rt_unlock(&finals_lock);
 		void *args = hx_arr_new(AK_PTR, 0);
 		RT_ROOT(args);
 		hx_apush_slow(args_root, AK_PTR, (uint64_t)(uintptr_t)&r[1]);
@@ -477,34 +611,29 @@ static void run_finalisers(int propagate) {
 }
 
 // old objects whose every slot may hold a young pointer, scanned whole by the
-// next minor collection; a small cache drops repeated entries for one object
-static size_t robjs_cap;
-static void *robjs_recent[256];
-
+// next minor collection (per thread, rt_mutator); a small cache drops
+// repeated entries for one object
 static void remember_obj(void *obj) {
+	rt_mutator *m = rt_mut;
 	size_t h = ((uintptr_t)obj >> 4) & 255;
-	if (robjs_recent[h] == obj) return;
-	robjs_recent[h] = obj;
-	if (robjs_len == robjs_cap) {
-		robjs_cap = robjs_cap ? robjs_cap * 2 : 256;
-		remembered_objs = (void **)realloc(remembered_objs, robjs_cap * sizeof(void *));
+	if (m->robjs_recent[h] == obj) return;
+	m->robjs_recent[h] = obj;
+	if (m->robjs_len == m->robjs_cap) {
+		m->robjs_cap = m->robjs_cap ? m->robjs_cap * 2 : 256;
+		m->robjs = (void **)realloc(m->robjs, m->robjs_cap * sizeof(void *));
 	}
-	remembered_objs[robjs_len++] = obj;
-}
-
-static void forget_objs(void) {
-	robjs_len = 0;
-	memset(robjs_recent, 0, sizeof robjs_recent);
+	m->robjs[m->robjs_len++] = obj;
 }
 
 void rt_write_barrier(void *obj, void **slot, void *val) {
 	(void)obj;
 	(void)val;
-	if (remembered_len == remembered_cap) {
-		remembered_cap = remembered_cap ? remembered_cap * 2 : 4096;
-		remembered = (void ***)realloc(remembered, remembered_cap * sizeof(void **));
+	rt_mutator *m = rt_mut;
+	if (m->rem_len == m->rem_cap) {
+		m->rem_cap = m->rem_cap ? m->rem_cap * 2 : 4096;
+		m->rem = (void ***)realloc(m->rem, m->rem_cap * sizeof(void **));
 	}
-	remembered[remembered_len++] = slot;
+	m->rem[m->rem_len++] = slot;
 }
 
 // after a bulk move or copy of references into obj (memmove in natives): the
@@ -534,7 +663,7 @@ static void census_now(const char *when) {
 	for (int i = 0; i < 2; i++)
 		gi.populated[i] = populated[cur_region ^ i] > regions[cur_region ^ i] ? (size_t)(populated[cur_region ^ i] - regions[cur_region ^ i]) : 0;
 #endif
-	gi.remembered = remembered_cap * sizeof(void **);
+	gi.remembered = (rt_mut->rem_cap + rt_mut->robjs_cap) * sizeof(void *); // the calling thread's
 	gi.gcstack = gc_cap * sizeof(gc_frame);
 	gi.shadow = (char *)rt_sp - (char *)rt_stack_base;
 	gi.minors = minors;
@@ -589,12 +718,16 @@ void rt_init(int ng, int argc, char **argv) {
 	// MB and is copied into fresh pages, so 4 KB page faults add up
 	const char *hp = getenv("RT_HUGE");
 	int huge = hp && atoi(hp); // opt-in: it costs more kernel time than it saves here
-	rt_young_start = rt_young_ptr = (char *)aligned_alloc(2u << 20, (minor_size + (2u << 20) - 1) & ~(size_t)((2u << 20) - 1));
+	rt_young_start = (char *)aligned_alloc(2u << 20, (minor_size + (2u << 20) - 1) & ~(size_t)((2u << 20) - 1));
 	if (huge) madvise(rt_young_start, minor_size, MADV_HUGEPAGE);
 #else
-	rt_young_start = rt_young_ptr = (char *)malloc(minor_size);
+	rt_young_start = (char *)malloc(minor_size);
 #endif
-	rt_young_limit = rt_young_start + minor_size;
+	rt_young_end = rt_young_start + minor_size;
+	young_next = rt_young_start; // rt_young_ptr = rt_young_limit = NULL: the first allocation takes a TLAB
+	const char *tk = getenv("RT_TLAB_KB");
+	tlab_size = tk ? (size_t)atoi(tk) << 10 : minor_size / 16;
+	if (tlab_size < 4096) tlab_size = 4096;
 #ifdef __EMSCRIPTEN__
 	old_start = old_ptr = (char *)malloc(32u << 20);
 	old_end = old_start + (32u << 20);
@@ -630,6 +763,7 @@ void rt_init(int ng, int argc, char **argv) {
 	mprotect(sstack + sbytes, page, PROT_NONE);
 	rt_stack_base = rt_sp = (void **)sstack;
 #endif
+	rt_threads_init();
 	nglobals = ng;
 	rt_globals = (void **)calloc(ng + 1, sizeof(void *));
 	for (int i = SMALL_MIN; i <= SMALL_MAX; i++) {
@@ -646,6 +780,16 @@ void rt_init(int ng, int argc, char **argv) {
 		*(int32_t *)&rt_type_objs[2 * t + 1] = t;
 	}
 	atexit(report);
+}
+
+// binds a mutator to the calling thread's runtime state
+void rt_mutator_bind(rt_mutator *m) {
+	m->sp_ref = &rt_sp;
+	m->base_ref = &rt_stack_base;
+	m->exn_ref = &rt_exn;
+	m->yptr_ref = &rt_young_ptr;
+	m->ylim_ref = &rt_young_limit;
+	rt_mut = m;
 }
 
 // ---- exceptions

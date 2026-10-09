@@ -28,7 +28,8 @@ class EvalArray {
 	}
 
 	static inline function blit(src:Array<Value>, srcPos:Int, dst:Array<Value>, dstPos:Int, len:Int):Void {
-		if (len < 0 || srcPos < 0 || dstPos < 0 || srcPos + len > src.length || dstPos + len > dst.length) throw new haxe.Exception("Invalid_argument(\"Array.blit\")");
+		if (len < 0 || srcPos < 0 || dstPos < 0 || srcPos + len > src.length || dstPos
+			+ len > dst.length) throw new haxe.Exception("Invalid_argument(\"Array.blit\")");
 		if (src == dst && srcPos < dstPos) {
 			var i = len - 1;
 			while (i >= 0) {
@@ -103,7 +104,8 @@ class EvalArray {
 		return {
 			hasNext: () -> i < length,
 			next: () -> {
-				if (i >= length) VNull else {
+				if (i >= length) VNull
+				else {
 					var v = a[i];
 					i++;
 					v;
@@ -284,11 +286,13 @@ class EvalArray {
 	}
 
 	public static function splice(a:Varray, pos:Int, len:Int, end:Int):Varray {
-		var values2 = [for (i in 0...len) {
-			var j = pos + i;
-			if (j < 0 || j >= a.avalues.length) throw new haxe.Exception("Invalid_argument(\"index out of bounds\")");
-			a.avalues[j];
-		}];
+		var values2 = [
+			for (i in 0...len) {
+				var j = pos + i;
+				if (j < 0 || j >= a.avalues.length) throw new haxe.Exception("Invalid_argument(\"index out of bounds\")");
+				a.avalues[j];
+			}
+		];
 		blit(a.avalues, pos + len, a.avalues, pos, a.alength - end);
 		a.alength = a.alength - len;
 		return create(values2);

@@ -49,14 +49,18 @@ class SyntaxExplorer {
 			check(KModuleType, path.tname);
 			if (path.tsub != null) check(KModuleType, path.tsub);
 			for (tp in path.tparams) switch tp {
-				case TPType(th): typeHint(th);
-				case TPExpr(e): expr(e);
+				case TPType(th):
+					typeHint(th);
+				case TPExpr(e):
+					expr(e);
 			}
 		}
 		typeHint = function(th:TypeHint):Void {
 			switch th.type {
-				case CTPath(path): typePath(KModuleType, path);
-				case CTParent(th) | CTOptional(th) | CTNamed(_, th): typeHint(th);
+				case CTPath(path):
+					typePath(KModuleType, path);
+				case CTParent(th) | CTOptional(th) | CTNamed(_, th):
+					typeHint(th);
 				case CTFunction(thl, th):
 					for (th in thl) typeHint(th);
 					typeHint(th);

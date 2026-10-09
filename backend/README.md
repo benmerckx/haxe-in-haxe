@@ -69,6 +69,8 @@ arrays/strings/maps by the type and field that first refers to them, the
 heap's sizes, malloc'd memory and RSS (`rt_census.c`). `RT_STATS=1` prints
 each major collection (live, from-space and new limit) and the peak RSS.
 
+`RT_VERIFY` (heap and remembered-set checks, added while debugging the formatter) was dropped when the remembered set became per-thread (OS threads); it needs porting to the per-mutator sets.
+
 GC policy (the copying algorithm is unchanged): the from-space is returned
 to the kernel after a major collection (`RT_RELEASE=0` keeps it), the
 to-space is faulted in as the copy reaches it, the populate-ahead batch is
@@ -84,98 +86,178 @@ peak is about the old space's size at the last major collection plus what
 survives it; a mark-sweep or mark-compact old generation (after the OS
 threads work) would remove the to-space from the peak.
 
-## Threads: green threads in the C runtime
+## Threads: OS threads (1:1) and green threads in the C runtime
 
-The hxc runtime runs Haxe threads as M:1 cooperative (green) threads
-(`rt/rt_thread.c`): every thread runs on the one OS thread, and only one runs
-at a time, so the GC and the runtime tables need no locks. The C build of the
-port uses them through the hxc `sys.thread` package (`std-hxc/sys/thread`,
-over `hxc.NativeThread`), so the compilation server (`--wait`, its worker
-thread and the per-client stdin forwarders), `--connect` stdin forwarding,
-`--cmd` output piping and Eval threads (`Thread.create`, `Deque`, `Lock`, ...
-in macros and `--interp`) work in it.
+The hxc runtime (`rt/rt_thread.c`) runs Haxe threads on **OS threads**
+(pthreads, 1:1, in parallel) in gcc, clang and cosmocc builds, and as **M:1
+green threads** in tcc builds (tcc has no `__thread`/`_Thread_local`;
+`-DRT_GREEN_THREADS` selects them with gcc too). The wasm playground has no
+threads. The C build of the port uses them through the hxc `sys.thread`
+package (`std-hxc/sys/thread`, over `hxc.NativeThread`) and `haxe.atomic`
+(over `hxc.NativeAtomic`): the compilation server, `--connect`/`--cmd` I/O
+threads, Eval threads (`--interp`, eval.luv) and the port's parallel compiler
+passes (`TaskPool`/`Parallel`: filters, DCE marking, HXB writing; run
+without `-D disable-parallelism`).
 
-- Switching: `ucontext` (`makecontext`/`swapcontext` from the C library, so
-  tcc, gcc and cosmocc builds all work). A thread record holds its C stack
-  (64 MB reserved with `MAP_NORESERVE` and a guard page, committed as
-  touched), its shadow stack (64 MB, likewise; the main thread has 1 GB
-  of each: `rt_run_main` runs the program's `main` on a reserved stack of
-  `RT_STACK_MB`, default 1024, as OCaml 5 lets the main fiber's stack grow
-  to 1 GB), its exception handler chain and pending exception. A switch
-  saves the globals `rt_sp`, `rt_stack_base`, `rt_hcur` and `rt_exn` into
-  the record and loads the next thread's, so shadow-stack push/pop,
-  allocation and `RT_TRY` are unchanged: with one thread nothing else runs
-  (no `poll`, no extra stacks; self-compile time is unchanged).
-- GC: the collector scans the running thread's shadow stack as before and,
-  through `rt_threads_scan`, every other thread's saved shadow stack, its
-  pending exception and the entry closure of a thread not started yet.
-  Values passed through `Deque`/`Lock`/`Tls` are ordinary Haxe objects
-  reachable from those roots. Natives that wait root their own references.
-- Scheduling points: `NativeThread.park` (all of `Mutex`, `Lock`,
-  `Semaphore`, `Condition`, `Deque.pop(true)`, `Thread.readMessage(true)`
-  are plain Haxe over park/unpark, with timeouts), `Sys.sleep` (0 yields),
-  and waiting for a descriptor. A thread that computes without blocking also
-  gives way at each minor collection (`rt_alloc_slow`, before allocating,
-  where the caller's live references are rooted), so a spin loop that
-  allocates (e.g. on a `haxe.atomic` value in Eval) does not starve the
-  others; a loop that never allocates does. Since a switch can happen at
-  any allocation, the primitives check their condition again after
-  queueing themselves, and an unpark of a thread that is not parked makes
-  its next park return at once. For the same reason `Tls` holds a mutex
-  around its map (shared by all threads), `Mutex` allocates its waiter list
-  up front, and the runtime's array growth (`hx_arr_grow`, `hx_apush_slow`)
-  reads the length again after allocating.
+### OS threads (1:1)
+
+- Thread-local runtime state: the shadow stack (`rt_sp`, `rt_stack_base`),
+  the allocation buffer (`rt_young_ptr`, `rt_young_limit`), the handler chain
+  (`rt_hcur`) and the pending exception (`rt_exn`) are `__thread` variables
+  with the local-exec TLS model (`rt.h` `RT_TLS`): one `%fs`-relative access,
+  as cheap as the global it replaces, so generated code is unchanged and the
+  sequential self-compile costs the same (bench/README.md). A thread record
+  holds its 64 MB C stack (pthread attribute) and 64 MB shadow stack
+  (reserved, committed as touched); the main thread keeps its 1 GB ones.
+- Allocation: the nursery (`rt_young_start`..`rt_young_end`, 4 MB) is shared;
+  each thread bumps through its own chunk (TLAB) taken from it with a CAS:
+  with one thread the chunk is the whole free nursery (as before threads),
+  with several a 16th of it (`RT_TLAB_KB`). Large objects go to the old space
+  with a CAS on its bump pointer. The fast path (`rt_alloc`) is unchanged.
+- Stop-the-world collections: the thread whose allocation finds the nursery
+  (or old space) full sets `rt_gc_requested` and waits under the world lock
+  until every other thread is stopped at a **safepoint** (the allocation slow
+  path `rt_alloc_slow`, where the caller's live references are rooted) or in
+  a **safe region** (`rt_blocking_enter`/`leave` around blocking calls), then
+  collects on its own thread: every thread's shadow stack, pending exception,
+  Tls values and entry closure are roots (`rt_threads_scan`), every thread's
+  remembered slots and remembered objects are processed
+  (`rt_mutators_foreach`), every TLAB is reset, and the threads resume. A
+  second thread that wants to collect meanwhile waits as at a safepoint and
+  retries its allocation. State changes use seq_cst atomics (Dekker-style:
+  either the collector sees a thread safe, or the thread sees the request);
+  the slow paths take the world lock.
+- Safe regions hold no heap pointer outside the shadow stack (natives root
+  what they need and read it again after leaving): waiting for a descriptor
+  (`rt_wait_fd`, a `poll` in 100 ms slices so a `close` by another thread
+  makes the wait fail with EBADF, as with green threads), sleeping,
+  contended mutex/semaphore/condition waits, `waitpid`, `Sys.command`, host
+  name resolution (serialized: `gethostbyname` is not reentrant), TLS BIO
+  `send`/`recv` (`sslRead`/`sslWrite` go through a malloc'ed copy, since the
+  heap buffer may move meanwhile) and libuv's backend wait in `Loop.run`.
+  Leaving a safe region waits for a collection in progress.
+- Write barrier: each thread appends to its own remembered set
+  (`rt_mutator`), merged by the collector; a thread that ends hands its set
+  to a "dead" mutator kept until the next minor collection. `rt_set_ptr`'s
+  duplicate check (a slot already holding a young pointer is remembered)
+  stays valid: whichever thread recorded the slot, all sets are processed.
+- Shared runtime tables: field names added at run time live in chunks that
+  never move (readers take no lock; adding takes a leaf lock), as does the
+  eval.luv handle table. Inline caches are filled once with a CAS (0 → busy
+  → type, published with release order) once a second thread exists; a miss
+  on an entry filled for another type looks the field up in a per-thread
+  table of immutable entries (a generated access may read its entry after
+  evaluating arguments that miss again). Identity hashes are set with a CAS
+  on the header; cached string hashes are a benign same-value race (relaxed
+  atomics); finaliser registration/dequeuing and the native-handle list have
+  leaf locks. Statics are initialized eagerly at startup (no lazy class
+  init). Leaf locks (`rt_lock`, taken only once a second thread was started)
+  are never held across a safepoint.
+- `sys.thread` primitives are natives: `Mutex` (re-entrant, a pthread mutex
+  plus owner/depth), `Condition` (its own mutex and a pthread condition on
+  `CLOCK_MONOTONIC`; spurious wakeups possible as on other pthread targets),
+  `Lock`/`Semaphore` (a counting semaphore), `Deque` (Haxe over a mutex and a
+  condition), `Tls` (per-thread slot arrays kept with the thread record, gone
+  when the thread ends). Handles are `T_NATIVE` objects freed by the collector
+  once unreachable (`rt_native_new`); a thread waiting on one roots it. A
+  thread blocked on a primitive is in a safe region, so a collection never
+  waits for it, and the primitives' internal pthread mutexes are taken
+  "safely" (try, else wait in a safe region) because a holder may wait for a
+  collection when it leaves a wait. `NativeThread.park`/`unpark` remain
+  (per-thread parker, never freed).
+- `haxe.atomic` (`std-hxc/haxe/atomic`): `AtomicInt` is a raw cell and
+  `AtomicObject` a one-slot reference array, with sequentially consistent
+  `__atomic` operations (object stores go through the write barrier);
+  `compareExchange` compares references. `AtomicBool` is the std's, over
+  `AtomicInt`.
+- `TaskPool` (`src/core/ds/TaskPool.hx`) keeps persistent worker threads on
+  hxc, as on HL/C (`#if (hlc || target.name == "hxc")`), instead of starting
+  threads for every `parallelFor`.
+- `RT_STATS` adds a line: threads started, contended mutex acquisitions and
+  their wait, stops of the world and the time until every thread had
+  stopped (the self-compile in parallel mode: 3 workers, ~840 contended
+  acquisitions, 0.3 s waiting, ~410 stops, 0.19 s to stop, max 6 ms on the
+  loaded 4-core box).
+- Limits: a loop that never allocates and never blocks delays a collection
+  (there are no polls at loop back-edges; every loop in the port allocates
+  or calls something that does, and time-to-safepoint stays in the
+  milliseconds); a blocking call outside a safe region (a write to a full
+  pipe, `accept` after another thread took the connection, file system
+  calls) likewise. Racy publication of new objects between threads (no
+  lock or atomic) relies on x86-64's store order, as the port mirrors
+  upstream's benign races (e.g. InlineConstructors reading another field's
+  expression while it is rewritten; OCaml 5 guarantees this, C does not):
+  the aarch64 half of the APE build is not validated for it. Eval threads
+  run in parallel (upstream: OCaml domains); `Thread.create` ignores the
+  stack size; the main thread's exit ends the process (as on hl and cpp).
+- Shared mutable state of Haxe code is the program's business, as on any
+  threaded target: a Haxe `Array` mutated by two threads at once can lose
+  elements or be copied while it is moved. Upstream's OCaml leans on
+  immutable lists (`l <- x :: l` is memory safe under races) where the port
+  mutates arrays in place, so such spots need a lock in the port: the
+  parallel filters' inline-call recording (`Inline.hx`, `mInlineCalls`)
+  takes a mutex, and shared `EReg`s (which keep their last match) were
+  replaced by fresh ones (`RenameVars`, `AnalyzerTexpr`, hxc `EReg.escape`);
+  hxc `Regex`'s lazily built case sets are published whole.
+- ThreadSanitizer: a build with the whole program instrumented does not run
+  (libtsan's fixed-size shadow call stack overflows in the port's parser,
+  single-threaded too, and TSan then hangs in its signal handler). What
+  works is instrumenting the runtime only: generated C compiled plainly
+  with `-D__SANITIZE_THREAD__` (so `RT_TRY` uses the intercepted `setjmp`),
+  `rt*.c` with `gcc -fsanitize=thread --param
+  tsan-instrument-func-entry-exit=0`; it sees every access the runtime
+  makes (allocation, barriers, arrays, strings, maps) and every lock, and
+  found the `mInlineCalls` race (test/TESTING.md). Racy publication
+  (above) shows up as occasional `Array_slice` reports.
+
+### Green threads (tcc, M:1)
+
+- Switching: `ucontext` (`makecontext`/`swapcontext`). A thread record holds
+  its C stack and shadow stack (64 MB each, reserved), handler chain and
+  pending exception; a switch saves the globals `rt_sp`, `rt_stack_base`,
+  `rt_hcur` and `rt_exn` (`RT_TLS` is empty here) into the record and loads
+  the next thread's. One mutator (remembered set, TLAB) serves all of them.
+- Scheduling points: parking in the primitives (queues of parked threads in
+  C, `rt_thread.c`: they do not allocate between looking at a primitive and
+  parking, so they need no atomics), `Sys.sleep` (0 yields), waiting for a
+  descriptor, and each minor collection (`rt_alloc_slow`), so a spin loop
+  that allocates does not starve the others; one that never allocates does.
 - I/O while other threads exist: a blocking socket (`rt_net.c`) is used
-  without blocking (`MSG_DONTWAIT`, a `poll` before `accept`, a
-  non-blocking `connect`) and the thread waits for the descriptor in the
-  scheduler, honouring `setTimeout` (a timeout fails with EAGAIN, i.e.
-  `haxe.io.Error.Blocked`, as the blocking call does). Sockets made
-  non-blocking with `setBlocking(false)` still throw `Blocked`.
-  `Socket.select` waits in the scheduler, then selects without waiting.
-  Reads and writes of `sys.io.File`/`Process` descriptors and `Sys.getChar`
-  wait until the descriptor is ready (pipes and terminals; regular files are
-  always ready), and `Process.exitCode()` polls the child with growing
-  sleeps. `close` marks the descriptor so a thread waiting on it fails
-  (EBADF) instead of using a reused number. When no thread can run, the
-  scheduler waits in `poll` over the waited descriptors up to the nearest
-  timer deadline; if no thread can ever be woken it prints
-  `fatal: deadlock, every thread is blocked forever` and exits with 1.
-- Still blocking the whole process: `Sys.print`/`println` and writes to
-  stdout/stderr, `Sys.command`, file system calls, host name resolution,
-  TLS (`rt_ssl.c` BIO send/recv) and libuv calls other than `Loop.run`
-  (which gives way while other threads exist, see the libuv section).
+  without blocking (`MSG_DONTWAIT`, a `poll` before `accept`, a non-blocking
+  `connect`) and the thread waits for the descriptor in the scheduler,
+  honouring `setTimeout`; `Socket.select` waits in the scheduler, then
+  selects without waiting; pipe/terminal reads and writes wait until ready;
+  `Process.exitCode()` polls the child with growing sleeps; `close` makes a
+  waiter fail (EBADF). When no thread can run the scheduler waits in `poll`
+  up to the nearest timer; if none can ever be woken it prints `fatal:
+  deadlock, every thread is blocked forever` and exits with 1. Still
+  blocking the process: stdout/stderr writes, `Sys.command`, file system
+  calls, host name resolution, TLS and libuv calls other than `Loop.run`.
+- `haxe.atomic` operations are plain (no thread switches inside them).
+
+### Both
+
 - `eval.luv` threads (`EvalLuv.hx`): `Thread.create` runs the Eval function
-  on a new green thread with its own Eval thread context (as upstream's
-  luv OS threads get one), and `ThreadPool.queueWork` hands the work to a
-  pool of `UV_THREADPOOL_SIZE` green threads (default 4, started by the
-  first `queueWork`; `ThreadPool.setSize` sets the variable as luv does).
-  A finished work signals a `uv_async_t` of its loop, whose callback (inside
-  `Loop.run`) calls the after-work callback, so the callback is delivered
-  by the loop as with libuv; `Request.cancel` cancels work no pool thread
-  has taken yet (`ECANCELED`). `Mutex`, `RwLock`, `Semaphore`, `Condition`,
-  `Barrier` and `Once` are Haxe over the hxc `sys.thread` primitives, so
-  they block only the calling green thread (libuv's `uv_mutex_t` & co.
-  would block the process and deadlock). Semantics differences from
-  upstream: no parallelism, and a thread gives way only where it blocks,
-  sleeps or allocates (upstream's Eval threads already never run Haxe code
-  at the same time, under the OCaml runtime lock, but switch at any point);
-  `Thread.create` ignores the stack size. libuv's own thread pool of real
-  threads still runs the file system and DNS requests.
-- Exit: the process exits when the main thread's `main` returns (as on hl
-  and cpp), whatever other threads do. An uncaught exception ends only its
-  thread (`Thread.onAbort` prints it). `haxe.atomic` needs nothing: the std
-  versions for non-threaded targets are correct with one running thread.
-  Thread ids are small integers (main: 1); `Thread.events` is not available
-  (the custom target does not define `target.threaded`).
-- Under `__EMSCRIPTEN__` (the wasm playground) there are no threads:
-  `Thread.create` throws "threads are not supported", a wait without a
-  timeout that would block forever throws, and a timed wait sleeps and times
-  out.
+  on a new thread with its own Eval thread context, `ThreadPool.queueWork`
+  hands the work to a pool of `UV_THREADPOOL_SIZE` threads (default 4); a
+  finished work signals a `uv_async_t` of its loop, whose callback (inside
+  `Loop.run`) calls the after-work callback. `Mutex`, `RwLock`, `Semaphore`,
+  `Condition`, `Barrier` and `Once` are Haxe over the hxc `sys.thread`
+  primitives (safe regions with OS threads; libuv's `uv_mutex_t` would block
+  a green scheduler). libuv's own thread pool runs file system and DNS
+  requests in C.
+- Exit: the process exits when the main thread's `main` returns. An uncaught
+  exception ends only its thread (`Thread.onAbort` prints it). Thread ids
+  are small integers (main: 1); `Thread.events` is not available (the custom
+  target does not define `target.threaded`).
+- Under `__EMSCRIPTEN__` there are no threads: `Thread.create` throws
+  "threads are not supported", a wait that would block forever throws, and
+  a timed wait sleeps and times out.
 
 `bench/threads/Threads.hx` checks the package (`sh backend/build.sh
-backend/bench/threads Threads && bin/backend/Threads/prog_c`).
-`sys.net.Socket`/`Host` are real (`backend/std-hxc/sys/net`, over
-`rt_net.c`).
+backend/bench/threads Threads && bin/backend/Threads/prog_c`; with
+`CC="gcc -O2"` on OS threads). `sys.net.Socket`/`Host` are real
+(`backend/std-hxc/sys/net`, over `rt_net.c`).
 
 ## Finalisers and regular expressions
 
@@ -239,19 +321,20 @@ throw when called.
   Windows table and system errors are translated at run time
   (`uv__cosmo_err`); interface names in IPv6 scope ids are numeric only
   (no `if_nametoindex`), and source-specific multicast is unsupported.
-- `Loop.run` with one green thread is `uv_run` (it blocks the process). While
-  other green threads exist (e.g. `eval.luv` thread pool work or a thread
+- `Loop.run` with one thread is `uv_run` (it blocks the process). While
+  other threads exist (e.g. `eval.luv` thread pool work or a thread
   that will `Async.send`), it runs `UV_RUN_NOWAIT` iterations and waits in
-  between in the green scheduler for the loop's backend descriptor
+  between (in the green scheduler, or in a safe region with OS threads) for
+  the loop's backend descriptor
   (`uv_backend_fd`, the epoll fd) up to `uv_backend_timeout`, so the other
   threads run meanwhile and an `Async.send` from one wakes the loop. A
   thread spawned by a callback during a plain `uv_run` stops it
   (`rt_spawn_hook`) and the run continues that way; `Loop.stop` is
   remembered across those iterations. Without a pollable backend descriptor
-  the loop is polled every millisecond. TLS reads and writes still block the
-  process. libuv's thread pool runs file system and DNS requests on real
+  the loop is polled every millisecond. With green threads TLS reads and
+  writes still block the process. libuv's thread pool runs file system and DNS requests on real
   threads in C only; their callbacks run on the loop's thread.
-  `eval.luv.Thread`/`ThreadPool` run on green threads (see the threads
+  `eval.luv.Thread`/`ThreadPool` run on hxc threads (see the threads
   section).
 - Tested on Linux x86-64 only (see bench/COSMO.md): the aarch64 half is built
   but not run (no qemu-aarch64 here), and macOS, Windows and the BSDs are

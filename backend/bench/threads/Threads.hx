@@ -40,10 +40,12 @@ class Threads {
 
 	static function lock() {
 		var l = new Lock();
-		var order = [];
+		var order = [], om = new Mutex();
 		for (i in 0...3)
 			Thread.create(() -> {
+				om.acquire(); // OS threads: concurrent pushes would race
 				order.push(i);
+				om.release();
 				l.release();
 			});
 		for (_ in 0...3) l.wait();
@@ -116,17 +118,23 @@ class Threads {
 	}
 
 	static function semaphore() {
-		var s = new Semaphore(0), n = 0;
+		// (OS threads run in parallel: n is guarded, and the main thread waits
+		// for the three acquisitions instead of sleeping a fixed time)
+		var s = new Semaphore(0), n = 0, m = new Mutex(), acquired = new Lock();
 		for (i in 0...3)
 			Thread.create(() -> {
 				s.acquire();
+				m.acquire();
 				n++;
+				m.release();
+				acquired.release();
 			});
 		Sys.sleep(0.01);
 		check("semaphore blocks", n == 0);
 		for (i in 0...3) s.release();
-		Sys.sleep(0.01);
-		check("semaphore", n == 3);
+		var all = true;
+		for (i in 0...3) if (!acquired.wait(10)) all = false;
+		check("semaphore", all && n == 3);
 		check("semaphore tryAcquire", !s.tryAcquire());
 		var t0 = Sys.time();
 		check("semaphore timeout", !s.tryAcquire(0.05) && Sys.time() - t0 >= 0.04);
@@ -251,7 +259,9 @@ class Threads {
 					sem.acquire();
 					var v = q.pop(true);
 					if (v[0] < 0) break;
+					m.acquire(); // two consumers: with OS threads an unguarded ++ loses counts
 					got++;
+					m.release();
 				}
 				done.release();
 			});

@@ -14,9 +14,15 @@ enum JsonValue {
 @:structInit class JsonField {
 	public var name:String;
 	public var value:JsonValue;
-	public inline function new(name:String, value:JsonValue) { this.name = name; this.value = value; }
+
+	public inline function new(name:String, value:JsonValue) {
+		this.name = name;
+		this.value = value;
+	}
+
 	public inline function clone():JsonField return new JsonField(name, value);
 }
+
 class Json {
 	public static function stringOfJson(json:JsonValue):String {
 		var output = new StringBuf();
@@ -26,13 +32,20 @@ class Json {
 
 	public static function writeJson(write:String->Void, value:JsonValue):Void {
 		switch (value) {
-			case JNull: write("null");
-			case JBool(value): write(value ? "true" : "false");
-			case JString(value): writeString(write, value);
-			case JFloat(value): writeFloat(write, value);
-			case JInt(value): writeInt(write, value);
-			case JObject(value): writeObject(write, value);
-			case JArray(value): writeArray(write, value);
+			case JNull:
+				write("null");
+			case JBool(value):
+				write(value ? "true" : "false");
+			case JString(value):
+				writeString(write, value);
+			case JFloat(value):
+				writeFloat(write, value);
+			case JInt(value):
+				writeInt(write, value);
+			case JObject(value):
+				writeObject(write, value);
+			case JArray(value):
+				writeArray(write, value);
 		}
 	}
 
@@ -42,15 +55,24 @@ class Json {
 		for (index in 0...value.length) {
 			var code = value.charCodeAt(index);
 			switch (code) {
-				case 34: escaped.add('\\"');
-				case 9: escaped.add('\\t');
-				case 13: escaped.add('\\r');
-				case 8: escaped.add('\\b');
-				case 10: escaped.add('\\n');
-				case 12: escaped.add('\\f');
-				case 92: escaped.add('\\\\');
-				case _ if (code <= 31 || code == 127): escaped.add('\\u${StringTools.hex(code, 4)}');
-				case _: escaped.addChar(code);
+				case 34:
+					escaped.add('\\"');
+				case 9:
+					escaped.add('\\t');
+				case 13:
+					escaped.add('\\r');
+				case 8:
+					escaped.add('\\b');
+				case 10:
+					escaped.add('\\n');
+				case 12:
+					escaped.add('\\f');
+				case 92:
+					escaped.add('\\\\');
+				case _ if (code <= 31 || code == 127):
+					escaped.add('\\u${StringTools.hex(code, 4)}');
+				case _:
+					escaped.addChar(code);
 			}
 		}
 		write(escaped.toString());
@@ -105,7 +127,9 @@ private class Parser {
 			case 116: readKeyword("true", JBool(true));
 			case 102: readKeyword("false", JBool(false));
 			case 110: readKeyword("null", JNull);
-			case 34: position++; JString(readStringContents());
+			case 34:
+				position++;
+				JString(readStringContents());
 			case 45, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57: readNumber();
 			case 123: readObject();
 			case 91: readArray();
@@ -194,23 +218,31 @@ private class Parser {
 			}
 			if (position == input.length) error("Invalid escape sequence");
 			switch (input.charCodeAt(position++)) {
-				case 34, 92, 47: output.addChar(input.charCodeAt(position - 1));
-				case 98: output.addChar(8);
-				case 102: output.addChar(12);
-				case 110: output.addChar(10);
-				case 114: output.addChar(13);
-				case 116: output.addChar(9);
+				case 34, 92, 47:
+					output.addChar(input.charCodeAt(position - 1));
+				case 98:
+					output.addChar(8);
+				case 102:
+					output.addChar(12);
+				case 110:
+					output.addChar(10);
+				case 114:
+					output.addChar(13);
+				case 116:
+					output.addChar(9);
 				case 117:
 					var high = readUnicodeEscape();
 					if (high >= 0xD800 && high <= 0xDBFF) {
-						if (input.substr(position, 2) != "\\u") error("Missing escape sequence representing low surrogate for code point beyond U+FFFF");
+						if (input.substr(position,
+							2) != "\\u") error("Missing escape sequence representing low surrogate for code point beyond U+FFFF");
 						position += 2;
 						var low = readUnicodeEscape();
 						if (low < 0xDC00 || low > 0xDFFF) error("Invalid low surrogate for code point beyond U+FFFF");
 						var scalar = 0x10000 + ((high - 0xD800) << 10) + low - 0xDC00;
 						output.add(String.fromCharCode(scalar));
 					} else output.addChar(high);
-				case _: error("Invalid escape sequence");
+				case _:
+					error("Invalid escape sequence");
 			}
 		}
 		return error("Unexpected end of input");
@@ -221,20 +253,31 @@ private class Parser {
 		var value = 0;
 		for (_ in 0...4) {
 			var code = input.charCodeAt(position++);
-			var digit = code >= 48 && code <= 57 ? code - 48 : code >= 65 && code <= 70 ? code - 65 + 10 : code >= 97 && code <= 102 ? code - 97 + 10 : -1;
+			var digit = code >= 48
+				&& code <= 57 ? code - 48 : code >= 65 && code <= 70 ? code - 65 + 10 : code >= 97 && code <= 102 ? code - 97 + 10 : -1;
 			if (digit < 0) error("Invalid escape sequence");
 			value = (value << 4) | digit;
 		}
 		return value;
 	}
 
-	function skipSpace():Void while (position < input.length && switch (input.charCodeAt(position)) { case 32, 9, 13, 10: true; case _: false; }) position++;
+	function skipSpace():Void while (position < input.length && switch (input.charCodeAt(position)) {
+			case 32, 9, 13, 10: true;
+			case _: false;
+		}) position++;
+
 	function consume(code:Int):Bool {
-		if (position < input.length && input.charCodeAt(position) == code) { position++; return true; }
+		if (position < input.length && input.charCodeAt(position) == code) {
+			position++;
+			return true;
+		}
 		return false;
 	}
+
 	static inline function isDigit(code:Int):Bool return code >= 48 && code <= 57;
+
 	static inline function isNonzeroDigit(code:Int):Bool return code >= 49 && code <= 57;
+
 	static function parseFloat(token:String):Float {
 		var value = Std.parseFloat(token);
 		if (Math.isNaN(value)) error("Invalid token");
@@ -259,5 +302,6 @@ private class Parser {
 		}
 		return value;
 	}
+
 	static function error<T>(message:String):T throw message;
 }

@@ -33,7 +33,9 @@ class ZipError extends haxe.Exception {
 
 class ZipInput {
 	public final filename:String;
+
 	final channel:sys.io.FileInput;
+
 	public final entries:Array<ZipEntry>;
 	public final comment:String;
 
@@ -49,7 +51,12 @@ class ZipInput {
 	}
 
 	// read_ecd: locate the end of central directory record from the end of the file.
-	static function readEcd(filename:String, ic:sys.io.FileInput):{entries:Int, size:Int, offset:Int, comment:String} {
+	static function readEcd(filename:String, ic:sys.io.FileInput):{
+		entries:Int,
+		size:Int,
+		offset:Int,
+		comment:String
+	} {
 		ic.seek(0, SeekEnd);
 		var filelen = ic.tell();
 		var start = filelen - 22 - 0xFFFF;
@@ -77,7 +84,12 @@ class ZipInput {
 		var commentLen = buf.getUInt16(found + 20);
 		var comment = buf.getString(found + 22, commentLen);
 		if (diskNo != 0 || cdDiskNo != 0) throw new ZipError(filename, "", "multi-disk ZIP files not supported");
-		return {entries: cdEntries, size: cdSize, offset: cdOffset, comment: comment};
+		return {
+			entries: cdEntries,
+			size: cdSize,
+			offset: cdOffset,
+			comment: comment
+		};
 	}
 
 	static function readCd(filename:String, ic:sys.io.FileInput, cdEntries:Int, cdOffset:Int, cdSize:Int):Array<ZipEntry> {
@@ -163,7 +175,8 @@ class ZipInput {
 					throw new ZipError(filename, e.filename, "decompression error");
 				};
 				z.close();
-				if (r.write != e.uncompressedSize) throw new ZipError(filename, e.filename, "wrong size for deflated entry (not enough data)");
+				if (r.write != e.uncompressedSize) throw new ZipError(filename, e.filename,
+					"wrong size for deflated entry (not enough data)");
 				if (haxe.crypto.Crc32.make(res) != e.crc) throw new ZipError(filename, e.filename, "CRC mismatch");
 				return res;
 		}
