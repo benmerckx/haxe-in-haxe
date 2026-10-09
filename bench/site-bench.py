@@ -83,9 +83,18 @@ def compile_case(case, target, options, out):
         if target == "hxc":
             # The JS-hosted frontend cannot spawn haxelib. Resolve the same
             # classpaths/defines using the reference haxelib before invoking it.
-            paths = subprocess.check_output(["haxelib", "path", lib], text=True)
+            lookup = ["haxelib", "path", lib]
+            started = time.perf_counter()
+            try:
+                paths = subprocess.check_output(lookup, text=True, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                (out / (target + "-dependency.log")).write_text(e.output)
+                return None, [{"command": lookup, "wall_s": time.perf_counter() - started,
+                               "exit_code": e.returncode, "error": e.output}]
             for line in paths.splitlines():
                 line = line.strip()
+                if line.startswith("Warning:"):
+                    continue
                 if line.startswith("-D "):
                     args += ["-D", line[3:]]
                 elif line and not line.startswith("-"):
