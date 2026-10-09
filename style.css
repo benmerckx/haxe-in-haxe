@@ -78,9 +78,34 @@ td:not(:first-child), th:not(:first-child) { white-space: nowrap; }
 .todo { color: var(--todo); }
 .cmd { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
 .steps li { margin-bottom: 10px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 4px; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.scroll { overflow-x: auto; }
+table.bench { font-size: 14px; margin-top: 4px; }
+table.bench td, table.bench th { padding: 6px 8px; vertical-align: middle; }
+table.bench .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.bench .chk { display: none; color: var(--ok); }
+table.bench .barcol { width: 42%; min-width: 140px; }
+table.bench tr.ref td { font-weight: 600; }
+table.bench .fail { color: var(--todo); white-space: normal; font-size: 13px; }
+.track { position: relative; height: 20px; background: var(--code); border-radius: 3px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); opacity: 0.85; border-radius: 3px; }
+.fill.fast { background: var(--ok); }
+.fill.base { background: var(--muted); }
+.mark { position: absolute; top: -3px; bottom: -3px; border-left: 2px dashed var(--fg); opacity: 0.45; }
+.lbl { position: absolute; right: 6px; top: 0; line-height: 20px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.runners dt { font-weight: 600; margin-top: 10px; }
+.runners dd { margin: 2px 0 0; color: var(--muted); }
 footer { border-top: 1px solid var(--line); margin-top: 64px; padding: 20px 16px 40px; color: var(--muted); font-size: 14px; }
 @media (max-width: 600px) {
 	.hero h1 { font-size: 36px; }
 	td, th { padding: 6px; }
 	td:not(:first-child), th:not(:first-child) { white-space: normal; }
+	table.bench .wall, table.bench .out { display: none; }
+	table.bench .chk { display: inline; }
+	table.bench td.num, table.bench th.num { white-space: nowrap; }
+	table.bench { font-size: 13px; }
+	table.bench td, table.bench th { padding: 5px 4px; }
+	table.bench .barcol { min-width: 90px; }
+	table.bench th.barcol .muted { display: none; }
 }

@@ -19,6 +19,7 @@
 			<a href="#status">Status</a>
 			<a href="#how">How it works</a>
 			<a href="#numbers">Numbers</a>
+			<a href="#benchmarks">Benchmarks</a>
 		</nav>
 	</div>
 </header>
@@ -120,11 +121,28 @@ chmod +x haxe-in-haxe.com
 			</tbody>
 		</table>
 	</section>
+	<section id="benchmarks">
+		<h2>Benchmarks</h2>
+		<p>The same compiler, run in different ways, compiling the same programs to HXB. The port's timing only counts if its archive has the same members as the reference compiler's and every <code>.hxb</code> payload is byte-identical.</p>
+		<div id="bench-results"><p class="note">Loading results…</p></div>
+		<h3>Runners</h3>
+		<dl class="runners">
+			<dt>OCaml reference</dt><dd>The upstream compiler, native OCaml, built from the pinned <code>haxe/</code> submodule. Every ratio is relative to it.</dd>
+			<dt>Eval, from source</dt><dd>The reference compiler runs the port's Haxe source with its Eval interpreter: <code>haxe -cp src --run haxe.Main …</code>. Each run first types all 52k lines of the port.</dd>
+			<dt>Eval, from HXB</dt><dd>The reference loads the port from an Eval HXB archive it wrote once (<code>--hxb-lib haxe-in-haxe.zip --run haxe.Main …</code>) and interprets it, skipping parsing and typing.</dd>
+			<dt>HashLink JIT, HL/C, JS, JVM, C++</dt><dd>The port compiled by the reference compiler to its existing targets: HashLink bytecode run by <code>hl</code>; HashLink C built with gcc -O2 against a static libhl with a patched allocator; JavaScript on Node; a JAR on the JVM; hxcpp C++ with single-threaded GC marking.</dd>
+			<dt>hxc: tcc, gcc -O2, cosmocc, wasm</dt><dd>The port compiled by this project's own C backend (<code>backend/</code>), whose runtime has a precise generational GC. The same C file built with tcc (fast to build), gcc -O2, cosmocc (one portable binary for x86-64 and ARM64; the fat build is measured), and Emscripten: the 64-bit WebAssembly of the playground, built for Node (24, for 64-bit memory) with direct file access instead of the in-memory file system.</dd>
+		</dl>
+		<h3>Method</h3>
+		<p>Every run is a fresh process compiling one workload with <code>-D disable-parallelism --interp --no-output --hxb out.zip</code>. The table shows the minimum over 3 runs; the Eval runners compiling the port itself ran once, as each run takes about half an hour. <b>CPU</b> is user plus system time of the process and its children: other jobs share this machine, so CPU time, which they disturb less than wall time, is the main measure. It can exceed wall time where a runtime uses several threads (JIT compilation and GC in Node and the JVM). <b>Peak RSS</b> is the largest resident set of the run. Start-up is included: the JVM, Node and Eval pay it on every run. Reproduce with <code>python3 bench/run.py</code> (<code>bench/README.md</code>).</p>
+		<p class="note" id="bench-machine"></p>
+	</section>
 </main>
 
 <footer class="wrap">
 	<p>An experimental port of <a href="https://haxe.org">Haxe</a>. Built <span data-info="date"></span> from commit <code data-info="commit"></code>.</p>
 </footer>
 <script src="playground.js"></script>
+<script src="bench.js"></script>
 </body>
 </html>
