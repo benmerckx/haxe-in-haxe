@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How we got here · Haxe in Haxe</title>
+<meta name="description" content="The long version: how the Haxe compiler was ported from OCaml to Haxe, made byte-identical, made fast, and given its own C and WebAssembly backend. What we tried, what worked and what didn't.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="hero story-hero">
+	<div class="wrap">
+		<p class="kicker"><a href="index.html">Haxe in Haxe</a> · The long version</p>
+		<h1>How we got here</h1>
+		<p class="lead">Porting the Haxe compiler from OCaml to Haxe, holding it to byte-identical output, making it fast, and then writing a backend for it. What we tried, what worked and what didn't.</p>
+		<nav class="links">
+			<a href="index.html">Home</a>
+			<a href="index.html#playground">Playground</a>
+			<a href="index.html#download">Download</a>
+			<a href="index.html#benchmarks">Benchmarks</a>
+		</nav>
+	</div>
+</header>
+
+<main class="wrap">
+<article class="story">
+
+<p class="byline">Written 9 October 2026. Every number below comes from the repository: its Git history, <code>test/TESTING.md</code>, <code>bench/README.md</code> and the other notes it cites.</p>
+
+<p>The Haxe compiler is written in OCaml. The compiler running on the <a href="index.html">front page</a> is a port of it written in Haxe. That port parses, types and filters Haxe programs and writes HXB archives that match the OCaml compiler's byte for byte. It runs macros in its own port of the Eval interpreter, and it is compiled to C by a backend that is also written in Haxe. The resulting native binary compiles the port's own source a little faster than the OCaml compiler does.</p>
+
+<p>This is the long version: the order things happened in, the dead ends, and what we would do the same way again.</p>
+
+<aside class="callout">
+	<p><b>Who “we” is.</b> The port was written by Claude, Anthropic's AI model, working in this repository with its owner, Ben Merckx. The repository's ground rules (<code>AGENTS.md</code>) set the scope and the bar. Much of the work ran as many sub-agents in parallel, each in its own Git worktree on its own branch, merged back after validation. The August and September commits are the owner's groundwork. From 7 October on, the history is Claude's: 198 commits in roughly 48 hours, out of 248 in total.</p>
+</aside>
+
+<nav class="toc" aria-label="Contents">
+	<p><b>Contents</b></p>
+	<ol>
+		<li><a href="#goal">The goal, and a strict oracle</a></li>
+		<li><a href="#false-start">A false start, then a real translation</a></li>
+		<li><a href="#ocaml">OCaml semantics that leak into bytes</a></li>
+		<li><a href="#harness">The harness, and the first green day</a></li>
+		<li><a href="#macros">Macros: porting an interpreter</a></li>
+		<li><a href="#fast">Making it fast enough on existing targets</a></li>
+		<li><a href="#hxc">Writing our own backend</a></li>
+		<li><a href="#portable">One binary for every OS, and the browser</a></li>
+		<li><a href="#target">hxc as a real target</a></li>
+		<li><a href="#rest">Filling in the rest of the compiler</a></li>
+		<li><a href="#upstream">Upstream's own test suite</a></li>
+		<li><a href="#today">Where it stands</a></li>
+		<li><a href="#lessons">Lessons</a></li>
+	</ol>
+</nav>
+
+<h2 id="goal">1. The goal, and a strict oracle</h2>
+
+<p>The brief was narrow on purpose. Port the compiler in <code>haxe/src</code> (a Git submodule pinned at upstream commit <code>b10fa6e</code>) to Haxe in <code>src/</code>, one module per upstream module, and stay close: same declarations, same branch order, same exceptions and error messages, same data layout wherever possible. Redesigning was out of scope. A faithful translation can be checked against its source line by line, and a redesign can't.</p>
+
+<p>The first functional target was not JavaScript or C++. It was <b>HXB</b>, Haxe's binary module format. An HXB archive is a ZIP file with one <code>.hxb</code> member per module. Each member serializes the typed AST after typing and the cross-target filters have run, but before any target generator touches it. Emitting HXB needs the whole front end (parsing, module loading, typing, finalization and filtering) and no code generator. That makes it the smallest output that still exercises everything that is hard about a compiler.</p>
+
+<p>It also makes a very good oracle. AGENTS.md defines conformance as:</p>
+
+<blockquote>the same normalized ZIP member-name set and byte-for-byte equality of every uncompressed <code>.hxb</code> member payload for the same effective invocation.</blockquote>
+
+<p>The container is ignored: timestamps, member order and compressor output don't count. Everything inside a member counts: the order of the string pool, every variable id, every position, every piece of metadata. A port can't pass by producing something equivalent. It has to make the same decisions in the same order as the original.</p>
+
+<p>The reference is the compiler built from the pinned submodule (<code>make -C haxe haxe</code>), never a system Haxe. That rule turned out to matter. In September there was no OCaml toolchain in the environment, so drafts could only be run against an installed Haxe 5.0.0-preview.1. Its standard library already differed from the pinned one: it rejected <code>StringMap.size()</code>, which the pinned std declares. Until 7 October, “conformance” could not be measured at all.</p>
+
+<h2 id="false-start">2. A false start, then a real translation</h2>
+
+<p>The repository's first commits (25 August, 41 of them in one night) are a hand-written bootstrap compiler. It had its own recursive-descent grammar, its own tokenizer and its own HXB writer, and it lowered language features by hand, one commit at a time: “lower key value for loops”, “lower simple inline local functions”, “type and serialize try catch expressions”.</p>
+
+<p>The night ended on a note that explains why this approach couldn't reach the bar. Upstream's pattern matcher allocates temporary variables, and every later variable id shifts with them:</p>
+
+<blockquote>The current allocation stream first diverges in <code>haxe.CallStack</code>'s complex enum-pattern lowering: upstream allocates matcher temporaries which the port does not yet create, shifting later IDs […] Implement matcher parity; never seed or offset the global counter to hide this gap.</blockquote>
+
+<p>With a byte-exact oracle, reimplementing a behaviour means reimplementing every allocation it makes along the way. The only practical way to do that is to translate the original. On 4 September the project switched to translation first. One commit added 126 draft Haxe files covering 124 upstream <code>.ml</code> modules (18.5k inserted lines), and they compiled the same day. The first run of the translated pipeline reached 22 modules of the <code>Basic</code> fixture and then died with <code>Cannot call null</code>.</p>
+
+<p>Two checkpoints in September got <code>Basic</code>, <code>Int64Basic</code> and then <code>TryCatch</code> through to HXB, fixing several OCaml-semantics bugs of the kind described in the next section.</p>
+
+<p>On 7 October the last hand-written pieces on the main path were replaced by mechanical translations of <code>hxbWriter.ml</code>, <code>grammar.ml</code> and the lexer's token rules. The parser corpus went from 1,339 to 1,355 of 1,366 upstream files. The reference compiler was built at last, and <code>Basic</code> matched it <b>byte for byte on all 22 HXB members</b>.</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Size</th><th class="n">files</th><th class="n">lines</th><th class="n">bytes</th></tr></thead>
+	<tbody>
+		<tr><td>Upstream OCaml in <code>haxe/src</code>, all of it</td><td class="n">297</td><td class="n">135k</td><td class="n">4.6&nbsp;MB</td></tr>
+		<tr><td>… without the target generators</td><td class="n">247</td><td class="n">89k</td><td class="n">2.9&nbsp;MB</td></tr>
+		<tr><td>The port in <code>src/</code> today</td><td class="n">277</td><td class="n">71k</td><td class="n">3.5&nbsp;MB</td></tr>
+		<tr><td>The C backend (<code>backend/src</code>) and its runtime (<code>backend/rt</code>)</td><td class="n">5 + 10</td><td class="n">3.5k + 6.8k</td><td class="n"></td></tr>
+	</tbody>
+</table></div>
+<figcaption>Counted with <code>wc</code> at the time of writing. The port also has support modules with no upstream counterpart, such as OCaml-style tables, streams and ZIP reading.</figcaption>
+</figure>
+
+<h2 id="ocaml">3. OCaml semantics that leak into bytes</h2>
+
+<p>Most payload differences didn't come from wrong logic. They came from places where upstream quietly relies on how OCaml behaves. A few kinds came up again and again.</p>
+
+<h3>Evaluation order</h3>
+
+<p>OCaml evaluates constructor, tuple and function arguments right to left. Haxe evaluates left to right. When the arguments allocate variables, the order shows up in the ids, and the ids are in the HXB. Upstream's <code>Texpr.map_expr_type</code> contains:</p>
+
+<pre class="code"><code>(* haxe/src/core/texpr.ml: the initializer is mapped before the variable *)
+{ e with eexpr = TVar (fv v, match eo with None -&gt; None | Some e -&gt; Some (f e)); ... }</code></pre>
+
+<p>The port spells the order out:</p>
+
+<pre class="code"><code>// src/core/Texpr.hx
+case TVar(v,eo): var eo = eo == null ? null : f(eo); def = TVar(fv(v),eo);</code></pre>
+
+<p>The same fix was needed in the inliner, in exception lowering (<code>catchesToIfs</code>), and in the pattern converter, where <code>make e :: loop el tl</code> types the tail first. It also showed up in error text. The “Recursive type” message is built with <code>sprintf</code>, whose arguments OCaml also evaluates right to left. Printing a constrained monomorph has a side effect on how it prints the next time, so the port has to print the field type first to produce the same message.</p>
+
+<h3>Hash table iteration order</h3>
+
+<p>OCaml's <code>Hashtbl</code> iterates in an order that depends on its hash function, and that order reaches the output: in the macro interpreter's tables and, later, in display results. The port has <code>core.ds.OcamlHashtbl</code>, which reproduces OCaml's bucket layout and resizing, and <code>core.ds.OcamlHash</code>, which reproduces <code>caml_hash</code> for the key shapes that occur. One bug here took a while to find. OCaml hashes the <em>tagged</em> integer <code>2n+1</code>, not <code>n</code>, so keys 1 to 5 came out as 3, 1, 4, 2, 5 instead of upstream's 1, 4, 5, 3, 2.</p>
+
+<pre class="code"><code>// src/core/ds/OcamlHashtbl.hx: caml_hash mixes Val_long(n) = 2n+1
+public static function hashInt(n:Int):Int {
+	var h = mixWord(0, (n &lt;&lt; 1) | 1);
+	...</code></pre>
+
+
+<h3>Physical equality</h3>
+
+<p>The HXB writer decides whether to write a position's file name in full with <code>p.pfile != pw.p_file</code>, which is OCaml's <em>physical</em> inequality. Positions created by macros carry freshly decoded strings, so upstream writes them in full even when the text is equal. The port needs a reference comparison on strings (<code>StrTools.physNeq</code>). JavaScript has no string identity, which is one reason 10 macro cases could never match on the JS build. The C backend had the same issue until it compared string pointers.</p>
+
+<h3>Immutable lists versus mutable arrays</h3>
+
+<p>Upstream prepends to immutable lists. Translated as arrays, the same code mutates shared data:</p>
+<ul>
+	<li>Types aliased their declaration's metadata array and unshifted <code>@:enum</code> into it. A second <code>--next</code> compilation then saw the change and printed 133 deprecation warnings at unknown positions.</li>
+	<li>Filters iterated the live field arrays, so fields added by <code>local_statics</code> were filtered a second time. Upstream iterates a snapshot by construction.</li>
+	<li>The parallel DCE and analyzer unshifted into metadata arrays that other threads were reading. Upstream needs no lock because its lists are immutable. Without <code>-D disable-parallelism</code>, 7 of 160 small cases failed with “Null access .meta”.</li>
+</ul>
+
+<h3>Numbers and text</h3>
+<ul>
+	<li>Int32 literal parsing used a <code>Float</code> accumulator seeded with an <code>Int</code>, which wrapped on Eval. Separately, negating <code>INT_MIN</code> after wrapping gave +2147483648 on hosts with unbounded integers (JS).</li>
+	<li>OCaml's <code>float_of_string</code> skips underscores, reads the whole string and accepts hex, <code>nan</code> and <code>inf</code> (<code>core.ds.OcamlFloat</code>), so <code>12.3_4</code> is not <code>12.3</code>. <code>string_of_float</code> prints <code>0.</code>. The JSON printer tries <code>%.16g</code> and falls back to <code>%.17g</code>.</li>
+</ul>
+
+<h3>The type system as a safety net</h3>
+
+<p>Early drafts used <code>Dynamic</code> for many OCaml records and tuples. In Haxe, reading a misspelled field of a <code>Dynamic</code> silently gives <code>null</code>. <code>find_array_read_access</code> returned a record with fields <code>field</code>, <code>type</code>, <code>ret</code>, <code>index</code> and <code>value</code>, but the caller read <code>key</code> and <code>cf</code>, so <code>a[k] += v</code> on an abstract with <code>@:arrayAccess</code> crashed. Upstream's unit tests found that one. After it, three passes replaced the remaining structured <code>Dynamic</code>s with typedefs that follow upstream.</p>
+
+<h3>Exceptions as control flow</h3>
+
+<p>Upstream uses exceptions the way OCaml programmers do: <code>Not_found</code>, <code>Exit</code>, parser backtracking. Compiling the 32-module <code>stdlib</code> workload throws about 119,000 of them. Cheap in OCaml, they were expensive on every Haxe target we tried, as the next sections show.</p>
+
+<h2 id="harness">4. The harness, and the first green day</h2>
+
+<p><code>test/conformance.py</code> runs every case with the pinned reference and with the port, then checks four things: the same member set, identical uncompressed payloads, that the reference can load the port's archive through <code>--hxb-lib</code> without the case's class path (so nothing is missing), and that the port run from source matches the port run from an Eval HXB archive. Cases the reference rejects must be rejected by the port too.</p>
+
+<pre class="code"><code>make -C haxe haxe                                   # the pinned reference
+HAXE_REFERENCE=haxe/haxe python3 test/conformance.py -j 8</code></pre>
+
+<p>The cases come from <code>test/discover-cases.py</code>. It classified 543 upstream configurations under <code>tests/misc/eval</code> and <code>tests/optimization</code>. 147 were included; the rest were recorded with a reason (306 only have compile-fail configurations, 67 create a macro context, 10 are rejected by the reference, and so on). Together with a smoke inventory and fixtures, that makes 282 cases.</p>
+
+<p>Two details mattered from the start. Every invocation uses <code>-D disable-parallelism</code>, because with parallel filters the reference takes variable ids from a shared counter and doesn't produce the same output twice itself. And the reference gets the checkout's <code>haxe/std</code> explicitly, or its built-in std path leaks into serialized positions.</p>
+
+<p>Running the port on Eval was slow, so the harness was switched to the port compiled to HashLink, an order of magnitude faster. It also surfaced bugs Eval had hidden: HashLink doesn't pad missing optional arguments in dynamic calls, and labeled OCaml arguments like <code>~static:true</code> had been translated as positional ones.</p>
+
+<p>The day the reference became available, 7 October, ended with <b>275 of 275 accepted cases byte-identical and all 7 expected failures rejected</b>. The last diffs were a mutable <code>TLazy</code> (upstream's is a <code>ref</code>, so resolving it updates every holder), two more right-to-left orders, and qualified metadata matches.</p>
+
+<h2 id="macros">5. Macros: porting an interpreter</h2>
+
+<p>Haxe macros run in Eval, an interpreter inside the compiler. A port that can't run macros can't compile most real code, including its own source. Its standard library uses macros. So the next milestone was translating <code>macro/eval/*.ml</code> (value model, hashing, the “JIT” that turns typed expressions into closures, prototypes, encoders and decoders, the standard library natives), <code>macroApi.ml</code> and <code>macroContext.ml</code>.</p>
+
+<p>This job was split across several agents. The history shows eight “WIP” translation checkpoints within seven minutes, then one integration commit. On its first run, 12 of 67 macro-context cases were byte-identical. Twenty minutes later all 66 relevant ones were. (The 67th sets its own <code>--hxb</code> output, so it isn't a conformance case.) The remaining bugs were the ones described above: physical string comparison, NUL bytes truncating HashLink <code>StringMap</code> keys in the string pool, right-to-left pattern typing, and filters seeing their own additions. Shortly after, the port could also run programs with <code>--interp</code> and <code>--run</code>. On 268 cases the exit code, stdout and stderr were identical to the reference's. There were 4 known differences, such as the exit code of a failed process spawn (a host-runtime detail) and a timing race in one test.</p>
+
+<p>The macro port is about 20,000 lines of Haxe (<code>src/macros</code>). The debugger, libuv and mbedtls were left out at first and fail explicitly. Faking success is against the rules. TLS and libuv came back later, for the C build.</p>
+
+<p>AGENTS.md also asks for <b>host execution</b>: compile the port to an Eval HXB archive with the pinned compiler, run <code>haxe.Main</code> from it with <code>--hxb-lib</code>, and check that the output matches the source-run port's. That works, and the harness checks it on every case. It is also a useful reminder of what an interpreter on an interpreter costs. Compiling the port's own source this way takes 1,885 s of CPU against the reference's 5 s, about 373 times slower.</p>
+
+<h2 id="fast">6. Making it fast enough on existing targets</h2>
+
+<p>Haxe compiles to many targets, so the obvious next step was to compile the port with the reference compiler to each of them and measure. <code>bench/run.py</code> only counts a run if its archive matches the reference's. The first rounds measured the “stdlib” workload (32 standard library modules as roots):</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Build of the port (fifth round, 8 Oct)</th><th class="n">stdlib</th><th class="n">vs. reference</th></tr></thead>
+	<tbody>
+		<tr><td>reference (native OCaml)</td><td class="n">0.24&nbsp;s</td><td class="n">1×</td></tr>
+		<tr><td>HL/C (HashLink compiled to C)</td><td class="n">0.37&nbsp;s</td><td class="n">1.5×</td></tr>
+		<tr><td>C++ (hxcpp)</td><td class="n">0.96&nbsp;s</td><td class="n">4×</td></tr>
+		<tr><td>HashLink JIT</td><td class="n">1.04&nbsp;s</td><td class="n">4.3×</td></tr>
+		<tr><td>JS (Node 22)</td><td class="n">2.11&nbsp;s</td><td class="n">9×</td></tr>
+		<tr><td>JVM (OpenJDK 21)</td><td class="n">2.96&nbsp;s</td><td class="n">12×</td></tr>
+		<tr><td>Go (hx2go, heavily patched; measured separately)</td><td class="n">5.10&nbsp;s</td><td class="n">20×</td></tr>
+	</tbody>
+</table></div>
+<figcaption>Median of 7 runs, from <code>bench/README.md</code>. Every build passed the full 282-case conformance suite.</figcaption>
+</figure>
+
+<p>Getting every target to run correctly took patches to the targets themselves:</p>
+<ul>
+	<li><b>HL/C:</b> the pinned compiler's <code>hl2c</code> crashed on one kind of <code>Dynamic</code> field read; <code>bench/hl2c-virtual-field-cast.patch</code> fixes it.</li>
+	<li><b>C++:</b> release builds crashed or hung at random, in the string hash, the GC and on collected objects. The cause was hxcpp's multi-threaded GC marking (debug builds mark on one thread, which is why they never crashed). <code>bench/hxcpp-single-thread-mark.patch</code> turns it off.</li>
+	<li><b>Go:</b> the hx2go custom target needed a source patch and five post-processing scripts (for example, a <code>break</code> inside a <code>try</code> left the whole <code>try</code> body). With all that it passed every case, and it was still the slowest build.</li>
+</ul>
+
+<p>Then came the performance work, in rounds, each one measured with callgrind or perf before changing anything. In rough order of impact:</p>
+<ol>
+	<li><b>Exceptions without stack traces.</b> Control-flow exceptions are thrown as shared instances, and stack traces are only recorded when <code>OCAMLRUNPARAM=b</code> is set, as in OCaml. On HashLink, throwing through <code>hl.Api.rethrow</code> skips the native stack capture. That capture alone had been <b>80% of the HL/C run</b>.</li>
+	<li><b>The GC trigger.</b> libhl starts a full, non-generational mark after every 20% of heap growth, so a heap full of typed modules was marked over and over. <code>GcPolicy</code> collects relative to the heap size after the last major collection instead.</li>
+	<li><b>Records as classes.</b> Anonymous structures became <code>@:structInit</code> classes and <code>Dynamic</code> parameters were typed, which helped HashLink a little and the JVM a lot.</li>
+	<li><b>A patched allocator.</b> <code>bench/libhl-allocator.patch</code> grew over several rounds: larger fixed-size classes, zeroed pages that aren't zeroed twice, inline bump allocation in generated code, batched slice refills, and keeping swept pages for reuse.</li>
+	<li><b>Fewer closures.</b> HashLink allocates every local function when its definition runs, whether it is called or not. One analyzer function made 14 allocations per call before doing anything. Helpers that are only called became <code>inline</code>, first in hot functions and then across every package.</li>
+</ol>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>HL/C compiling the port's own source</th><th class="n">reference</th><th class="n">HL/C</th><th class="n">ratio</th></tr></thead>
+	<tbody>
+		<tr><td>8 Oct, after macros landed</td><td class="n">4.32&nbsp;s</td><td class="n">8.68&nbsp;s</td><td class="n">2.0×</td></tr>
+		<tr><td>8 Oct, night (first performance pass)</td><td class="n">4.01&nbsp;s</td><td class="n">6.73&nbsp;s</td><td class="n">1.7×</td></tr>
+		<tr><td>9 Oct, early (second pass)</td><td class="n">4.81&nbsp;s</td><td class="n">6.17&nbsp;s</td><td class="n">1.3×</td></tr>
+	</tbody>
+</table></div>
+<figcaption>Single-threaded wall time, medians. The machine is shared and drifted by 10–15% overnight, so later changes were compared in interleaved A/B runs.</figcaption>
+</figure>
+
+<p>Some things didn't work and were dropped, each with its numbers recorded:</p>
+<ul>
+	<li><b>A generational GC for HL/C.</b> Sticky mark bits, an arena with a byte-per-granule remembered set, and a write barrier emitted by a patched <code>hl2c</code>. It passed the whole conformance suite even with a 1 MB nursery, and it was slower: 0.42 s of user time on <code>stdlib</code> against 0.32 s, and 35–60% slower on the self-compile with a 32–128 MB nursery. The patches are kept in <code>bench/experiments/generational-gc</code>.</li>
+	<li>Bigger allocation slices, skipping the zeroing of pointer-free slices, populating GC chunks at <code>mmap</code>, <code>-O3</code>, <code>-march=native</code> and static linking all made no measurable difference. Transparent huge pages cost 2–3 s of system time on the self-compile, because page faults compacted memory synchronously, so they became opt-in.</li>
+</ul>
+
+<p>At the end of the second pass, HL/C was 1.3× the reference single-threaded. What remained was mostly the runtime: allocation and GC marking were over half the instructions, and live data was about 2.5× the reference's. libhl's collector is conservative and non-generational. We weren't going to win that with more patches to someone else's runtime.</p>
+
+<h2 id="hxc">7. Writing our own backend</h2>
+
+<p>We also wanted the compiler in a browser, so the next experiment was compiling HL/C's output to WebAssembly with Emscripten. It produced identical archives and showed two problems. The module was 51.5 MB (Binaryen's <code>--spill-pointers</code>, needed so libhl's conservative stack scan can see pointers in wasm locals, grew it from 30.6 MB). And there was a stall of about 20 seconds that had nothing to do with the work.</p>
+
+<p>The stall turned out to happen <em>at exit</em>: <code>hello</code> finished in 2–3.4 s, and then Node waited until about 27 s for optimizing compiles already running on background threads. The 10 largest functions were 45% of the module. All of them contained <code>hl_trap</code>, which is <code>setjmp</code>, and Emscripten's <code>setjmp</code> lowering stores every live local around every call (one <code>setjmp</code> made a synthetic function 26× larger). Marking the largest functions baseline-only through an experimental V8 section cut the self-compile from 25–31 s to 17.5–18 s, but that is a workaround, not a design.</p>
+
+<p>So we wrote down a go/no-go for a backend of our own (<code>bench/WASM-BACKEND.md</code>): one typed IR, lowered from the filtered typed AST that HXB serializes, feeding a WasmGC emitter and a C emitter. The prototype covered a small subset and two benchmark programs, and measured every route we could think of:</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Route (enum-tree benchmark)</th><th class="n">Bench</th><th class="n">retain (≈200 MB live)</th></tr></thead>
+	<tbody>
+		<tr><td>HL/C native, patched libhl</td><td class="n">0.43&nbsp;s</td><td class="n">0.61&nbsp;s</td></tr>
+		<tr><td>HL/C → wasm (Emscripten)</td><td class="n">0.59&nbsp;s</td><td class="n">0.83&nbsp;s</td></tr>
+		<tr><td>Haxe JS target (Node 22)</td><td class="n">1.12&nbsp;s</td><td class="n">1.93&nbsp;s</td></tr>
+		<tr><td><b>new C</b> (precise generational GC, shadow stack)</td><td class="n">0.32&nbsp;s</td><td class="n">0.54&nbsp;s</td></tr>
+		<tr><td><b>new WasmGC</b> (Node 22)</td><td class="n">0.38&nbsp;s</td><td class="n">0.66&nbsp;s</td></tr>
+		<tr><td><b>new C → linear-memory wasm</b></td><td class="n">0.39&nbsp;s</td><td class="n">0.65&nbsp;s</td></tr>
+		<tr><td>hand-written OCaml translation, ocamlopt</td><td class="n">0.28&nbsp;s</td><td class="n">0.44&nbsp;s</td></tr>
+		<tr><td>same, wasm_of_ocaml (Int32)</td><td class="n">0.64&nbsp;s</td><td class="n">0.99&nbsp;s</td></tr>
+		<tr><td>Go 1.24 translation</td><td class="n">0.30&nbsp;s</td><td class="n">0.43&nbsp;s</td></tr>
+	</tbody>
+</table></div>
+<figcaption>Best of 3–5 runs, from <code>bench/WASM-BACKEND.md</code> and <code>bench/README.md</code>. The prototype handled Ints, classes, enums, arrays, closures and exceptions; no strings, Dynamic or maps yet.</figcaption>
+</figure>
+
+<p>What the measurements said:</p>
+<ul>
+	<li><b>C in linear memory ran as fast as WasmGC</b> on Node, needed no pointer spilling, and shares one GC and one set of semantics with the native build. One runtime then serves both.</li>
+	<li><b>Never lower <code>try</code> to <code>setjmp</code> on wasm.</b> The C emitter wraps it in <code>RT_TRY</code> macros: <code>setjmp</code> natively (0.027 s for 667k throws), and C++ <code>try</code>/<code>catch</code> when Emscripten compiles the file as C++, which becomes wasm exception handling. For a 40-call test function that was 3.3 KB of wasm instead of 80.7 KB.</li>
+	<li><b>OCaml as a target</b> was the fastest native route, but <code>wasm_of_ocaml</code>'s 31-bit <code>int</code> forces boxed <code>Int32</code> for Haxe's <code>Int</code>, and it was slower than our own routes on wasm.</li>
+	<li><b>tcc</b> compiles C 26× faster than <code>gcc -O2</code>, and its code is about 1.7× slower. That makes it the development compiler, with gcc for release builds.</li>
+</ul>
+
+<p>We chose C first. The design note estimated the full lowering, runtime and std as “a multi-week project”. It went faster, mostly because the test program and the test suite already existed. On the morning of 9 October the lowering grew from the subset to the whole port (erased generics with boxing at the boundaries, strings, floats, anonymous structures, <code>Dynamic</code>, closures, exceptions, optional arguments): 7,394 functions and 199 runtime natives, 16 MB of C that tcc compiles and links in under a second. Ten minutes after the first conformance case passed on the tcc build, all 282 did. Less than half an hour later the <code>gcc -O2</code> build was level with the reference on the self-compile (4.96 s against 4.97 s).</p>
+
+<p>The runtime is plain C. It has a precise generational copying GC that finds roots through a shadow stack, where a liveness pass roots only references that are live across a call or an allocation. Strings are UTF-16, Haxe's semantics on HashLink. Dynamic field access uses field ids and inline caches, and exceptions use <code>setjmp</code>. The standard library is mostly Haxe over a few externs. That includes the regular expression engine. Some bugs found on the way:</p>
+<ul>
+	<li><b><code>__builtin_setjmp</code> at <code>-O2</code>.</b> GCC models the builtin's receiver as reachable only from the <code>setjmp</code> point, so a handler's load of the pending exception was hoisted above the throwing call. The fix was the real <code>_setjmp</code>/<code>_longjmp</code>, which GCC treats conservatively as <code>returns_twice</code>.</li>
+	<li><b>Strict aliasing.</b> The runtime reads object slots through casts, so every build passes <code>-fno-strict-aliasing</code>.</li>
+	<li><b>A missing write barrier</b> after bulk pointer moves (<code>insert</code>, <code>splice</code>, <code>reverse</code>, copies). An old object pointing at a young one then wasn't remembered.</li>
+	<li><b><code>Null&lt;T&gt;</code> unary operators.</b> <code>!x</code>, <code>-x</code> and <code>~x</code> returned the unboxed value under the boxed type. GCC 14 (in cosmocc) rejected the int-to-pointer conversion, which is how we noticed.</li>
+</ul>
+
+<p>Then came performance. The workload turned out to be <b>memory-latency bound</b>: a third of <code>mapExpr</code>'s samples waited on one enum tag load. The biggest single win was making the copying collector depth-first, so an object's descendants land right after it, in the order the compiler's tree walks visit them (−15% on the self-compile). Pre-faulting the old space in 32 MB batches and a handful of smaller runtime costs did the rest.</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Workload (CPU time, min of 3)</th><th class="n">OCaml reference</th><th class="n">hxc, gcc -O2</th></tr></thead>
+	<tbody>
+		<tr><td>The port's own source (runs macros)</td><td class="n">4.94&nbsp;s</td><td class="n">3.89–4.08&nbsp;s</td></tr>
+		<tr><td>282 conformance cases, summed</td><td class="n">18.05&nbsp;s</td><td class="n">16.79&nbsp;s (faster on 220)</td></tr>
+		<tr><td>66 macro cases, summed</td><td class="n">12.12&nbsp;s</td><td class="n">10.49&nbsp;s (faster on all)</td></tr>
+		<tr><td>hello / 17 std modules</td><td class="n">0.11 / 0.20&nbsp;s</td><td class="n">0.11 / 0.18&nbsp;s</td></tr>
+	</tbody>
+</table></div>
+<figcaption>From <code>bench/README.md</code>, 9 October. Outputs byte-identical. Peak memory on the self-compile was 694 MB against 462 MB.</figcaption>
+</figure>
+
+<p>We stopped there on purpose. The nursery and heap sizes (<code>RT_MINOR_KB</code>, <code>RT_OLD_MB</code>) stay at generic defaults instead of being tuned to this benchmark. A compiler that compiles itself is a tempting benchmark to overfit, and a backend is supposed to be good for other programs too.</p>
+
+<h2 id="portable">8. One binary for every OS, and the browser</h2>
+
+<p>The same C file builds with <a href="https://github.com/jart/cosmopolitan">Cosmopolitan</a>'s <code>cosmocc</code> into an “actually portable executable”: one file that runs on Linux, macOS, Windows and the BSDs, on x86-64 and ARM64.</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Building the port's C</th><th class="n">compile + link</th><th class="n">binary</th><th class="n">gzip -9</th></tr></thead>
+	<tbody>
+		<tr><td>tcc 0.9.27</td><td class="n">0.6&nbsp;s</td><td class="n">14.6&nbsp;MB</td><td class="n">3.2&nbsp;MB</td></tr>
+		<tr><td>gcc 13.3 -O2</td><td class="n">132&nbsp;s</td><td class="n">8.8&nbsp;MB</td><td class="n">3.0&nbsp;MB</td></tr>
+		<tr><td>cosmocc -O2, x86-64 only</td><td class="n">148&nbsp;s</td><td class="n">8.5&nbsp;MB</td><td class="n">3.1&nbsp;MB</td></tr>
+		<tr><td>cosmocc -O2, fat (x86-64 + ARM64)</td><td class="n">203&nbsp;s</td><td class="n">17.0&nbsp;MB</td><td class="n">6.3&nbsp;MB</td></tr>
+		<tr><td>chibicc (tried, dropped)</td><td class="n">52&nbsp;s</td><td class="n"></td><td class="n"></td></tr>
+	</tbody>
+</table></div>
+<figcaption>From <code>bench/COSMO.md</code>, 16 MB / 467k lines of generated C at the time. chibicc compiled and ran the port, but spent 35 s generating 290 MB of assembly, so tcc stayed the fast compiler.</figcaption>
+</figure>
+
+<p>The fat binary passes the full conformance suite and all macro cases. Only its x86-64 Linux half has actually been run. The ARM64 half, macOS, Windows and the BSDs are untested, and the front page says so. On the self-compile it is 5–13% slower than the glibc gcc build, which we haven't investigated yet. Later, mbedtls and libuv were patched and built with cosmocc too (libuv as a generic Unix port with a <code>poll(2)</code> backend, with errno codes translated at run time because Cosmopolitan's errno constants are variables), so TLS and <code>eval.luv</code> work in the portable binary.</p>
+
+<p>For the <b>browser</b>, Emscripten compiles the same C to WebAssembly, with two non-obvious choices recorded in <code>site/build.sh</code>:</p>
+<ul>
+	<li><b>Compiled as C++</b>, so <code>RT_TRY</code> becomes native wasm exception handling. With Emscripten's <code>setjmp</code> lowering, one try-heavy function grew past V8's function size limit (12 MB of wasm).</li>
+	<li><b>memory64</b>, because the runtime lays objects out in 8-byte slots holding 64-bit pointers. That is why the playground needs a recent browser.</li>
+</ul>
+<p>The first build was 7.5 MB of wasm (1.5 MB gzipped). Today's is 9.7 MB (1.9 MB gzipped), down from HL/C's 51.5 MB. It runs in a Web Worker, with a fresh instance per run. The editor is Monaco, with a Haxe tokenizer, and a second worker answers its completion, hover, signature help and go-to-definition requests through the compiler's JSON-RPC display API, the one IDEs use.</p>
+
+<p>Completion only became possible once the <b>display services</b> were ported. <code>test/display.py</code> replays the upstream display test corpus against both compilers and requires identical exit code, stdout and stderr. The upstream assertions aren't evaluated, so even a case upstream marks as failing has to be reproduced. All <b>679</b> requests the test methods issue match, and so do all <b>7,325</b> requests of the extended run (every position method at every marker).</p>
+
+<p>The site is static. Hosting took three tries: GitHub Pages was out because the repository is private, Cloudflare Pages was already tied to another account, so it ended up on Netlify, deploying a pre-built <code>site-dist</code> branch (the wasm and the APE are built here, not on the host). The downloadable <code>haxe-in-haxe.com</code> (23.1 MB, the binary plus a zip of the std subset it needs) is kept under the 25 MiB per-file limit that <code>site/build.sh</code> plans for.</p>
+
+<h2 id="target">9. hxc as a real target</h2>
+
+<p>The next step was packaging the backend for anyone's Haxe code: <code>backend/haxelib</code>, the <b>hxc</b> library.</p>
+
+<p>The first version shipped the whole port as a portable binary, and the user's Haxe only ran a launcher script. It worked, but it meant typing the user's program with our compiler, without <code>-lib</code> support at the time. The better design came within the same hour. Let the user's own Haxe do the typing and write HXB, and let the bundled <code>hxc.com</code> read that archive with the ported HXB reader and emit C:</p>
+
+<pre class="code"><code>haxelib install hxc.zip
+haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
+./bin/main</code></pre>
+
+<p>An init macro in the library makes this one <code>haxe</code> call. With <code>--custom-target hxc=&lt;out&gt;</code> it asks the compiler to write the program as HXB, and after generation it runs <code>hxc.com</code> and the C compiler. Typing, macros, <code>-lib</code> and IDE support all come from the user's Haxe. Options are <code>-D hxc.*</code> defines: the C compiler, <code>hxc.static</code> for a Cosmopolitan build, <code>hxc.ssl</code> and <code>hxc.uv</code>.</p>
+
+<p>Using HXB as the interchange format paid for itself straight away. It separates “does the port type correctly” from “does the backend compile correctly”, because the reference compiler can produce the backend's input. Comparing the C generated from source with the C generated from the reference's HXB found two bugs:</p>
+<ul>
+	<li><b>Int32 negation.</b> <code>int32OfString("-2147483648")</code> negated <code>INT_MIN</code> after wrapping, which is +2147483648 when the port itself runs on JS.</li>
+	<li><b>The std path and DCE.</b> DCE reruns on modules loaded from HXB and keeps every class outside the std path whole. With the bundled std at <code>/zip/std</code>, the user's std classes counted as user code. The tool now runs with the user's std path, and the backend built through the package gives byte-identical C to the source build.</li>
+</ul>
+<p>The catch is coupling. HXB is tied to the compiler that writes it, so the user's Haxe must be the exact build <code>hxc.com</code> was made from. The package records it in <code>hxc.json</code> and names it in the error.</p>
+
+<h2 id="rest">10. Filling in the rest of the compiler</h2>
+
+<p>With the core done, the remaining upstream services were translated the same way and given harnesses that compare against the reference:</p>
+<ul>
+	<li><b>HXB library input</b> (<code>hxbReader.ml</code>). A new round-trip check reads every module of the reference's archive back through <code>--hxb-lib</code> and writes it again; all 275 cases round-trip identically.</li>
+	<li><b>The compilation server</b>, its caches, and <b>haxelib</b>. <code>test/server.py</code> drives a reference server and a port server through the same scenarios (every case twice, an edit sequence whose 628 lines of verbose log must match, stdin forwarding, <code>--next</code>, <code>--server-connect</code>): 587 of 587 pass.</li>
+	<li><b>Threads in the C runtime.</b> The server needs threads, and so do Eval programs. The first design is M:1 green threads on <code>ucontext</code>. Only one thread runs at a time, so the GC and runtime tables need no locks and the single-threaded hot paths stay unchanged. Threads switch when they block, sleep, wait for a descriptor, or at a minor collection. That last point caused the subtle bugs: a switch can happen inside any allocation. A lazily allocated waiter list in <code>Mutex</code> could lose a waiter, a <code>Tls</code> map could be switched out half rebuilt, and array growth reused a stale length. Each one hung the compiler's parallel filters only now and then.</li>
+	<li><b>Gc.finalise</b> in the C GC, with OCaml's semantics: a major collection that finds the value unreachable copies it back and queues the call. HashLink has no finalisers on Haxe objects, so this is the one place the C build passes upstream's unit tests where the HashLink build can't.</li>
+</ul>
+<p>Green threads give concurrency without parallelism. Upstream runs some filter passes in parallel, so OS threads in the C runtime are the obvious next step.</p>
+
+<h2 id="upstream">11. Upstream's own test suite</h2>
+
+<p>The conformance set covers what can be compared as HXB. The upstream repository has a much larger test suite. <code>test/upstream.py</code> runs the steps of upstream CI's target-independent job (<code>tests/runci/targets/Macro.hx</code>), in the same order, with the port on <code>PATH</code> as <code>haxe</code>, so the runners' own nested <code>haxe</code> calls use it too.</p>
+
+<p>The first full run of the <code>misc</code> step failed on 64 of 686 projects. The most common cause was a single missing branch. Upstream's <code>handle_display_after_typing</code> aborts a compilation that already has errors before finalization. Without it, the port added follow-up errors such as “Invalid -main” after the real ones. Other finds:</p>
+<ul>
+	<li>The <b>HashLink 2.0 JIT</b> compiles every early-exit <code>endtrap</code> against the innermost trap. Leaving two nested <code>try</code> blocks at once therefore left the outer handler installed after its frame was gone, and the next uncaught exception jumped into a dead frame. It was found with gdb on a segfault in <code>nullsafety</code>, and the five affected places in the port were found by scanning the HashLink bytecode dump for consecutive <code>endtrap false</code>.</li>
+	<li>Resources were decoded as UTF-8, which lost bytes of binary resources. <code>Path.mkdir_from_path</code> split with a regular expression missing <code>g</code>. Numeric parsing needed OCaml's rules.</li>
+</ul>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Step</th><th class="n">Reference</th><th class="n">Port, HashLink</th><th class="n">Port, C (hxc)</th></tr></thead>
+	<tbody>
+		<tr><td>unit-macro (and its <code>--hxb-lib</code> run)</td><td class="n">11372/11372</td><td class="n">11367/11371 *</td><td class="n">11372/11372</td></tr>
+		<tr><td>nullsafety</td><td class="n">pass</td><td class="n">pass</td><td class="n">pass</td></tr>
+		<tr><td>misc (2 excluded)</td><td class="n">684/684</td><td class="n">684/684</td><td class="n">684/684</td></tr>
+		<tr><td>misc-resolution (3 excluded)</td><td class="n">7/7</td><td class="n">7/7</td><td class="n">7/7</td></tr>
+		<tr><td>sys-hxb, sys-run</td><td class="n">pass</td><td class="n">pass</td><td class="n">pass</td></tr>
+		<tr><td>compiler-loops</td><td class="n">19/19</td><td class="n">19/19</td><td class="n">19/19</td></tr>
+		<tr><td>connect-stdin</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td></tr>
+		<tr><td>threads</td><td class="n">144/144</td><td class="n">141/142 †</td><td class="n">144/144</td></tr>
+	</tbody>
+</table></div>
+<figcaption>From <code>test/TESTING.md</code>. * The 4 errors are <code>unit.TestGcFinalizer</code>: HashLink has no finalisers. † <code>ThreadPool</code> needs a libuv loop, which only the C build has. The threads figure for the C build is with libuv.</figcaption>
+</figure>
+
+<p>Exclusions apply to both compilers alike and each has a reason in the script. The projects excluded inside steps all need a target generator the port doesn't have: two misc projects compile with <code>-js</code> and check the JavaScript, three resolution projects run <code>node</code>, and one block of the sys tests builds a Neko binary. Four whole steps are skipped: source maps and an ES6 null-safety run (both JS), display (its own CI job), and the third-party projects, which are cloned from GitHub and run separately.</p>
+
+<h2 id="today">12. Where it stands</h2>
+
+<p>The <a href="index.html#benchmarks">benchmarks on the front page</a> come from <code>bench/results.json</code>. The same compiler, built twelve ways, compiles three workloads, and a run counts only if its archive is byte-identical to the reference's:</p>
+
+<figure>
+<div class="scroll"><table>
+	<thead><tr><th>Runner (CPU time, min of 3)</th><th class="n">hello</th><th class="n">stdlib</th><th class="n">self</th><th class="n">self peak RSS</th></tr></thead>
+	<tbody>
+		<tr><td>OCaml reference</td><td class="n">0.12&nbsp;s</td><td class="n">0.23&nbsp;s</td><td class="n">5.05&nbsp;s</td><td class="n">480&nbsp;MB</td></tr>
+		<tr><td>hxc, gcc -O2</td><td class="n">0.12&nbsp;s</td><td class="n">0.22&nbsp;s</td><td class="n">4.42&nbsp;s</td><td class="n">798&nbsp;MB</td></tr>
+		<tr><td>hxc, cosmocc (fat APE)</td><td class="n">0.10&nbsp;s</td><td class="n">0.22&nbsp;s</td><td class="n">5.05&nbsp;s</td><td class="n">760&nbsp;MB</td></tr>
+		<tr><td>hxc, tcc</td><td class="n">0.28&nbsp;s</td><td class="n">0.58&nbsp;s</td><td class="n">11.6&nbsp;s</td><td class="n">805&nbsp;MB</td></tr>
+		<tr><td>hxc, wasm (Node 24)</td><td class="n">2.01&nbsp;s</td><td class="n">2.61&nbsp;s</td><td class="n">11.6&nbsp;s</td><td class="n">1219&nbsp;MB</td></tr>
+		<tr><td>HL/C, patched libhl</td><td class="n">0.18&nbsp;s</td><td class="n">0.39&nbsp;s</td><td class="n">8.15&nbsp;s</td><td class="n">1657&nbsp;MB</td></tr>
+		<tr><td>HashLink JIT</td><td class="n">0.79&nbsp;s</td><td class="n">1.15&nbsp;s</td><td class="n">15.3&nbsp;s</td><td class="n">1351&nbsp;MB</td></tr>
+		<tr><td>C++ (hxcpp)</td><td class="n">0.40&nbsp;s</td><td class="n">0.87&nbsp;s</td><td class="n">17.9&nbsp;s</td><td class="n">1266&nbsp;MB</td></tr>
+		<tr><td>JS (Node 22)</td><td class="n">2.19&nbsp;s</td><td class="n">4.30&nbsp;s</td><td class="n">41.8&nbsp;s</td><td class="n">1717&nbsp;MB</td></tr>
+		<tr><td>JVM (OpenJDK 21)</td><td class="n">5.90&nbsp;s</td><td class="n">9.24&nbsp;s</td><td class="n">64.3&nbsp;s</td><td class="n">1027&nbsp;MB</td></tr>
+		<tr><td>Eval, from HXB</td><td class="n">11.3&nbsp;s</td><td class="n">20.6&nbsp;s</td><td class="n">1885&nbsp;s</td><td class="n">3329&nbsp;MB</td></tr>
+	</tbody>
+</table></div>
+<figcaption>Commit <code>93f1df5</code>, a shared 4-core Xeon at 2.10 GHz, <code>-D disable-parallelism</code>. The self-compile number differs from section 7's because the machine and the port both changed in between. The comparison that matters is within one run.</figcaption>
+</figure>
+
+<p>An honest list of limits:</p>
+<ul>
+	<li><b>Memory.</b> The C build uses about 1.7× the reference's peak memory on the self-compile (798 MB against 480 MB). Two likely contributors: copying collections need free space to copy into, and strings are UTF-16 (two bytes per ASCII character, where OCaml strings are bytes). The design note recommended OCaml's non-moving major heap, and the runtime doesn't have one yet.</li>
+	<li><b>No code generators.</b> JS, C++, HashLink, JVM and the other generators aren't ported. The port type-checks, runs programs with <code>--interp</code>, writes HXB, and (through hxc) produces C.</li>
+	<li><b>Parallelism.</b> Conformance runs single-threaded because the reference itself isn't deterministic under parallel filters. The C runtime's green threads don't run in parallel.</li>
+	<li><b>Portability claims are partly untested.</b> Only Linux x86-64 has run the portable binary. The hxc target covers what the compiler needs to compile itself, not the whole language and std.</li>
+	<li><b>Small gaps</b> are recorded in <code>TRANSLATION.md</code> and <code>test/TESTING.md</code>: the Eval debugger, memory statistics that need OCaml object sizes, IPv4-only sockets, and one-second file-time resolution on HashLink.</li>
+</ul>
+
+<h2 id="lessons">13. Lessons</h2>
+
+<h3>What worked</h3>
+<ul>
+	<li><b>A byte-identical oracle.</b> It turned “is this right?” into a diff, and it found bugs no reasonable test would have looked for: hash iteration order, argument evaluation order, string identity. It also made every performance change safe to try, since a benchmark only counted if its output matched.</li>
+	<li><b>Translating instead of reimplementing.</b> The hand-written start couldn't get variable ids right. The translation got all 22 members of the first fixture right on the day it could first be measured. Keeping the port traceable to upstream also made it reviewable: a disagreement with the reference meant reading two functions side by side.</li>
+	<li><b>Parallel agents with strict validation.</b> The macro runtime, the HXB reader, the server, display, threads and the upstream suite were each worked on in separate worktrees. After each merge the suites were run again, and the results are recorded in <code>test/TESTING.md</code>. The merge commits record how conflicts were resolved: against upstream, not by picking a side.</li>
+	<li><b>Measuring before optimizing.</b> Nearly every speedup in <code>bench/README.md</code> starts with a profile that pointed somewhere unexpected: stack capture on throws (80% of the HL/C run), closures allocated at their definition, short free runs after a sweep, an enum tag load waiting on memory.</li>
+	<li><b>Writing negative results down.</b> The generational GC for HL/C, hx2go, chibicc, transparent huge pages: each has its numbers in the repository.</li>
+</ul>
+
+<h3>What didn't</h3>
+<ul>
+	<li>Reimplementing a compiler by hand and hoping to converge on its exact output.</li>
+	<li>Patching other people's runtimes past a point. libhl improved a lot, but a conservative, non-generational collector stayed the ceiling. The faster answer was a runtime designed for this workload's shape.</li>
+</ul>
+
+<h3>Surprises</h3>
+<ul>
+	<li>How much of a compiler's observable output depends on its implementation language's evaluation order and hash function.</li>
+	<li>That the ~20 s WebAssembly stall happened <em>after</em> the program had finished, and was caused by <code>setjmp</code>.</li>
+	<li>That the biggest single speedup of the C runtime was the order in which the collector copies objects.</li>
+	<li>That running a compiler this hard also finds bugs in the runtimes underneath it: a HashLink JIT trap bug, hxcpp's parallel marking, races in libhl's lazy initialisation.</li>
+</ul>
+
+<p>The code, the notes behind every number, and the harnesses are all in the repository. The fastest way to see the result is still the <a href="index.html#playground">playground</a>.</p>
+
+</article>
+</main>
+
+<footer class="wrap story-foot">
+	<p><a href="index.html">Haxe in Haxe</a>, an experimental port of <a href="https://haxe.org">Haxe</a>.</p>
+</footer>
+</body>
+</html>

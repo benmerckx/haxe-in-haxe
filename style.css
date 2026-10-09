@@ -109,3 +109,42 @@ footer { border-top: 1px solid var(--line); margin-top: 64px; padding: 20px 16px
 	table.bench .barcol { min-width: 90px; }
 	table.bench th.barcol .muted { display: none; }
 }
+
+/* Long-form pages (story.html) */
+.kicker a { color: inherit; text-decoration: none; }
+.kicker a:hover { text-decoration: underline; }
+.story { max-width: 720px; margin: 0 auto; font-size: 17px; line-height: 1.65; }
+.story > p, .story li { overflow-wrap: break-word; }
+.story h2 { margin-top: 52px; font-size: 25px; line-height: 1.3; scroll-margin-top: 16px; }
+.story h3 { margin-top: 30px; font-size: 18px; }
+.story code { font-size: 0.86em; }
+.story ul, .story ol { padding-left: 1.4em; }
+.story li { margin-bottom: 6px; }
+.story .byline { color: var(--muted); font-size: 14px; margin-top: 28px; }
+.story blockquote { margin: 18px 0; padding: 4px 0 4px 16px; border-left: 3px solid var(--line); color: var(--muted); }
+.story .callout { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 4px 18px; margin: 24px 0; font-size: 16px; }
+.story .toc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 18px 10px; margin: 24px 0; font-size: 15px; }
+.story .toc p { margin: 8px 0 4px; }
+.story .toc ol { margin: 0; columns: 2; column-gap: 28px; }
+.story .toc li { margin: 2px 0; break-inside: avoid; }
+.story pre.code { tab-size: 4; background: var(--code); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 13.5px; line-height: 1.5; }
+.story pre.code code { background: none; padding: 0; font-size: inherit; }
+.story figure { margin: 22px 0; }
+.story figcaption { color: var(--muted); font-size: 13.5px; line-height: 1.5; margin-top: 6px; }
+.story table { font-size: 14.5px; margin: 0; }
+.story td, .story th { white-space: normal; }
+.story td.n, .story th.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.story-hero .lead { max-width: 760px; }
+@media (max-width: 600px) {
+	.story { font-size: 16px; }
+	.story h2 { font-size: 22px; }
+	.story .toc ol { columns: 1; }
+	.story table { font-size: 12.5px; }
+	.story td, .story th { padding: 5px 4px; }
+	.story td:first-child { min-width: 92px; }
+	.story td.n, .story th.n { white-space: normal; }
+}
+
+.storylink { margin: -8px 0 20px; font-size: 16px; }
+.storylink a { font-weight: 600; }
+.story-hero .wrap, .story-foot { max-width: 752px; }

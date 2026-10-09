@@ -13,6 +13,7 @@
 		<p class="kicker">Experimental</p>
 		<h1>Haxe in Haxe</h1>
 		<p class="lead">The Haxe compiler, ported line by line from OCaml to Haxe, compiled to C, and running here in your browser as WebAssembly.</p>
+		<p class="storylink"><a href="story.html">How we got here: the long story, with what worked and what didn't →</a></p>
 		<nav class="links">
 			<a href="#playground">Playground</a>
 			<a href="#download">Download</a>
@@ -20,6 +21,7 @@
 			<a href="#how">How it works</a>
 			<a href="#numbers">Numbers</a>
 			<a href="#benchmarks">Benchmarks</a>
+			<a href="story.html"><b>The story</b></a>
 		</nav>
 	</div>
 </header>
@@ -75,12 +77,12 @@ chmod +x haxe-in-haxe.com
 				<tr><td>Syntax: lexer, parser, preprocessor</td><td>139 KB</td><td>254 KB</td><td class="ok">ported</td></tr>
 				<tr><td>Typing</td><td>699 KB</td><td>746 KB</td><td class="ok">ported</td></tr>
 				<tr><td>Core types, unification, printing</td><td>353 KB</td><td>511 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Context, compiler driver, HXB writer</td><td>627 KB</td><td>314 KB</td><td class="ok">ported (batch mode)</td></tr>
+				<tr><td>Context, compiler driver, HXB writer and reader</td><td>627 KB</td><td>314 KB</td><td class="ok">ported</td></tr>
 				<tr><td>Filters, optimization, analyzer, DCE</td><td>363 KB</td><td>341 KB</td><td class="ok">ported</td></tr>
 				<tr><td>Coroutines, codegen helpers</td><td>191 KB</td><td>121 KB</td><td class="ok">ported</td></tr>
-				<tr><td>Macros: Eval interpreter, Macro API</td><td>553 KB</td><td>544 KB</td><td class="ok">ported (no debugger, libuv, TLS)</td></tr>
+				<tr><td>Macros: Eval interpreter, Macro API</td><td>553 KB</td><td>544 KB</td><td class="ok">ported, incl. TLS, libuv, threads (no debugger)</td></tr>
 				<tr><td>Target generators (JS, C++, HL, JVM, …)</td><td>1.6 MB</td><td>–</td><td class="todo">out of scope for now</td></tr>
-				<tr><td>Display, server mode, haxelib</td><td>–</td><td>–</td><td class="todo">later milestone</td></tr>
+				<tr><td>Display (completion, hover, …), compilation server, haxelib</td><td>–</td><td>–</td><td class="ok">ported</td></tr>
 			</tbody>
 		</table>
 		<p class="note">Sizes are source bytes per upstream directory; the Haxe side is often denser or more verbose depending on the module. File-level mapping: <code>TRANSLATION.md</code>; test results: <code>test/TESTING.md</code>.</p>
@@ -140,7 +142,7 @@ chmod +x haxe-in-haxe.com
 </main>
 
 <footer class="wrap">
-	<p>An experimental port of <a href="https://haxe.org">Haxe</a>. Built <span data-info="date"></span> from commit <code data-info="commit"></code>.</p>
+	<p>An experimental port of <a href="https://haxe.org">Haxe</a>. <a href="story.html">How we got here</a>. Built <span data-info="date"></span> from commit <code data-info="commit"></code>.</p>
 </footer>
 <script src="playground.js"></script>
 <script src="bench.js"></script>
