@@ -1,0 +1,98 @@
+{
+  "repos": {
+    "benchmark-runner": {
+      "url": "https://github.com/HaxeBenchmarks/benchmark-runner.git",
+      "commit": "d921d5c2a24d465188da9fb91842dbf019251d62"
+    },
+    "hxnodejs": {
+      "url": "https://github.com/HaxeFoundation/hxnodejs.git",
+      "commit": "f88685a70b2e4f03dbe0a824ce90ea8b56b27753"
+    },
+    "hxcpp": {
+      "url": "https://github.com/HaxeFoundation/hxcpp.git",
+      "commit": "849dd48350094c48825afff9a1d252aad5a82f33"
+    },
+    "hxjava": {
+      "url": "https://github.com/HaxeFoundation/hxjava.git",
+      "commit": "f8c7dc6c56f4bf8f5912b4844a1b55ab094ee0cf"
+    },
+    "crypto": {
+      "url": "https://github.com/HaxeFoundation/crypto.git",
+      "commit": "9959143e1eeb2bc941eddae40d96c65e824581a5"
+    },
+    "hashlink": {
+      "url": "https://github.com/HaxeFoundation/hashlink.git",
+      "commit": "d049add0a84dc6ae43088a6c386992dbba8604dc"
+    },
+    "formatter": {
+      "url": "https://github.com/HaxeCheckstyle/haxe-formatter.git",
+      "commit": "8d8ea9a18082955e9118667adcd6354ca643053e"
+    },
+    "hxargs": {
+      "url": "https://github.com/simn/hxargs.git",
+      "commit": "1d8ec84f641833edd6f0cb2e4290b7524fd27219"
+    },
+    "hxparse": {
+      "url": "https://github.com/Simn/hxparse.git",
+      "commit": "876070ec62a4869de60081f87763e23457a3bda8"
+    },
+    "haxeparser": {
+      "url": "https://github.com/Simn/haxeparser.git",
+      "commit": "e5746bfc55c09a3694db42738ff575b91441971a"
+    },
+    "json2object": {
+      "url": "https://github.com/elnabo/json2object.git",
+      "commit": "a75859de1e966c09e73591b6c9186086c143fe60"
+    },
+    "hxtemplo": {
+      "url": "https://github.com/Simn/hxtemplo.git",
+      "commit": "760a81368d1a877e9fd43fc7bf0d1de83e654f3e"
+    },
+    "dox": {
+      "url": "https://github.com/HaxeFoundation/dox.git",
+      "commit": "3ef9fb960a6101895cc99c7d30862665490f7470"
+    },
+    "markdown": {
+      "url": "https://github.com/dpeek/haxe-markdown.git",
+      "commit": "d4f20e8680441b1e3214b0e531307b3094283ed0"
+    },
+    "tokentree": {
+      "url": "https://github.com/HaxeCheckstyle/tokentree.git",
+      "commit": "d6f75b95d037aafe1dbc97cf77352f37c0c74ff3"
+    },
+    "api-data": {
+      "url": "https://github.com/HaxeFoundation/api.haxe.org.git",
+      "commit": "21607a900147c91f1e117514936a64854a42c136"
+    },
+    "openfl": {
+      "url": "https://github.com/openfl/openfl.git",
+      "commit": "393f69cd66c32aa3442e6f756a3e3ed6ba9213f8"
+    },
+    "lime": {
+      "url": "https://github.com/openfl/lime.git",
+      "commit": "f67beb0544123ab88538c8ac6526c18a3bda6d29"
+    }
+  },
+  "haxelib_archives": {
+    "hx3compat": {
+      "version": "1.0.3",
+      "url": "https://lib.haxe.org/p/hx3compat/1.0.3/download/",
+      "sha256": "ecb2295fdaef547bba999a4d00cb09d7548164a48b280afb0cf404d8d3e5a729"
+    },
+    "hxjsonast": {
+      "version": "1.0.1",
+      "url": "https://lib.haxe.org/p/hxjsonast/1.0.1/download/",
+      "sha256": "472314befd1d67a80bbd9b66517bad0a5582838802a4fe049af814a32e60c74d"
+    }
+  },
+  "source_repo": "benmerckx/haxe-in-haxe",
+  "source_commit": "54799e3b6e1a989925f48da548514bba7a3ca989",
+  "branch": "bench/hxc-fast-targets",
+  "haxe_commit": "b10fa6e93c0206cc0dc8f7abba98534e3edac248",
+  "compiler_artifact": {
+    "repository": "HaxeFoundation/haxe",
+    "run_id": 30819370272,
+    "artifact_id": 8858230180,
+    "sha256": "76c3e6e3d9548071653d4ced40af41e3566504406227f24c1b926a7389195915"
+  }
+}
