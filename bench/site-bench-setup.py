@@ -48,6 +48,9 @@ def main():
         with zipfile.ZipFile(archive) as z:
             z.extractall(lib)
         run(["haxelib", "dev", name, lib])
+    # hxtemplo explicitly requests hxparse's git version; dev registration
+    # alone does not satisfy that version-qualified dependency in haxelib.
+    run(["haxelib", "git", "hxparse", (dest / "hxparse").as_uri(), lock["repos"]["hxparse"]["commit"]])
     run(["haxelib", "dev", "hashlink", dest / "hashlink/other/haxelib"])
     run(["make", "-j4", "hl", "libhl.so", "fmt.hdll"], cwd=dest / "hashlink")
     for tool in ("run", "hxcpp"):
