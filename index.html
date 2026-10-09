@@ -28,7 +28,7 @@
 		<div class="card"><b>275 / 275</b><span>HXB conformance cases byte-identical to the reference compiler (plus 7 the reference also rejects)</span></div>
 		<div class="card"><b>66 / 66</b><span>macro cases: the Eval macro interpreter and the Macro API are ported too</span></div>
 		<div class="card"><b>247 → 231</b><span>OCaml modules in scope, mapped to Haxe modules (2.9 MB of OCaml, 2.8 MB of Haxe)</span></div>
-		<div class="card"><b>5.0 s vs 4.9 s</b><span>the port compiling itself, natively (gcc -O2) versus the OCaml compiler</span></div>
+		<div class="card"><b>4.0 s vs 4.9 s</b><span>the port compiling itself, natively (gcc -O2) versus the OCaml compiler; 7–13% faster on the conformance cases too</span></div>
 	</section>
 
 	<section id="playground">
@@ -43,14 +43,14 @@
 			<span id="state" class="state">Loading compiler…</span>
 		</div>
 		<div class="play">
-			<textarea id="code" spellcheck="false" wrap="off" aria-label="Main.hx"></textarea>
+			<div id="editor" aria-label="Haxe source"></div>
 			<div class="output">
 				<div class="outhead">Output <span id="timing"></span></div>
 				<pre id="out"></pre>
 				<div id="members" hidden></div>
 			</div>
 		</div>
-		<p class="note">The file is <code>Main.hx</code> with a <code>Main</code> class. The first run downloads <span data-info="wasmGz">~10 MB</span> of WebAssembly and <span data-info="dataGz">~1 MB</span> of standard library; later runs are cached.</p>
+		<p class="note">The editor (<a href="https://microsoft.github.io/monaco-editor/">Monaco</a>) asks the same compiler for completion, hover, signature help and go-to-definition through the JSON-RPC display API that IDEs use, and type-checks as you type. The main class is the one declaring <code>static function main</code>. Examples marked “From try.haxe.org” are from <a href="https://try.haxe.org/">try.haxe.org</a> (<a href="examples/LICENSE-try-haxe.txt">MIT</a>); its Http, canvas and utest examples need the network, the JavaScript target or a library, so they're left out. The first run downloads <span data-info="wasmGz">~10 MB</span> of WebAssembly and <span data-info="dataGz">~1 MB</span> of standard library; later runs are cached.</p>
 	</section>
 
 	<section id="download">
@@ -99,13 +99,14 @@ chmod +x haxe-in-haxe.com
 	<section id="numbers">
 		<h2>Numbers</h2>
 		<h3>Compile time of the compiler</h3>
-		<p>Median of 3 runs, <code>-D disable-parallelism</code>, every output checked byte-for-byte against the reference.</p>
+		<p>Median of 3 runs, <code>-D disable-parallelism</code>, every output checked byte-for-byte against the reference. * measured before the GC improvements that made the gcc build faster than OCaml.</p>
 		<table>
 			<thead><tr><th>Workload</th><th>OCaml reference</th><th>gcc -O2</th><th>cosmocc (APE)</th><th>tcc</th></tr></thead>
 			<tbody>
 				<tr><td>hello world</td><td>0.15 s</td><td>0.11 s</td><td>0.12 s</td><td>0.27 s</td></tr>
 				<tr><td>30 std modules</td><td>0.24 s</td><td>0.23 s</td><td>0.24 s</td><td>0.63 s</td></tr>
-				<tr><td>the port itself (52k lines, runs macros)</td><td>4.88 s</td><td>5.03 s</td><td>5.67 s</td><td>12.08 s</td></tr>
+				<tr><td>282 conformance cases, summed (CPU)</td><td>18.05 s</td><td>16.79 s</td><td>–</td><td>–</td></tr>
+				<tr><td>the port itself (52k lines, runs macros)</td><td>4.94 s</td><td>3.9–4.1 s</td><td>5.67 s*</td><td>12.08 s*</td></tr>
 			</tbody>
 		</table>
 		<h3>Building the compiler from its C</h3>

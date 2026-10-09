@@ -58,8 +58,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .state { color: var(--muted); font-size: 14px; }
 .play { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 760px) { .play { grid-template-columns: 1fr; } }
+#editor { min-height: 460px; height: 460px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
 textarea {
-	width: 100%; min-height: 420px; resize: vertical; tab-size: 4; white-space: pre; overflow-wrap: normal; overflow-x: auto;
+	width: 100%; min-height: 460px; resize: vertical; tab-size: 4; white-space: pre; overflow-wrap: normal; overflow-x: auto;
 	background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; line-height: 1.5;
 }
 .output { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 420px; max-height: 640px; min-width: 0; }

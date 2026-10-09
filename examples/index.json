@@ -1,0 +1,127 @@
+[
+ {
+  "title": "Hello",
+  "file": "hih-hello.hx",
+  "source": "haxe-in-haxe"
+ },
+ {
+  "title": "Enums and pattern matching",
+  "file": "hih-enums-and-pattern-matching.hx",
+  "source": "haxe-in-haxe"
+ },
+ {
+  "title": "Macros",
+  "file": "hih-macros.hx",
+  "source": "haxe-in-haxe"
+ },
+ {
+  "title": "Generics and abstracts",
+  "file": "hih-generics-and-abstracts.hx",
+  "source": "haxe-in-haxe"
+ },
+ {
+  "title": "Standard library",
+  "file": "hih-standard-library.hx",
+  "source": "haxe-in-haxe"
+ },
+ {
+  "title": "Hello world",
+  "file": "try-hello-world.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Hello world (module-level fields)",
+  "file": "try-hello-world-module-level-fields.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Inheritance",
+  "file": "try-inheritance.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Generic types",
+  "file": "try-generic-types.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Enums",
+  "file": "try-enums.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Maps",
+  "file": "try-maps.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Abstracts",
+  "file": "try-abstracts.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Static Extension",
+  "file": "try-static-extension.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "String interpolation",
+  "file": "try-string-interpolation.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Array Comprehension",
+  "file": "try-array-comprehension.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Pattern Matching - Array matching",
+  "file": "try-pattern-matching-array-matching.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Pattern Matching - Structure matching",
+  "file": "try-pattern-matching-structure-matching.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Pattern Matching - Enum matching",
+  "file": "try-pattern-matching-enum-matching.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Iterators",
+  "file": "try-iterators.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Function Bindings",
+  "file": "try-function-bindings.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Metadata",
+  "file": "try-metadata.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Access Control",
+  "file": "try-access-control.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Inline constructors",
+  "file": "try-inline-constructors.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "Conditional compilation",
+  "file": "try-conditional-compilation.hx",
+  "source": "try.haxe.org"
+ },
+ {
+  "title": "StringTools",
+  "file": "try-stringtools.hx",
+  "source": "try.haxe.org"
+ }
+]
