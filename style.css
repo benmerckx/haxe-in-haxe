@@ -1,0 +1,85 @@
+:root {
+	--bg: #fbfaf7;
+	--fg: #1d1c1a;
+	--muted: #6b675f;
+	--line: #e3dfd6;
+	--panel: #ffffff;
+	--code: #f3f0ea;
+	--accent: #ea8220;
+	--accent-fg: #ffffff;
+	--ok: #2f7d32;
+	--todo: #8a6d1d;
+	--mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #161513;
+		--fg: #ece9e2;
+		--muted: #a29d93;
+		--line: #34312c;
+		--panel: #1e1d1a;
+		--code: #26241f;
+		--accent: #f29a3f;
+		--accent-fg: #1a1208;
+		--ok: #7cc47f;
+		--todo: #d9b85c;
+	}
+}
+* { box-sizing: border-box; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+a { color: var(--accent); }
+code, pre, textarea { font-family: var(--mono); font-size: 14px; }
+code { background: var(--code); padding: 1px 4px; border-radius: 3px; }
+h2 { margin-top: 56px; font-size: 26px; }
+h3 { margin-top: 28px; font-size: 18px; }
+.hero { border-bottom: 1px solid var(--line); padding: 56px 0 28px; }
+.hero h1 { font-size: 48px; margin: 4px 0 8px; letter-spacing: -0.02em; }
+.kicker { color: var(--accent); font-weight: 600; text-transform: uppercase; font-size: 13px; letter-spacing: 0.08em; margin: 0; }
+.lead { font-size: 20px; max-width: 720px; color: var(--muted); margin: 0 0 20px; }
+.links { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 28px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.card b { display: block; font-size: 24px; }
+.card span { color: var(--muted); font-size: 14px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0 10px; }
+select, button, .button {
+	font: inherit; font-size: 15px; color: var(--fg); background: var(--panel);
+	border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; cursor: pointer; text-decoration: none; display: inline-block;
+}
+select { margin-left: 6px; padding: 6px 8px; }
+button:disabled { opacity: 0.5; cursor: default; }
+.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.state { color: var(--muted); font-size: 14px; }
+.play { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .play { grid-template-columns: 1fr; } }
+textarea {
+	width: 100%; min-height: 420px; resize: vertical; tab-size: 4; white-space: pre; overflow-wrap: normal; overflow-x: auto;
+	background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; line-height: 1.5;
+}
+.output { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 420px; max-height: 640px; min-width: 0; }
+.outhead { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+#out { margin: 0; padding: 12px; white-space: pre-wrap; word-break: break-word; overflow: auto; flex: 1; }
+#out .err { color: #d0473b; }
+#members { padding: 0 12px 12px; overflow: auto; max-height: 340px; }
+#members table { font-size: 13px; }
+.note, .muted { color: var(--muted); font-size: 14px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 15px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; }
+td:not(:first-child), th:not(:first-child) { white-space: nowrap; }
+.ok { color: var(--ok); }
+.todo { color: var(--todo); }
+.cmd { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+.steps li { margin-bottom: 10px; }
+footer { border-top: 1px solid var(--line); margin-top: 64px; padding: 20px 16px 40px; color: var(--muted); font-size: 14px; }
+@media (max-width: 600px) {
+	.hero h1 { font-size: 36px; }
+	td, th { padding: 6px; }
+	td:not(:first-child), th:not(:first-child) { white-space: normal; }
+}

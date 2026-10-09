@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haxe in Haxe</title>
+<meta name="description" content="The Haxe compiler ported from OCaml to Haxe, compiled to C and WebAssembly. Try it in the browser.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="hero">
+	<div class="wrap">
+		<p class="kicker">Experimental</p>
+		<h1>Haxe in Haxe</h1>
+		<p class="lead">The Haxe compiler, ported line by line from OCaml to Haxe, compiled to C, and running here in your browser as WebAssembly.</p>
+		<nav class="links">
+			<a href="#playground">Playground</a>
+			<a href="#download">Download</a>
+			<a href="#status">Status</a>
+			<a href="#how">How it works</a>
+			<a href="#numbers">Numbers</a>
+		</nav>
+	</div>
+</header>
+
+<main class="wrap">
+	<section class="cards" aria-label="Summary">
+		<div class="card"><b>275 / 275</b><span>HXB conformance cases byte-identical to the reference compiler (plus 7 the reference also rejects)</span></div>
+		<div class="card"><b>66 / 66</b><span>macro cases: the Eval macro interpreter and the Macro API are ported too</span></div>
+		<div class="card"><b>247 → 231</b><span>OCaml modules in scope, mapped to Haxe modules (2.9 MB of OCaml, 2.8 MB of Haxe)</span></div>
+		<div class="card"><b>5.0 s vs 4.9 s</b><span>the port compiling itself, natively (gcc -O2) versus the OCaml compiler</span></div>
+	</section>
+
+	<section id="playground">
+		<h2>Playground</h2>
+		<p>The compiler below is the port, built from its own C output with Emscripten. <em>Run</em> type-checks your program and executes it with the port's Eval interpreter (<code>--interp</code>), the same interpreter that runs macros. <em>Compile to HXB</em> emits the compiler's binary module format, the port's first output target. Everything happens locally in a Web Worker; each run starts a fresh compiler instance. The runtime keeps 64-bit pointers, so this is a 64-bit WebAssembly module (memory64): it needs a recent Chrome, Edge or Firefox.</p>
+		<div class="toolbar">
+			<label>Example
+				<select id="example"></select>
+			</label>
+			<button id="run" class="primary" disabled>Run</button>
+			<button id="hxb" disabled>Compile to HXB</button>
+			<span id="state" class="state">Loading compiler…</span>
+		</div>
+		<div class="play">
+			<textarea id="code" spellcheck="false" wrap="off" aria-label="Main.hx"></textarea>
+			<div class="output">
+				<div class="outhead">Output <span id="timing"></span></div>
+				<pre id="out"></pre>
+				<div id="members" hidden></div>
+			</div>
+		</div>
+		<p class="note">The file is <code>Main.hx</code> with a <code>Main</code> class. The first run downloads <span data-info="wasmGz">~10 MB</span> of WebAssembly and <span data-info="dataGz">~1 MB</span> of standard library; later runs are cached.</p>
+	</section>
+
+	<section id="download">
+		<h2>Download</h2>
+		<p>One binary for Linux, macOS, Windows and the BSDs, on x86-64 and ARM64, built with <a href="https://github.com/jart/cosmopolitan">Cosmopolitan</a>. It carries the parts of the Haxe standard library it needs, so nothing else has to be installed.</p>
+		<p><a class="button primary" href="haxe-in-haxe.com" download>haxe-in-haxe.com</a> <span class="muted"><span data-info="comSize">17 MB</span>, <span data-info="date"></span>, commit <code data-info="commit"></code></span></p>
+<pre class="cmd"># Linux, macOS, BSD (Windows: rename to .exe)
+chmod +x haxe-in-haxe.com
+./haxe-in-haxe.com -cp src --main Main --interp                  # run a program
+./haxe-in-haxe.com -cp src --main Main --hxb out.zip --no-output # emit HXB
+# if your shell can't start it, use: sh ./haxe-in-haxe.com ...</pre>
+		<p class="note">Only the x86-64 Linux half has been tested. Code generation for JavaScript, C++, HashLink and the other targets isn't ported: the binary type-checks, runs programs with <code>--interp</code> and writes HXB.</p>
+	</section>
+
+	<section id="status">
+		<h2>Status</h2>
+		<p>The goal is a close-to-line-by-line port of the Haxe compiler (<code>haxe/src</code>, pinned upstream commit <code>b10fa6e</code>) that keeps upstream's structure, branch order and data layout. Conformance is strict: for the same invocation, the port must write the same set of HXB modules, each byte-identical to what the OCaml compiler writes.</p>
+		<table>
+			<thead><tr><th>Area</th><th>Upstream (OCaml)</th><th>Port (Haxe)</th><th>State</th></tr></thead>
+			<tbody>
+				<tr><td>Syntax: lexer, parser, preprocessor</td><td>139 KB</td><td>254 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Typing</td><td>699 KB</td><td>746 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Core types, unification, printing</td><td>353 KB</td><td>511 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Context, compiler driver, HXB writer</td><td>627 KB</td><td>314 KB</td><td class="ok">ported (batch mode)</td></tr>
+				<tr><td>Filters, optimization, analyzer, DCE</td><td>363 KB</td><td>341 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Coroutines, codegen helpers</td><td>191 KB</td><td>121 KB</td><td class="ok">ported</td></tr>
+				<tr><td>Macros: Eval interpreter, Macro API</td><td>553 KB</td><td>544 KB</td><td class="ok">ported (no debugger, libuv, TLS)</td></tr>
+				<tr><td>Target generators (JS, C++, HL, JVM, …)</td><td>1.6 MB</td><td>–</td><td class="todo">out of scope for now</td></tr>
+				<tr><td>Display, server mode, haxelib</td><td>–</td><td>–</td><td class="todo">later milestone</td></tr>
+			</tbody>
+		</table>
+		<p class="note">Sizes are source bytes per upstream directory; the Haxe side is often denser or more verbose depending on the module. File-level mapping: <code>TRANSLATION.md</code>; test results: <code>test/TESTING.md</code>.</p>
+	</section>
+
+	<section id="how">
+		<h2>How it works</h2>
+		<ol class="steps">
+			<li><b>Port.</b> Each OCaml module in <code>haxe/src</code> has a Haxe counterpart in <code>src/</code>: records become classes, variants become enums, lists become arrays, with upstream's evaluation order preserved.</li>
+			<li><b>Type itself.</b> The port parses, types and filters its own source, the same pipeline that produces HXB.</li>
+			<li><b>Lower to C.</b> A small backend (<code>backend/</code>, also Haxe) lowers the typed program to C. Ints and floats are unboxed, generics are erased with boxing at the boundaries, virtual calls go through dispatch tables, and structural field access uses inline caches.</li>
+			<li><b>Runtime.</b> About 3,000 lines of C: a precise generational copying GC with a shadow stack, UTF-16 strings, arrays with unboxed element kinds, and exceptions on <code>setjmp</code>. The standard library is mostly written in Haxe over a few native primitives, including the regular-expression engine.</li>
+			<li><b>Compile the C.</b> <code>tcc</code> compiles the 16 MB file in under a second for development, <code>gcc -O2</code> builds the fast native binary, <code>cosmocc</code> the portable one, and Emscripten the WebAssembly on this page.</li>
+		</ol>
+	</section>
+
+	<section id="numbers">
+		<h2>Numbers</h2>
+		<h3>Compile time of the compiler</h3>
+		<p>Median of 3 runs, <code>-D disable-parallelism</code>, every output checked byte-for-byte against the reference.</p>
+		<table>
+			<thead><tr><th>Workload</th><th>OCaml reference</th><th>gcc -O2</th><th>cosmocc (APE)</th><th>tcc</th></tr></thead>
+			<tbody>
+				<tr><td>hello world</td><td>0.15 s</td><td>0.11 s</td><td>0.12 s</td><td>0.27 s</td></tr>
+				<tr><td>30 std modules</td><td>0.24 s</td><td>0.23 s</td><td>0.24 s</td><td>0.63 s</td></tr>
+				<tr><td>the port itself (52k lines, runs macros)</td><td>4.88 s</td><td>5.03 s</td><td>5.67 s</td><td>12.08 s</td></tr>
+			</tbody>
+		</table>
+		<h3>Building the compiler from its C</h3>
+		<table>
+			<thead><tr><th>C compiler</th><th>build time</th><th>binary</th><th>gzip</th></tr></thead>
+			<tbody>
+				<tr><td>tcc</td><td>0.6 s</td><td>14.6 MB</td><td>3.2 MB</td></tr>
+				<tr><td>gcc -O2</td><td>132 s</td><td>8.8 MB</td><td>3.0 MB</td></tr>
+				<tr><td>cosmocc -O2, x86-64 + ARM64</td><td>203 s</td><td>17.0 MB</td><td>6.3 MB</td></tr>
+				<tr><td>emcc -O2 (this page)</td><td>84 s</td><td data-info="wasmSize">–</td><td data-info="wasmGz">–</td></tr>
+			</tbody>
+		</table>
+	</section>
+</main>
+
+<footer class="wrap">
+	<p>An experimental port of <a href="https://haxe.org">Haxe</a>. Built <span data-info="date"></span> from commit <code data-info="commit"></code>.</p>
+</footer>
+<script src="playground.js"></script>
+</body>
+</html>
