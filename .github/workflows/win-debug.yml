@@ -1,0 +1,71 @@
+name: win-debug
+on:
+  push:
+    branches: [ci-zig-debug]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  win:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v8
+        with:
+          name: haxe-in-haxe-cosmo
+          path: dl
+          run-id: 38166493839
+          github-token: ${{ github.token }}
+      - name: Experiments
+        run: |
+          unzip -q dl/haxe-in-haxe-windows-x86_64.zip -d t
+          B=$PWD/t/haxe-in-haxe-windows-x86_64/haxe-in-haxe.exe
+          mkdir w && cd w
+          cat > D.hx <<'EOF'
+          class D {
+          	static function tryp(cmd:String, args:Array<String>) {
+          		try {
+          			var p = new sys.io.Process(cmd, args);
+          			Sys.println("process " + cmd + " " + args + ": [" + StringTools.trim(p.stdout.readAll().toString()) + "] [" + StringTools.trim(p.stderr.readAll().toString()) + "] exit " + p.exitCode());
+          		} catch (e:Dynamic) Sys.println("process " + cmd + " threw " + e);
+          	}
+          	static function main() {
+          		Sys.println("cwd " + haxe.Json.stringify(Sys.getCwd()));
+          		Sys.println("prog " + haxe.Json.stringify(Sys.programPath()));
+          		Sys.println("PATH " + haxe.Json.stringify(Sys.getEnv("PATH")));
+          		Sys.println("abs " + haxe.Json.stringify(sys.FileSystem.absolutePath("x.txt")));
+          		Sys.println("exists C:/Windows " + sys.FileSystem.exists("C:/Windows") + " C:\\Windows " + sys.FileSystem.exists("C:\\Windows") + " /c/Windows " + sys.FileSystem.exists("/c/Windows"));
+          		tryp("node", ["-e", "console.log(1)"]);
+          		tryp("node.exe", ["-e", "console.log(2)"]);
+          		tryp(Sys.getEnv("NODE_EXE"), ["-e", "console.log(3)"]);
+          		tryp("cmd.exe", ["/c", "echo", "hi"]);
+          		tryp("node -e console.log(4)", null);
+          		tryp("echo hi from sh", null);
+          		Sys.println("command node: " + Sys.command("node", ["-e", "process.exit(3)"]));
+          		Sys.println("command node.exe: " + Sys.command("node.exe", ["-e", "process.exit(3)"]));
+          		Sys.println("command NODE_EXE: " + Sys.command(Sys.getEnv("NODE_EXE"), ["-e", "process.exit(3)"]));
+          	}
+          }
+          EOF
+          export NODE_EXE="$(cygpath -w "$(command -v node)")"
+          echo "NODE_EXE=$NODE_EXE"
+          echo "== bash"
+          "$B" -main D --interp || true
+          echo "== bash, unix NODE_EXE"
+          NODE_EXE="$(command -v node)" "$B" -main D --interp || true
+      - name: Experiments (pwsh)
+        shell: pwsh
+        run: |
+          $env:NODE_EXE = (Get-Command node).Source
+          Set-Location w
+          & ../t/haxe-in-haxe-windows-x86_64/haxe-in-haxe.exe -main D --interp
+          Set-Content M.hx 'class M { static function main() { trace("hello"); } }'
+          & ../t/haxe-in-haxe-windows-x86_64/haxe-in-haxe.exe -main M --js m.js --cmd "node m.js"
+          & ../t/haxe-in-haxe-windows-x86_64/haxe-in-haxe.exe -cp $PWD -main M --js "$PWD\m2.js"
+          Get-Item m2.js
