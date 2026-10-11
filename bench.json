@@ -25,19 +25,19 @@
   }
  },
  "runners": {
-  "hxc": "bin/backend/hih/hih",
+  "hxc": "bin/hxc/hih/hih",
   "reference": "haxe/haxe",
-  "hxc-cosmo": "sh bin/backend/hih/hih.com",
+  "hxc-cosmo": "sh bin/hxc/hih/hih.com",
   "js": "node --stack-size=65500 bin/bench/hih.js",
   "cpp": "bin/bench/cpp/Main",
-  "hxc-o2": "bin/backend/hih/hih_o2",
+  "hxc-o2": "bin/hxc/hih/hih_o2",
   "hl": "hl bin/bench/hih.hl",
   "jvm": "java -Xss512m -XX:+UnlockDiagnosticVMOptions -XX:-BytecodeVerificationRemote -XX:-BytecodeVerificationLocal -jar bin/bench/hih.jar",
-  "wasm": "/root/emsdk/node/24.19.0_64bit/bin/node --stack-size=65500 bin/bench/wasm/hih.js",
+  "wasm": "node --stack-size=65500 bin/bench/wasm/hih.js",
   "hlc": "bin/bench/hih-hlc",
   "eval-source": "haxe/haxe -D eval-call-stack-depth=1000000 -cp src --run haxe.Main",
   "eval-hxb": "haxe/haxe -D eval-call-stack-depth=1000000 --hxb-lib bin/bench/haxe-in-haxe.eval.hxb --run haxe.Main",
-  "hxc-clang": "bin/backend/hih/hih_clang"
+  "hxc-clang": "bin/hxc/hih/hih_clang"
  },
  "results": [
   {

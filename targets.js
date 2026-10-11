@@ -1,5 +1,5 @@
-// Target generators section: renders targets.json (bench/targets-results.json,
-// written by bench/targets.py --json and copied by site/build.sh).
+// Target generators section: renders targets.json (site/bench/targets-results.json,
+// written by site/bench/targets.py --json and copied by site/build.sh).
 (() => {
 	const root = document.getElementById("targets-results");
 	if (!root) return;

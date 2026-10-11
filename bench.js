@@ -1,5 +1,5 @@
-// Benchmarks section: renders bench.json (bench/results.json, written by
-// bench/run.py --json and copied by site/build.sh).
+// Benchmarks section: renders bench.json (site/bench/results.json, written by
+// site/bench/run.py --json and copied by site/build.sh).
 (() => {
 	const root = document.getElementById("bench-results");
 	if (!root) return;

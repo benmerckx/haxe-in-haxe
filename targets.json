@@ -5,7 +5,7 @@
   "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
   "cores": 4,
   "runs": 3,
-  "port": "/home/user/haxe-in-haxe/bin/hxc/hih/hih_clang",
+  "port": "bin/hxc/hih/hih_clang",
   "reference": "5.0.0-preview.1",
   "platform": "Linux-6.18.44-fc-v114-x86_64-with-glibc2.39"
  },
