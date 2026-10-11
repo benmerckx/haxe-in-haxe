@@ -11,10 +11,11 @@ importScripts("hih.js");
 
 let wasmModule = null;
 
+let moduleReady = null;
+const modulePromise = new Promise((resolve) => (moduleReady = resolve));
+
 function instantiateWasm(imports, done) {
-	const ready = wasmModule
-		? Promise.resolve(wasmModule)
-		: WebAssembly.compileStreaming(fetch("hih.wasm")).then((m) => (wasmModule = m));
+	const ready = wasmModule ? Promise.resolve(wasmModule) : modulePromise;
 	ready.then((m) => WebAssembly.instantiate(m, imports)).then((inst) => done(inst, wasmModule));
 	return {};
 }
@@ -45,6 +46,12 @@ function run(mod, args) {
 
 onmessage = async (e) => {
 	const m = e.data;
+	if (m.type === "module") {
+		// the module compiled once by the page (playground.js)
+		wasmModule = m.module;
+		if (moduleReady) moduleReady(m.module);
+		return;
+	}
 	try {
 		if (m.type === "warmup") {
 			await instance("Main.hx", "", () => {}, () => {});

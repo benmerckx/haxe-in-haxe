@@ -94,20 +94,62 @@ function setupMonaco() {
 
 // ---- running programs
 
-let runner = null, busy = false, zipUrl = null;
+// The compiler is a 10 MB WebAssembly module with 64-bit memory. It is compiled
+// once, only when the playground comes into view (or Run is pressed), and the
+// compiled module is shared with the workers. Phones and low-memory devices
+// skip the background type-checker (diagnostics, completion), the second
+// compiler instance: two of them got mobile browsers' tabs killed.
+const LOW_MEMORY = (navigator.deviceMemory || 8) <= 4 || matchMedia("(pointer: coarse)").matches;
+const MEMORY64 = (() => {
+	// a module with one memory64 memory (limits flag 4)
+	try { return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 5, 3, 1, 4, 0])); } catch (err) { return false; }
+})();
+let wasmModule = null;
+function compilerModule() {
+	return wasmModule ||= WebAssembly.compileStreaming(fetch("hih.wasm"));
+}
+function startWorker(onmessage) {
+	const w = new Worker("worker.js");
+	w.onmessage = onmessage;
+	compilerModule().then((module) => w.postMessage({type: "module", module}), (err) => {
+		setBusy(true, "The compiler could not be loaded: " + (err && err.message ? err.message : err));
+	});
+	return w;
+}
+
+let runner = null, busy = false, zipUrl = null, runnerReady = false;
 function newRunner() {
-	runner = new Worker("worker.js");
-	runner.onmessage = (e) => onRunnerMessage(e.data);
+	runner = startWorker((e) => onRunnerMessage(e.data));
 	runner.postMessage({type: "warmup"});
 }
-newRunner();
+function ensureRunner() {
+	if (runner || !MEMORY64) return;
+	newRunner();
+}
 
 function setBusy(b, text) {
 	busy = b;
 	runBtn.disabled = hxbBtn.disabled = b;
 	state.textContent = text || "";
 }
-setBusy(true, "Loading compiler…");
+if (!MEMORY64) setBusy(true, "This browser cannot run the compiler: it needs WebAssembly with 64-bit memory (Chrome or Edge 133+, Firefox 134+).");
+else {
+	setBusy(true, "The compiler loads when the playground is in view…");
+	const playground = document.getElementById("playground");
+	if (playground && "IntersectionObserver" in self) {
+		const io = new IntersectionObserver((entries) => {
+			if (entries.some((x) => x.isIntersecting)) {
+				io.disconnect();
+				setBusy(true, "Loading compiler…");
+				ensureRunner();
+			}
+		});
+		io.observe(playground);
+	} else {
+		setBusy(true, "Loading compiler…");
+		ensureRunner();
+	}
+}
 
 function print(text, cls) {
 	const span = document.createElement("span");
@@ -130,7 +172,11 @@ hxbBtn.onclick = () => start("hxb");
 
 function onRunnerMessage(m) {
 	switch (m.type) {
-		case "ready": setBusy(false, "Ready. Ctrl+Enter runs."); break;
+		case "ready":
+			runnerReady = true;
+			setBusy(false, "Ready. Ctrl+Enter runs.");
+			scheduleCheck();
+			break;
 		case "out": print(m.text); break;
 		case "err": print(m.text, "err"); break;
 		case "done":
@@ -189,20 +235,21 @@ function showZip(buf) {
 let lsp = null, lspSeq = 0;
 const pending = new Map();
 function newLsp() {
-	lsp = new Worker("worker.js");
-	lsp.onmessage = (e) => {
+	lsp = startWorker((e) => {
 		const m = e.data, p = pending.get(m.id);
 		if (!p) return;
 		pending.delete(m.id);
 		if (m.type === "failed") { lsp.terminate(); newLsp(); p(null); } else p(m);
-	};
+	});
 }
-newLsp();
 
 // one request at a time; a newer request of the same kind replaces a queued one
 const queue = new Map();
 let inflight = false;
 function request(kind, msg) {
+	// the type-checker starts once the compiler has loaded, and not on small devices
+	if (LOW_MEMORY || !MEMORY64 || !runnerReady) return Promise.resolve(null);
+	if (!lsp) newLsp();
 	return new Promise((resolve) => {
 		const prev = queue.get(kind);
 		if (prev) prev.resolve(null);

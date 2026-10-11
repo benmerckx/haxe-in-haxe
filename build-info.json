@@ -1,8 +1,8 @@
 {
 	"date": "2026-10-11",
-	"commit": "8e65fb2",
-	"wasmSize": "10.0 MB",
-	"wasmGz": "1.9 MB",
+	"commit": "a042fb8",
+	"wasmSize": "11.0 MB",
+	"wasmGz": "2.1 MB",
 	"dataGz": "0.2 MB",
-	"comSize": "26.1 MB"
+	"comSize": "40.0 MB"
 }
