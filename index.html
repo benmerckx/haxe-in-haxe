@@ -75,11 +75,11 @@ chmod +x haxe-in-haxe.com
 		<h2>Use hxc</h2>
 		<p>The C backend is also a Haxe target for your own programs: the <code>hxc</code> haxelib package. Your Haxe types the program (macros, <code>-lib</code> and IDE support included) and writes HXB; the bundled <code>hxc.com</code>, this port with the backend, reads the archive and writes C; clang, gcc or tcc builds a native binary, or cosmocc a portable one. Threads, sockets, TLS and libuv are supported.</p>
 <pre class="cmd"># in a checkout of the repository (needs cosmocc, or NATIVE_CC=clang)
-sh backend/haxelib/build.sh                     # bin/haxelib/hxc.zip
+sh hxc/haxelib/build.sh                     # bin/haxelib/hxc.zip
 haxelib install bin/haxelib/hxc.zip
 haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 ./bin/main</pre>
-		<p class="note">HXB is tied to the compiler that writes it, so your Haxe must be the build <code>hxc.com</code> was made from (named in the package's <code>hxc.json</code>). Options (<code>-D hxc.cc</code>, <code>hxc.static</code>, <code>hxc.ssl</code>, <code>hxc.uv</code>, …) are in <code>backend/haxelib/README.md</code>. The first real program built this way besides the compiler is <a href="https://github.com/HaxeCheckstyle/haxe-formatter">haxe-formatter</a>, which formatted this project's sources.</p>
+		<p class="note">HXB is tied to the compiler that writes it, so your Haxe must be the build <code>hxc.com</code> was made from (named in the package's <code>hxc.json</code>). Options (<code>-D hxc.cc</code>, <code>hxc.static</code>, <code>hxc.ssl</code>, <code>hxc.uv</code>, …) are in <code>hxc/haxelib/README.md</code>. The first real program built this way besides the compiler is <a href="https://github.com/HaxeCheckstyle/haxe-formatter">haxe-formatter</a>, which formatted this project's sources.</p>
 	</section>
 
 	<section id="status">
@@ -108,7 +108,7 @@ haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 		<ol class="steps">
 			<li><b>Port.</b> Each OCaml module in <code>haxe/src</code> has a Haxe counterpart in <code>src/</code>: records become classes, variants become enums, lists become arrays, with upstream's evaluation order preserved.</li>
 			<li><b>Type itself.</b> The port parses, types and filters its own source, the same pipeline that produces HXB.</li>
-			<li><b>Lower to C.</b> A small backend (<code>backend/</code>, also Haxe) lowers the typed program to C. Ints and floats are unboxed, generics are erased with boxing at the boundaries, virtual calls go through dispatch tables, and structural field access uses inline caches.</li>
+			<li><b>Lower to C.</b> A small backend (<code>hxc/</code>, also Haxe) lowers the typed program to C. Ints and floats are unboxed, generics are erased with boxing at the boundaries, virtual calls go through dispatch tables, and structural field access uses inline caches.</li>
 			<li><b>Runtime.</b> About 8,800 lines of C: a precise generational copying GC with a shadow stack, compact object layouts, real OS threads with stop-the-world collections (green threads under tcc), UTF-16 strings, arrays with unboxed element kinds, exceptions on <code>setjmp</code>, and bindings for sockets, mbedtls and libuv. The standard library is mostly written in Haxe over a few native primitives, including the regular-expression engine.</li>
 			<li><b>Compile the C.</b> <code>tcc</code> compiles the 16 MB file in about a second for development, <code>clang -O2</code> builds the fastest native binary (<code>gcc -O2</code> is 4–10% behind), <code>cosmocc</code> the portable one, and Emscripten the WebAssembly on this page.</li>
 		</ol>
@@ -163,7 +163,7 @@ haxe -lib hxc -cp src -main Main --custom-target hxc=bin/main
 			<dt>Eval, from source</dt><dd>The reference compiler runs the port's Haxe source with its Eval interpreter: <code>haxe -cp src --run haxe.Main …</code>. Each run first types all 52k lines of the port.</dd>
 			<dt>Eval, from HXB</dt><dd>The reference loads the port from an Eval HXB archive it wrote once (<code>--hxb-lib haxe-in-haxe.zip --run haxe.Main …</code>) and interprets it, skipping parsing and typing.</dd>
 			<dt>HashLink JIT, HL/C, JS, JVM, C++</dt><dd>The port compiled by the reference compiler to its existing targets: HashLink bytecode run by <code>hl</code>; HashLink C built with gcc -O2 against a static libhl with a patched allocator; JavaScript on Node; a JAR on the JVM; hxcpp C++ with single-threaded GC marking.</dd>
-			<dt>hxc: tcc, gcc -O2, cosmocc, wasm</dt><dd>The port compiled by this project's own C backend (<code>backend/</code>), whose runtime has a precise generational GC. The same C file built with tcc (fast to build), gcc -O2, cosmocc (one portable binary for x86-64 and ARM64; the fat build is measured), and Emscripten: the 64-bit WebAssembly of the playground, built for Node (24, for 64-bit memory) with direct file access instead of the in-memory file system.</dd>
+			<dt>hxc: tcc, gcc -O2, cosmocc, wasm</dt><dd>The port compiled by this project's own C backend (<code>hxc/</code>), whose runtime has a precise generational GC. The same C file built with tcc (fast to build), gcc -O2, cosmocc (one portable binary for x86-64 and ARM64; the fat build is measured), and Emscripten: the 64-bit WebAssembly of the playground, built for Node (24, for 64-bit memory) with direct file access instead of the in-memory file system.</dd>
 		</dl>
 		<h3>Method</h3>
 		<p>Every run is a fresh process compiling one workload with <code>-D disable-parallelism --interp --no-output --hxb out.zip</code>. The table shows the minimum over 3 runs; the Eval runners compiling the port itself ran once, as each run takes about half an hour. <b>CPU</b> is user plus system time of the process and its children: other jobs share this machine, so CPU time, which they disturb less than wall time, is the main measure. It can exceed wall time where a runtime uses several threads (JIT compilation and GC in Node and the JVM). <b>Peak RSS</b> is the largest resident set of the run. Start-up is included: the JVM, Node and Eval pay it on every run. Reproduce with <code>python3 bench/run.py</code> (<code>bench/README.md</code>).</p>
