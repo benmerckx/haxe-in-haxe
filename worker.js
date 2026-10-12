@@ -20,12 +20,29 @@ function instantiateWasm(imports, done) {
 	return {};
 }
 
+// stdout/stderr byte by byte: Emscripten's default print only passes on complete
+// lines, and the compiler ends a --display reply without a newline
+function lineWriter(emit) {
+	const decoder = new TextDecoder();
+	let bytes = [];
+	const flush = () => {
+		if (bytes.length) emit(decoder.decode(new Uint8Array(bytes)));
+		bytes = [];
+	};
+	const write = (b) => {
+		if (b === null || b === 10) flush();
+		else bytes.push(b < 0 ? b + 256 : b);
+	};
+	return {write, flush};
+}
+
 async function instance(file, code, print, printErr) {
-	return createHih({
+	const out = lineWriter(print), err = lineWriter(printErr);
+	const mod = await createHih({
 		noInitialRun: true,
 		instantiateWasm,
-		print,
-		printErr,
+		stdout: out.write,
+		stderr: err.write,
 		preRun: [(m) => {
 			m.ENV.HAXE_STD_PATH = "/lib/haxe/std/";
 			m.FS.mkdir("/work");
@@ -33,6 +50,8 @@ async function instance(file, code, print, printErr) {
 			m.FS.chdir("/work");
 		}],
 	});
+	mod.flushOutput = () => { out.flush(); err.flush(); };
+	return mod;
 }
 
 function run(mod, args) {
@@ -41,6 +60,8 @@ function run(mod, args) {
 	} catch (err) {
 		if (err && err.name === "ExitStatus") return err.status;
 		throw err;
+	} finally {
+		mod.flushOutput();
 	}
 }
 
