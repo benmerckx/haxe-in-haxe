@@ -318,13 +318,27 @@ class Driver {
 		var demit = Target.emitter(abi, data);
 		var dg = new DataGen(prep, abi, data, mf -> compileMir(mf, demit));
 		dg.run();
-		dg.allocStubs(objs);
+		// the allocation stubs and thunks: in parallel, into objects of their own
+		// (a fixed number: the executable does not depend on the machine)
+		var stubs = dg.allocStubs(objs);
+		var nchunks = stubs.length < 8 ? stubs.length : 8;
+		var sobjs:Array<Obj> = [for (_ in 0...nchunks) null];
+		parallel(nchunks, jobs, c -> {
+			var o = new Obj();
+			var em = Target.emitter(abi, o);
+			var k = c;
+			while (k < stubs.length) {
+				compileMir(stubs[k](), em);
+				k += nchunks;
+			}
+			sobjs[c] = o;
+		});
 		var t3 = haxe.Timer.stamp();
 		var rtPath = o.rtObj != null ? o.rtObj : Options.toolDir() + "rt/" + abi.name + "/rt.o";
 		if (!sys.FileSystem.exists(rtPath)) throw "hxmc: the runtime object " + rtPath + " is missing (hxmc/tools/mkrt.sh)";
 		var rt = ElfReader.read(sys.io.File.getBytes(rtPath));
 		var t4 = haxe.Timer.stamp();
-		var ft = frameTable([data].concat(objs));
+		var ft = frameTable([data].concat(sobjs).concat(objs));
 		var all = ft.objs.concat([ft.table, rt]);
 		var exe = abi.os == "windows" ? new LinkPE(all, abi.arm).link("mainCRTStartup") : abi.os == "macos" ? {
 			var l = new LinkMachO(all, abi);

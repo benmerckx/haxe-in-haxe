@@ -374,9 +374,11 @@ class DataGen {
 	// allocation site's slow path is one call (after run: hx_main_body
 	// allocates). They record their frames for the stack maps (an
 	// allocation may collect), as the thunks the program calls C functions
-	// through (StackMaps.THUNK) do; both are dropped by the linker when
-	// nothing calls them.
-	public function allocStubs(objs:Array<Obj>) {
+	// through (StackMaps.THUNK) do (only those called: no dead-code
+	// sections of their own). Returned as builders of their Mir, to be
+	// compiled (Driver: in parallel).
+	public function allocStubs(objs:Array<Obj>):Array<() -> MFunc> {
+		var out:Array<() -> MFunc> = [];
 		var names = new Map<String, Bool>();
 		var thunks = new Map<String, Bool>();
 		for (o in objs.concat([obj]))
@@ -391,13 +393,14 @@ class DataGen {
 			var parts = n.substr(MirBuild.ALLOC_STUB.length).split("$");
 			var lo = Std.parseInt(parts[0]), bytes = Std.parseInt(parts[2]);
 			var ty = parts[1];
-			var mf = MirBuild.synthetic(prep, abi, n, [], I64, (b, _) -> {
-				var t = StringTools.startsWith(ty, "#") ? b.iconst(Std.parseInt(ty.substr(1))) : b.idConst(ty, 0);
-				b.ret(b.call("hxmc_alloc_slow", [b.iconst(lo), t, b.iconst(bytes)], I64));
+			out.push(() -> {
+				var mf = MirBuild.synthetic(prep, abi, n, [], I64, (b, _) -> {
+					var t = StringTools.startsWith(ty, "#") ? b.iconst(Std.parseInt(ty.substr(1))) : b.idConst(ty, 0);
+					b.ret(b.call("hxmc_alloc_slow", [b.iconst(lo), t, b.iconst(bytes)], I64));
+				});
+				mf.inlineRecords = true;
+				mf;
 			});
-			mf.inlineRecords = true;
-			mf.section = Link.GC_PREFIX + n;
-			compile(mf);
 		}
 		var list = [for (n in thunks.keys()) n];
 		list.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
@@ -410,14 +413,16 @@ class DataGen {
 			if (noReturn) sig = sig.substr(1);
 			var ret = StackMaps.charTy(sig.charAt(0));
 			var params = [for (k in 1...sig.length) StackMaps.charTy(sig.charAt(k))];
-			var mf = MirBuild.synthetic(prep, abi, n, params, ret, (b, ps) -> {
-				var r = b.call(target, ps, ret, noReturn);
-				if (noReturn) b.add(b.mk(Unreachable, Void)) else b.ret(ret == Void ? -1 : r);
+			out.push(() -> {
+				var mf = MirBuild.synthetic(prep, abi, n, params, ret, (b, ps) -> {
+					var r = b.call(target, ps, ret, noReturn);
+					if (noReturn) b.add(b.mk(Unreachable, Void)) else b.ret(ret == Void ? -1 : r);
+				});
+				mf.inlineRecords = true;
+				mf;
 			});
-			mf.inlineRecords = true;
-			mf.section = Link.GC_PREFIX + n;
-			compile(mf);
 		}
+		return out;
 	}
 
 	function entry(mf:MFunc) {

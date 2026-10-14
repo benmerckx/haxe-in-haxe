@@ -448,40 +448,42 @@ class Facts {
 		}
 		for (f in p.funcs)
 			f.noGc = cand.exists(f);
-		// the functions that enter a safe region, or call one that does
-		function enters(e:Ex):Bool {
-			var r = switch e {
-				case ECallHost("rt_blocking_enter", _, _): true;
-				case _: false;
+		// the functions that enter a safe region, or call one that does (one
+		// walk of the bodies: the direct ones and the callers, then the
+		// callers' closure)
+		var callers = new Map<FuncInfo, Array<FuncInfo>>();
+		var work:Array<FuncInfo> = [];
+		for (f in p.funcs) {
+			var here = false;
+			function ex(e:Ex) {
+				switch e {
+					case ECallHost("rt_blocking_enter", _, _): here = true;
+					case ECall(g, _):
+						var cs = callers.get(g);
+						if (cs == null) callers.set(g, cs = []);
+						if (cs.length == 0 || cs[cs.length - 1] != f) cs.push(f);
+					case _:
+				}
+				Facts.iterEx(ex, e);
 			}
-			if (!r) Facts.iterEx(x -> if (!r && enters(x)) r = true, e);
-			return r;
-		}
-		function stEnters(s:Stmt):Bool {
-			var r = false;
-			Facts.iterStmt(x -> if (!r && stEnters(x)) r = true, x -> if (!r && enters(x)) r = true, s);
-			return r;
-		}
-		function calls(e:Ex):Bool {
-			var r = switch e {
-				case ECall(g, _): g.blocks;
-				case _: false;
+			function st(s:Stmt)
+				Facts.iterStmt(st, ex, s);
+			for (s in f.body)
+				st(s);
+			if (here) {
+				f.blocksHere = f.blocks = true;
+				work.push(f);
 			}
-			if (!r) Facts.iterEx(x -> if (!r && calls(x)) r = true, e);
-			return r;
 		}
-		function stCalls(s:Stmt):Bool {
-			var r = false;
-			Facts.iterStmt(x -> if (!r && stCalls(x)) r = true, x -> if (!r && calls(x)) r = true, s);
-			return r;
-		}
-		for (f in p.funcs)
-			if (Lambda.exists(f.body, stEnters)) f.blocksHere = f.blocks = true;
-		var more = true;
-		while (more) {
-			more = false;
-			for (f in p.funcs)
-				if (!f.blocks && Lambda.exists(f.body, stCalls)) f.blocks = more = true;
+		while (work.length > 0) {
+			var g = work.pop();
+			var cs = callers.get(g);
+			if (cs != null)
+				for (c in cs)
+					if (!c.blocks) {
+						c.blocks = true;
+						work.push(c);
+					}
 		}
 		// @:hxmc.noGc: a promise the runtime's Haxe code relies on (raw
 		// addresses kept across calls), checked
