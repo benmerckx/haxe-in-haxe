@@ -126,6 +126,7 @@ class Driver {
 				mb.icaches = ic.count;
 			}
 			if (o.opt) new Opt(mf).run();
+			StackMaps.record(mf, prep.isHaxe, false);
 			if (dumpSet != null && dumpSet.exists(name)) Sys.println(mf.dump());
 			var layout = Layout.order(mf);
 			var s1 = haxe.Timer.stamp();
@@ -165,11 +166,14 @@ class Driver {
 
 	// a synthetic function (DataGen) into obj
 	function compileMir(mf:MFunc, emit:Target.Emitter) {
+		StackMaps.record(mf, prep.isHaxe, mf.inlineRecords);
 		var isel = Target.selector(abi);
 		var lf = isel.select(mf, Layout.order(mf));
 		var ra = new Regalloc(lf, isel);
 		ra.run();
+		if (mf.section != null) emit.useSection(mf.section);
 		emit.func(lf, ra.usedRegs, true);
+		if (mf.section != null) emit.useSection(null);
 	}
 
 	function stats(t0:Float, t1:Float, t2:Float) {
@@ -314,13 +318,14 @@ class Driver {
 		var demit = Target.emitter(abi, data);
 		var dg = new DataGen(prep, abi, data, mf -> compileMir(mf, demit));
 		dg.run();
-		dg.allocStubs(objs, demit);
+		dg.allocStubs(objs);
 		var t3 = haxe.Timer.stamp();
 		var rtPath = o.rtObj != null ? o.rtObj : Options.toolDir() + "rt/" + abi.name + "/rt.o";
 		if (!sys.FileSystem.exists(rtPath)) throw "hxmc: the runtime object " + rtPath + " is missing (hxmc/tools/mkrt.sh)";
 		var rt = ElfReader.read(sys.io.File.getBytes(rtPath));
 		var t4 = haxe.Timer.stamp();
-		var all = [data].concat(objs).concat([rt]);
+		var ft = frameTable([data].concat(objs));
+		var all = ft.objs.concat([ft.table, rt]);
 		var exe = abi.os == "windows" ? new LinkPE(all, abi.arm).link("mainCRTStartup") : abi.os == "macos" ? {
 			var l = new LinkMachO(all, abi);
 			l.symbols = !o.strip;
@@ -348,6 +353,34 @@ class Driver {
 
 	static function ms(s:Float):String
 		return Std.int(s * 1000) + " ms";
+
+	// the frame descriptors of the objects (StackMaps) in one table, a
+	// section between hxmc_frames_start and hxmc_frames_end; the objects
+	// are linked without theirs (views of them: cached objects stay whole)
+	static function frameTable(objs:Array<Obj>):{table:Obj, objs:Array<Obj>} {
+		var t = new Obj();
+		var sec = t.section(StackMaps.TABLE, RoData, 8);
+		var out = [];
+		for (o in objs) {
+			var keep = [];
+			for (s in o.sections)
+				if (s.name == StackMaps.SECTION) {
+					var base = sec.buf.len;
+					sec.buf.buf(s.buf);
+					for (r in s.relocs)
+						sec.relocs.push(new Obj.Reloc(base + r.offset, r.kind, r.sym, r.addend));
+				} else keep.push(s);
+			if (keep.length == o.sections.length) out.push(o) else {
+				var v = new Obj();
+				v.sections = keep;
+				v.symbols = o.symbols;
+				out.push(v);
+			}
+		}
+		t.define(StackMaps.START, sec, 0, 0, true);
+		t.define(StackMaps.END, sec, sec.buf.len, 0, true);
+		return {table: t, objs: out};
+	}
 }
 
 // The order blocks are laid out in: reverse postorder, the cold blocks (slow

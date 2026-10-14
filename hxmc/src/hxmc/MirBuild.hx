@@ -6,8 +6,9 @@ import hxmc.Mir;
 // hxmc's IR (hxmc.ir.Ir: structured statements in A-normal form) of one
 // function to Mir (the runtime's inline helpers of rt.h are expanded here,
 // so the native code and the runtime agree on every detail):
-// - reference locals that Roots puts in shadow-stack slots live in memory
-//   (fr[k]); in functions with a try block the locals a handler can see
+// - reference locals that Roots puts in root slots live in memory (fr[k],
+//   a frame area the stack maps describe, MFunc.rootSlots); in functions
+//   with a try block the locals a handler can see
 //   live in memory, so values survive the second return of setjmp; the other
 //   locals become SSA values (Braun et al., "Simple and Efficient
 //   Construction of Static Single Assignment Form", on the structured input);
@@ -23,7 +24,7 @@ class MirBuild {
 	var roots:Roots;
 	var refSlot = new Map<Local, Int>();
 	var nslots = 0;
-	var fr = -1; // the frame's shadow-stack slots (value)
+	var fr = -1; // the frame's root slots (value: their address)
 	var memSlot = new Map<Local, Int>(); // try functions: frame slot of a scalar local
 	var defs:Array<BlockDefs> = [];
 	var incomplete:Array<Null<Map<Int, MIns>>> = []; // (made when a block gets one)
@@ -42,7 +43,6 @@ class MirBuild {
 		return nslots;
 
 	static var noShadow = Sys.getEnv("HXMC_NOSHADOW") == "1";
-	static var frameSpills = Sys.getEnv("HXMC_FRAMESPILL") != "0"; // (measurement: 0 pushes on every slow path)
 
 	public var icaches = 0; // inline caches of this function (bss: <name>__ic, IC_SIZE each)
 	public var icSym:String;
@@ -324,9 +324,28 @@ class MirBuild {
 	function tyOfVal(v:Int):MTy
 		return f.vals[v].ty;
 
+	// whether nothing collects during a call of sym (in this function): a
+	// function of the program that never reaches a GC point nor enters a
+	// safe region, or such a C function, unless this function is in a
+	// safe region itself (it enters one)
+	function keepsFrame(sym:String):Bool
+		return fn != null && !fn.blocksHere && walkFree(sym);
+
+	// whether no collection walks the stack during a call of sym: the
+	// callee neither collects nor enters (or leaves) a safe region
+	function walkFree(sym:String):Bool {
+		if (p == null) return false;
+		var g = p.e.byCName.get(sym);
+		if (g != null) return g.noGc && !g.blocks;
+		if (sym == "rt_blocking_enter" || sym == "rt_blocking_leave") return false;
+		return hxmc.ir.FnLower.noGcHost(sym) || StackMaps.quiet(sym);
+	}
+
 	function call(sym:String, args:Array<Int>, ret:MTy, noReturn = false):Int {
 		var i = mk(Call, ret);
-		i.sym = sym;
+		i.sym = p != null ? p.hostSym(sym) : sym;
+		i.keepsFrame = keepsFrame(i.sym);
+		i.walkFree = walkFree(i.sym);
 		i.args = args;
 		i.argTys = [for (a in args) tyOfVal(a)];
 		i.noReturn = noReturn;
@@ -633,6 +652,7 @@ class MirBuild {
 
 	public function build():MFunc {
 		f = new MFunc(p.funcSym(fn));
+		f.blocksHere = fn.blocksHere;
 		for (a in fn.args)
 			f.params.push(mty(a.ty));
 		f.ret = mty(fn.ret);
@@ -643,30 +663,40 @@ class MirBuild {
 		}
 		nextVar = maxId;
 		roots = Roots.analyze(fn);
-		for (l in fn.args.concat(fn.locals)) {
-			var s = roots.slots[l.id];
-			if (s >= 0) refSlot.set(l, s);
-		}
-		nslots = roots.nslots;
-		// measurement only (HXMC_NOSHADOW=1): no shadow-stack frames, references in
-		// SSA values; correct only while nothing collects (the cost of the frames)
-		if (noShadow && !fn.hasTry) {
-			refSlot = new Map();
-			nslots = 0;
-		}
-		// a function with a frame keeps the references its slow paths spill
-		// in slots of its own after its locals' (no push and pop on the slow
-		// paths); one without one pushes them there
-		if (nslots > 0 && !noShadow && frameSpills) {
-			var most = 1; // (an array store's value: one more)
+		// the root slots: the rooted locals' (shared by locals that never live
+		// at the same time, Roots.assign), those whose slots start null
+		// (zeroed by the prologue: a GC point may find them unassigned, or
+		// they may be read unassigned) last, then the references slow paths
+		// spill (an array store's slow path roots the value: one slot at
+		// least), also zeroed
+		var all = fn.args.concat(fn.locals);
+		nslots = 0;
+		// measurement only (HXMC_NOSHADOW=1): no root slots, references in
+		// SSA values; correct only while nothing collects (the cost of the slots)
+		if (!(noShadow && !fn.hasTry)) {
+			// (try functions: every slot starts null, none is shared)
+			var unset = fn.hasTry ? roots.rooted.copy() : Roots.maybeUnset(fn);
+			var zero = Roots.needZero(fn, roots.rooted);
+			zero.union(unset);
+			var a = roots.assign(all, zero, unset);
+			for (l in all) {
+				var k = a.slotOf.get(l.id);
+				if (k != null) refSlot.set(l, k);
+			}
+			nslots = a.nslots;
+			zeroSlots = a.nzero;
+			var most = hasArrayStore(fn.body) ? 1 : 0;
 			for (list in roots.spills) {
 				var n = 1;
 				for (l in list)
-					if (!refSlot.exists(l)) n++;
+					if (!roots.rooted.get(l.id)) n++;
 				if (n > most) most = n;
 			}
-			spillBase = nslots;
-			nslots += most;
+			if (most > 0) {
+				spillBase = nslots;
+				nslots += most;
+				zeroSlots += most;
+			}
 		}
 		var entry = newBlock();
 		f.entry = entry;
@@ -678,25 +708,13 @@ class MirBuild {
 			pi.imm = i;
 			params.push(add(pi));
 		}
+		// (the prologue zeroes them: a GC point before a slot's first
+		// assignment finds null)
 		if (nslots > 0) {
-			fr = push(nslots);
-			if (fn.hasTry) {
-				var z = lconst(0, 0);
-				for (k in 0...nslots)
-					store(8, fr, 8 * k, z);
-			} else {
-				var zero = new Map<Int, Bool>();
-				var unset = Roots.maybeUnset(fn);
-				for (l in fn.locals)
-					if (unset.get(l.id) && refSlot.exists(l)) zero.set(refSlot.get(l), true);
-				if (zero.keys().hasNext()) {
-					var z = lconst(0, 0);
-					var ks = [for (k in zero.keys()) k];
-					ks.sort((x, y) -> x - y);
-					for (k in ks)
-						store(8, fr, 8 * k, z);
-				}
-			}
+			var slot = f.slot(8 * nslots, 8);
+			f.rootSlots.push(slot);
+			f.rootZero.push(8 * zeroSlots);
+			fr = stackAddr(slot);
 		}
 		// try functions: the scalars memLocals finds live in memory; the
 		// others are SSA values, which are immutable (in a slot or a
@@ -716,14 +734,7 @@ class MirBuild {
 				}
 		stmts(fn.body);
 		if (!terminated()) {
-			popFrame();
 			if (f.ret == Void) ret(-1) else ret(f.ret == F64 ? fconst(0) : f.ret == I64 ? lconst(0, 0) : iconst(0));
-		}
-		if (retBlock != null) {
-			seal(retBlock);
-			cur = retBlock;
-			popFrame();
-			ret(f.ret == Void ? -1 : readVar(retVar, cur));
 		}
 		for (b in f.blocks)
 			if (!b.sealed) seal(b);
@@ -766,50 +777,8 @@ class MirBuild {
 		add(i);
 	}
 
-	// rt_push(n): the frame's slots on the shadow stack
-	function push(n:Int):Int {
-		var sp = tlsLoad("rt_sp");
-		var top = op2(Add, I64, sp, lconst32(8 * n));
-		tlsStore("rt_sp", top);
-		raiseHw(top);
-		return sp;
-	}
-
-	// rt_sp_hw = max(rt_sp_hw, top): rarely raised (after a collection), on a slow path
-	function raiseHw(top:Int) {
-		var hw = tlsLoad("rt_sp_hw");
-		var up = newBlock(), done = newBlock();
-		up.cold = true;
-		br(cmp(CUGt, top, hw), up, done);
-		seal(up);
-		cur = up;
-		tlsStore("rt_sp_hw", top);
-		jmp(done);
-		seal(done);
-		cur = done;
-	}
-
-	// a function with a frame returns through one block (one pop of the
-	// frame, one epilogue)
-	var retBlock:Null<MBlock> = null;
-	var retVar = -1;
-
 	function retFrom(v:Int) {
-		if (nslots == 0) {
-			ret(v);
-			return;
-		}
-		if (retBlock == null) {
-			retBlock = newBlock();
-			retBlock.cold = false;
-			if (f.ret != Void) retVar = newVar(f.ret);
-		}
-		if (v >= 0) writeVar(retVar, cur, v);
-		jmp(retBlock);
-	}
-
-	function popFrame() {
-		if (nslots > 0) tlsStore("rt_sp", fr);
+		ret(v);
 	}
 
 	// replaces phis whose operands are one value (or the phi itself), until none is left
@@ -1169,35 +1138,46 @@ class MirBuild {
 		return obj;
 	}
 
-	var spillBase = -1; // the frame's spill slots (none: pushed on the slow path)
+	var spillBase = -1; // the first of the frame's spill slots (-1: none)
+	var zeroSlots = 0; // root slots the prologue zeroes (the last ones)
 
 	// the allocation slow path's stubs: hxmc_new$<header low word>$<type symbol or #index>$<bytes>
 	public static inline var ALLOC_STUB = "hxmc_new$";
 
-	// stores the cold site's references in a pushed area (null: none)
+	static function hasArrayStore(ss:Array<Stmt>):Bool {
+		var r = false;
+		function st(s:Stmt) {
+			switch s {
+				case SArrSet(_) | SArrPush(_): r = true;
+				case _:
+			}
+			if (!r) hxmc.ir.Facts.iterStmt(st, e -> {}, s);
+		}
+		for (s in ss)
+			st(s);
+		return r;
+	}
+
+	// stores the cold site's references in its spill slots: their offset
+	// from fr (-1: none)
 	function spillOpen(list:Null<Array<Local>>, extra:Int):Int {
 		if (list == null || list.length + extra == 0) return -1;
-		if (spillBase >= 0) {
-			var at = op2(Add, I64, fr, lconst32(8 * spillBase));
-			for (k in 0...list.length)
-				storeM(Opt.MFrame, 8, at, 8 * k, readLocal(list[k]));
-			return at;
-		}
-		var sp = tlsLoad("rt_sp");
-		var top = op2(Add, I64, sp, lconst32(8 * (list.length + extra)));
-		tlsStore("rt_sp", top);
-		raiseHw(top);
+		if (spillBase < 0) throw new Unsupported("a cold site without spill slots");
+		var at = 8 * spillBase;
 		for (k in 0...list.length)
-			store(8, sp, 8 * k, readLocal(list[k]));
-		return sp;
+			storeM(Opt.MFrame, 8, fr, at + 8 * k, readLocal(list[k]));
+		return at;
 	}
 
 	function spillClose(list:Null<Array<Local>>, sp:Int) {
 		if (sp < 0) return;
 		for (k in 0...list.length)
-			writeLocal(list[k], spillBase >= 0 ? loadM(Opt.MFrame, I64, 8, sp, 8 * k) : load(I64, 8, sp, 8 * k));
-		if (spillBase < 0) tlsStore("rt_sp", sp);
+			writeLocal(list[k], loadM(Opt.MFrame, I64, 8, fr, sp + 8 * k));
 	}
+
+	// the address of the root slots' word at byte offset `off`
+	function rootAddr(off:Int):Int
+		return off == 0 ? fr : op2(Add, I64, fr, lconst32(off));
 
 	// ---- cold statements
 
@@ -1240,7 +1220,7 @@ class MirBuild {
 	// the address of the slot holding array local `a` (rooted, or in the cold site's spill area)
 	function arrSlot(a:Local, sp:Int, list:Null<Array<Local>>):Int {
 		var s = refSlot.get(a);
-		if (s != null) return op2(Add, I64, fr, lconst32(8 * s));
+		if (s != null) return rootAddr(8 * s);
 		if (noShadow && (sp < 0 || list == null || list.indexOf(a) < 0)) {
 			// (measurement: a frame slot holding the array; nothing collects)
 			var addr = stackAddr(f.slot(8, 8));
@@ -1248,7 +1228,7 @@ class MirBuild {
 			return addr;
 		}
 		if (sp < 0 || list == null || list.indexOf(a) < 0) throw new Unsupported("array local neither rooted nor spilled");
-		return op2(Add, I64, sp, lconst32(8 * list.indexOf(a)));
+		return rootAddr(sp + 8 * list.indexOf(a));
 	}
 
 	function arrSet(elem:Ty, a:Local, i:Ex, v:Ex, cold:Bool) {
@@ -1279,8 +1259,8 @@ class MirBuild {
 			// the value is rooted in a pushed slot (after the spilled references)
 			var n = list == null ? 0 : list.length;
 			var sp = spillOpen(list == null ? [] : list, 1);
-			store(8, sp, 8 * n, vv);
-			call("hx_aset_slow", [arrSlot(a, sp, list), iv, iconst(k), op2(Add, I64, sp, lconst32(8 * n))], Void);
+			storeM(Opt.MFrame, 8, fr, sp + 8 * n, vv);
+			call("hx_aset_slow", [arrSlot(a, sp, list), iv, iconst(k), rootAddr(sp + 8 * n)], Void);
 			spillClose(list == null ? [] : list, sp);
 		} else {
 			var sp = spillOpen(list, 0);
@@ -1321,8 +1301,8 @@ class MirBuild {
 		if (k == Abi.AK_PTR) {
 			var n = list == null ? 0 : list.length;
 			var sp = spillOpen(list == null ? [] : list, 1);
-			store(8, sp, 8 * n, vv);
-			call("hx_apush_slow", [arrSlot(a, sp, list), iconst(k), op2(Add, I64, sp, lconst32(8 * n))], I32);
+			storeM(Opt.MFrame, 8, fr, sp + 8 * n, vv);
+			call("hx_apush_slow", [arrSlot(a, sp, list), iconst(k), rootAddr(sp + 8 * n)], I32);
 			spillClose(list == null ? [] : list, sp);
 		} else {
 			var sp = spillOpen(list, 0);
@@ -1562,6 +1542,8 @@ class MirBuild {
 				var xs = [for (a in args) ex(a)];
 				var c = mk(Call, mty(g.ret));
 				c.sym = p.funcSym(g);
+				c.keepsFrame = keepsFrame(c.sym);
+				c.walkFree = walkFree(c.sym);
 				c.args = xs;
 				c.argTys = [for (a in g.args) mty(a.ty) == Void ? I32 : mty(a.ty)];
 				var id = add(c);
@@ -2083,6 +2065,13 @@ class MirBuild {
 			case "setU16At": stAt(2);
 			case "setI32At": stAt(4);
 			case "setI64At" | "setF64At": stAt(8);
+			// (constant sizes, type indices and kinds: the inline allocation of new objects)
+			case "alloc" | "allocRaw" if (args[0].match(EInt(_)) && args[1].match(EInt(_)) && args[2].match(EInt(_))):
+				var c = [for (a in args) switch a {
+					case EInt(v): v;
+					case _: 0;
+				}];
+				alloc(c[0], c[1], c[2], short == "alloc");
 			case "alloc" | "allocRaw": allocDyn(ex(args[0]), ex(args[1]), ex(args[2]), short == "alloc");
 			case "callRef1" | "callRef2":
 				var xs = [for (a in args) ex(a)];

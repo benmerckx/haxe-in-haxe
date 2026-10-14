@@ -21,7 +21,7 @@ esac
 out=$ROOT/bin/hxmc/rt/$target
 mkdir -p "$out/obj"
 CFLAGS="-O2 -g0 -w -fno-strict-aliasing -fno-pie -fno-pic -ffunction-sections -fdata-sections -DHXMC_NO_SSL -DHXMC_NO_UV -DRT_CALL_ON_STACK -I $ROOT/hxmc/rt"
-files="rt rt_dyn rt_str rt_ssl rt_uv rt_thread rt_census"
+files="rt rt_dyn rt_str rt_ssl rt_uv rt_thread rt_census rt_frames"
 case $target in
 windows-*)
 	CFLAGS="-O2 -g0 -w -fno-strict-aliasing -DHXMC_NO_SSL -DHXMC_NO_UV -I $ROOT/hxmc/rt"

@@ -268,6 +268,13 @@ class Isel implements hxmc.Target.Selector {
 		f = new LFunc(mf.name, 32);
 		for (s in mf.slots)
 			f.slot(s.size, s.align);
+		f.rootSlots = mf.rootSlots;
+		f.rootZero = mf.rootZero;
+		f.entrySlot = mf.entrySlot;
+		f.needsRecord = mf.entrySlot >= 0;
+		for (b in mf.blocks)
+			for (i in b.ins)
+				if (i.op == Call && !i.dead && !i.walkFree) f.needsRecord = true;
 		vreg = hxmc.Lir.Arrays.filled(mf.vals.length, -1);
 		useCount = hxmc.Lir.Arrays.filled(mf.vals.length, 0);
 		folded = [for (_ in mf.vals) false];
@@ -571,6 +578,8 @@ class Isel implements hxmc.Target.Selector {
 	function ins(i:MIns, b:MBlock, next:Null<MBlock>) {
 		switch i.op {
 			case Phi | Const | SymAddr | StackAddr:
+			case FramePtr:
+				mov(reg(i.id), 29); // (x29: never allocated)
 			case Param:
 				var k = i.imm;
 				// (stack arguments: 8-byte slots; Apple packs them by size)
@@ -614,6 +623,13 @@ class Isel implements hxmc.Target.Selector {
 				x.s2 = tlsBase;
 			case Copy:
 				mov(reg(i.id), use(i.a));
+			case Add if (m.vals[i.a].op == StackAddr && immOf(i.b) != null && m.vals[i.b].sym == null):
+				// a frame slot's address + a constant: one add from sp
+				var x = emit(LEA);
+				x.d = reg(i.id);
+				x.base = LIns.FRAME;
+				x.slot = m.vals[i.a].imm;
+				x.disp = immOf(i.b);
 			case Add | Sub | And | Or | Xor:
 				var size = sz(i.ty);
 				var imm = immOf(i.b);

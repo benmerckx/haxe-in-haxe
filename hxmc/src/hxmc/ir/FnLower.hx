@@ -251,7 +251,7 @@ class FnLower {
 		m;
 	};
 	// natives that never allocate (not GC points), with side effects
-	public static var NOGC = ["Math_random" => true];
+	public static var NOGC = ["Math_random" => true, "hx_box_bool" => true];
 
 	public static function isPure(n:String):Bool
 		return PURE.exists(n) || MATH.exists(n) || PURE_INTRINSICS.exists(n);

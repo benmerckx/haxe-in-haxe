@@ -502,6 +502,12 @@ class Asm {
 		b.u8(0x50 + (r & 7));
 	}
 
+	// push of a sign-extended 8-bit immediate (6a ib)
+	public function pushImm8(v:Int) {
+		b.u8(0x6a);
+		b.u8(v & 0xff);
+	}
+
 	public function pop(r:Int) {
 		if ((r & 8) != 0) b.u8(0x41);
 		b.u8(0x58 + (r & 7));

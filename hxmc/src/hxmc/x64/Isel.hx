@@ -76,10 +76,11 @@ class Isel implements hxmc.Target.Selector {
 	// with 32 bytes of shadow space, rsi, rdi and xmm6-15 callee-saved
 	public static var ARG_GPRS = [7, 6, 2, 1, 8, 9];
 	public static var CALLER_SAVED = [0, 1, 2, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
-	public static var CALLEE_SAVED = [3, 5, 12, 13, 14, 15];
+	// (rbp is the frame pointer, never allocated: Emit's frame record, the stack maps' walk)
+	public static var CALLEE_SAVED = [3, 12, 13, 14, 15];
 	public static var WIN_ARG_GPRS = [1, 2, 8, 9];
 	public static var WIN_CALLER_SAVED = [0, 1, 2, 8, 9, 10, 11, 16, 17, 18, 19, 20, 21];
-	public static var WIN_CALLEE_SAVED = [3, 5, 6, 7, 12, 13, 14, 15, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+	public static var WIN_CALLEE_SAVED = [3, 6, 7, 12, 13, 14, 15, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
 
 	public var win:Bool;
 	var callerSaved:Array<Int>;
@@ -106,10 +107,10 @@ class Isel implements hxmc.Target.Selector {
 		this.abi = abi;
 		win = abi.os == "windows";
 		if (win) {
-			gprs = [1, 2, 8, 9, 10, 11, 0, 3, 6, 7, 12, 13, 14, 15, 5];
+			gprs = [1, 2, 8, 9, 10, 11, 0, 3, 6, 7, 12, 13, 14, 15];
 			callerSaved = WIN_CALLER_SAVED;
 		} else {
-			gprs = [1, 2, 6, 7, 8, 9, 10, 11, 0, 3, 12, 13, 14, 15, 5];
+			gprs = [1, 2, 6, 7, 8, 9, 10, 11, 0, 3, 12, 13, 14, 15];
 			callerSaved = CALLER_SAVED;
 		}
 		fprs = [for (i in 16...32) i];
@@ -335,6 +336,13 @@ class Isel implements hxmc.Target.Selector {
 		f = new LFunc(mf.name, 16);
 		for (s in mf.slots)
 			f.slot(s.size, s.align);
+		f.rootSlots = mf.rootSlots;
+		f.rootZero = mf.rootZero;
+		f.entrySlot = mf.entrySlot;
+		f.needsRecord = mf.entrySlot >= 0;
+		for (b in mf.blocks)
+			for (i in b.ins)
+				if (i.op == Call && !i.dead && !i.walkFree) f.needsRecord = true;
 		vreg = hxmc.Lir.Arrays.filled(mf.vals.length, -1);
 		useCount = hxmc.Lir.Arrays.filled(mf.vals.length, 0);
 		folded = [for (_ in mf.vals) false];
@@ -523,7 +531,12 @@ class Isel implements hxmc.Target.Selector {
 		var bi = m.vals[base];
 		x.disp = disp;
 		x.scale = scale;
-		if (folded[base] && bi.op == Add) {
+		if (folded[base] && bi.op == Add && m.vals[bi.a].op == StackAddr && index < 0 && m.vals[bi.b].sym == null) {
+			// a frame slot + a constant
+			x.base = LIns.FRAME;
+			x.slot = m.vals[bi.a].imm;
+			x.disp += m.vals[bi.b].imm;
+		} else if (folded[base] && bi.op == Add) {
 			var c = m.vals[bi.b];
 			x.disp += c.imm;
 			x.dsym = c.sym;
@@ -736,6 +749,8 @@ class Isel implements hxmc.Target.Selector {
 	function ins(i:MIns, b:MBlock, next:Null<MBlock>) {
 		switch i.op {
 			case Phi:
+			case FramePtr:
+				mov(reg(i.id), 5); // (rbp: never allocated)
 			case Param:
 				var loc = argLoc(m.params, i.imm);
 				var d = reg(i.id);
@@ -777,6 +792,14 @@ class Isel implements hxmc.Target.Selector {
 				x.sym = i.sym;
 			case Copy:
 				mov(reg(i.id), use(i.a));
+			case Add if (m.vals[i.a].op == StackAddr && immOf(i.b) != null && isymOf(i.b) == null):
+				// a frame slot's address + a constant: one lea
+				var x = emit(LEA);
+				x.d = reg(i.id);
+				x.base = LIns.FRAME;
+				x.slot = m.vals[i.a].imm;
+				x.disp = immOf(i.b);
+				x.size = 8;
 			case Add | Sub | And | Or | Xor:
 				var d = reg(i.id);
 				var size = sz(i.ty);

@@ -63,6 +63,7 @@ enum abstract Op(Int) to Int {
 	var Unreachable; // after a call that does not return
 	// values (late additions)
 	var Rotr; // a rotated right by the constant b (I32/I64)
+	var FramePtr; // the function's frame pointer (rbp / x29: the frame record)
 }
 
 enum abstract Cond(Int) to Int from Int {
@@ -104,6 +105,8 @@ class MIns {
 	public var block:MBlock;
 	public var noReturn = false; // Call
 	public var returnsTwice = false; // Call (setjmp)
+	public var keepsFrame = false; // Call: nothing collects meanwhile (Opt: the root slots keep their values)
+	public var walkFree = false; // Call: no collection walks the stack meanwhile (the caller needs no frame record for it)
 	public var variadic = -1; // Call: the first variadic argument of a C function (-1: none)
 	public var argTys:Null<Array<MTy>>; // Call: the C types of the arguments (I32 stays 32-bit in the ABI)
 	public var dead = false;
@@ -146,6 +149,17 @@ class MFunc {
 	public var blocks:Array<MBlock> = [];
 	public var vals:Array<MIns> = [];
 	public var slots:Array<{size:Int, align:Int}> = []; // frame slots (StackAddr)
+	// stack maps (hxmc/rt/rt_frames.c): the slots holding references across
+	// GC points (8 bytes per reference, null or valid whenever the function
+	// calls: zeroed by the prologue), laid out together after the outgoing
+	// arguments; an entry function's (C calls it) slot of the transition
+	// record it saves (StackMaps.entry)
+	public var rootSlots:Array<Int> = [];
+	public var rootZero:Array<Int> = []; // per root slot: the bytes at its end the prologue zeroes
+	public var entrySlot = -1;
+	public var section:Null<String>; // a section of its own (DataGen's GC-able functions)
+	public var blocksHere = false; // FuncInfo.blocksHere (Inline: its calls never keep the frame)
+	public var inlineRecords = false; // StackMaps.record: no thunks (thunks, allocation stubs)
 	public var entry:MBlock;
 	var marks = 0;
 
@@ -228,6 +242,6 @@ class MFunc {
 		return [
 			"param", "const", "constf", "symaddr", "tlsload", "tlsstore", "stackaddr", "copy", "phi", "add", "sub", "mul", "and", "or", "xor", "shl", "sar",
 			"shr", "neg", "not", "div", "rem", "fadd", "fsub", "fmul", "fdiv", "fneg", "fsqrt", "fabs", "cmp", "sext", "zext", "trunc", "i2f", "f2i", "bitstof",
-			"ftobits", "select", "load", "store", "call", "jmp", "br", "switch", "ret", "unreachable", "rotr"
+			"ftobits", "select", "load", "store", "call", "jmp", "br", "switch", "ret", "unreachable", "rotr", "frameptr"
 		][(o : Int)];
 }

@@ -104,6 +104,28 @@ class DataGen {
 		types();
 		dispatch();
 		mainBody();
+		exportEntries();
+	}
+
+	// the entries C calls the exported runtime functions by (their C names,
+	// Facts.cname): a call of the Haxe function between saving and
+	// restoring the stack maps' record (StackMaps.entry); dropped with it
+	// by the linker when nothing calls it
+	function exportEntries() {
+		var names = [for (n in prep.exports.keys()) n];
+		names.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
+		for (n in names) {
+			var f = prep.exports.get(n);
+			var params = [for (a in f.args) MirBuild.mty(a.ty)];
+			var ret = MirBuild.mty(f.ret);
+			var mf = MirBuild.synthetic(prep, abi, n, params, ret, (b, ps) -> {
+				var r = b.call(e.cname(f), ps, ret);
+				b.ret(ret == Void ? -1 : r);
+			});
+			StackMaps.entry(mf);
+			mf.section = Link.GC_PREFIX + n;
+			compile(mf);
+		}
 	}
 
 	// the program-wide numbers as absolute symbols (Prep.tySym...)
@@ -349,29 +371,63 @@ class DataGen {
 
 	// the allocation stubs the program's code calls (MirBuild.ALLOC_STUB):
 	// each passes its header words and size to hxmc_alloc_slow, so an
-	// allocation site's slow path is one call (after run: hx_main_body allocates)
-	public function allocStubs(objs:Array<Obj>, emit:Target.Emitter) {
+	// allocation site's slow path is one call (after run: hx_main_body
+	// allocates). They record their frames for the stack maps (an
+	// allocation may collect), as the thunks the program calls C functions
+	// through (StackMaps.THUNK) do; both are dropped by the linker when
+	// nothing calls them.
+	public function allocStubs(objs:Array<Obj>) {
 		var names = new Map<String, Bool>();
+		var thunks = new Map<String, Bool>();
 		for (o in objs.concat([obj]))
 			for (s in o.symbols)
-				if (s.section == null && !s.abs && StringTools.startsWith(s.name, MirBuild.ALLOC_STUB)) names.set(s.name, true);
+				if (s.section == null && !s.abs) {
+					if (StringTools.startsWith(s.name, MirBuild.ALLOC_STUB)) names.set(s.name, true);
+					else if (StringTools.startsWith(s.name, StackMaps.THUNK)) thunks.set(s.name, true);
+				}
 		var list = [for (n in names.keys()) n];
 		list.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
 		for (n in list) {
 			var parts = n.substr(MirBuild.ALLOC_STUB.length).split("$");
 			var lo = Std.parseInt(parts[0]), bytes = Std.parseInt(parts[2]);
 			var ty = parts[1];
-			var sym = StringTools.startsWith(ty, "#") ? null : ty;
-			if (emit.allocStub(n, lo, sym, sym == null ? Std.parseInt(ty.substr(1)) : 0, bytes)) continue;
-			compile(MirBuild.synthetic(prep, abi, n, [], I64, (b, _) -> {
+			var mf = MirBuild.synthetic(prep, abi, n, [], I64, (b, _) -> {
 				var t = StringTools.startsWith(ty, "#") ? b.iconst(Std.parseInt(ty.substr(1))) : b.idConst(ty, 0);
 				b.ret(b.call("hxmc_alloc_slow", [b.iconst(lo), t, b.iconst(bytes)], I64));
-			}));
+			});
+			mf.inlineRecords = true;
+			mf.section = Link.GC_PREFIX + n;
+			compile(mf);
+		}
+		var list = [for (n in thunks.keys()) n];
+		list.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
+		for (n in list) {
+			var sig = n.substr(StackMaps.THUNK.length);
+			var d = sig.indexOf("$");
+			var target = sig.substr(d + 1);
+			sig = sig.substr(0, d);
+			var noReturn = StringTools.startsWith(sig, "n");
+			if (noReturn) sig = sig.substr(1);
+			var ret = StackMaps.charTy(sig.charAt(0));
+			var params = [for (k in 1...sig.length) StackMaps.charTy(sig.charAt(k))];
+			var mf = MirBuild.synthetic(prep, abi, n, params, ret, (b, ps) -> {
+				var r = b.call(target, ps, ret, noReturn);
+				if (noReturn) b.add(b.mk(Unreachable, Void)) else b.ret(ret == Void ? -1 : r);
+			});
+			mf.inlineRecords = true;
+			mf.section = Link.GC_PREFIX + n;
+			compile(mf);
 		}
 	}
 
+	function entry(mf:MFunc) {
+		StackMaps.entry(mf);
+		compile(mf);
+	}
+
 	function mainBody() {
-		compile(MirBuild.synthetic(prep, abi, "hx_main_body", [], Void, (b, _) -> {
+		// (main and the program's body are entries: C calls them, StackMaps.entry)
+		entry(MirBuild.synthetic(prep, abi, "hx_main_body", [], Void, (b, _) -> {
 			for (i in 0...p.globals.length) {
 				var c = p.globals[i].init;
 				if (c != null) {
@@ -384,7 +440,7 @@ class DataGen {
 			b.call(e.cname(p.main), [], Void);
 			b.ret(-1);
 		}));
-		compile(MirBuild.synthetic(prep, abi, "main", [I32, I64], I32, (b, ps) -> {
+		entry(MirBuild.synthetic(prep, abi, "main", [I32, I64], I32, (b, ps) -> {
 			b.call("rt_init", [b.iconst(p.globals.length), ps[0], ps[1]], Void);
 			b.call("rt_run_main", [b.symAddr("hx_main_body")], Void);
 			b.ret(b.iconst(0));

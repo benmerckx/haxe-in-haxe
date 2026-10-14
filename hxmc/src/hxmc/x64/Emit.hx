@@ -83,44 +83,89 @@ class Emit implements hxmc.Target.Emitter {
 			text.buf.u8(0xcc);
 		var start = text.buf.len;
 		a.reset();
-		// frame: outgoing arguments, then the slots
-		var off = f.outArgs;
-		slotOff = [];
-		for (s in f.slots) {
-			var al = s.align < 8 ? 8 : s.align;
-			off = (off + al - 1) & ~(al - 1);
-			slotOff.push(off);
-			off += s.size;
-		}
+		// frame: outgoing arguments, Win64's saved xmm registers, the other
+		// slots, then the root slots (together: one range for the stack
+		// maps, at the top: pushed when they start null)
 		saved = [for (r in (win ? Isel.WIN_CALLEE_SAVED : Isel.CALLEE_SAVED)) if (r < 16 && usedRegs[r]) r];
+		// a function with a call during which a collection may walk the stack
+		// has a frame record (push rbp; mov rbp, rsp): the chain the walk follows
+		var record = f.needsRecord;
 		savedX = [for (r in (win ? Isel.WIN_CALLEE_SAVED : [])) if (r >= 16 && usedRegs[r]) r];
 		savedXOff = [];
+		var base = f.outArgs;
 		for (_ in savedX) {
-			off = (off + 15) & ~15;
-			savedXOff.push(off);
-			off += 16;
+			base = (base + 15) & ~15;
+			savedXOff.push(base);
+			base += 16;
 		}
+		var lay = hxmc.StackMaps.layout(f, base);
+		slotOff = lay.slotOff;
+		var off = lay.end;
 		var x = off;
-		while ((8 + 8 * saved.length + x) % 16 != 0)
+		while ((8 + 8 * (saved.length + (record ? 1 : 0)) + x) % 16 != 0)
 			x += 8;
 		// leaf functions without slots keep rsp as it is
 		if (!f.hasCalls && f.slots.length == 0 && f.outArgs == 0 && savedX.length == 0) x = 0;
 		frameSize = x;
+		hasRecord = record;
+		// the root slots that start null: pushed zeros (push 0, two bytes a
+		// slot, with the padding above them) when they end the layout
+		var pushFrom = -1;
+		if (lay.zeros.length > 0) {
+			var zs = lay.zeros.copy();
+			zs.sort((p, q) -> p.off - q.off);
+			var at = zs[0].off, ok = true;
+			for (z in zs) {
+				if (z.off != at) ok = false;
+				at = z.off + z.bytes;
+			}
+			if (ok && at == off) pushFrom = zs[0].off;
+		}
+		if (record) {
+			a.push(Asm.RBP);
+			a.movRR(8, Asm.RBP, Asm.RSP);
+		}
 		for (r in saved)
 			a.push(r);
-		if (win && frameSize >= 4096) {
+		var rest = frameSize;
+		if (pushFrom >= 0) {
+			for (_ in 0...(frameSize - pushFrom) >> 3)
+				a.pushImm8(0);
+			rest = pushFrom;
+		}
+		if (win && rest >= 4096) {
 			// Windows commits the stack one guard page at a time: touch each page
-			var left = frameSize;
+			var left = rest;
 			while (left >= 4096) {
 				a.aluRI(Asm.SUB, 8, Asm.RSP, 4096);
 				a.aluMI(Asm.OR, 8, new Mem(Asm.RSP, 0), 0);
 				left -= 4096;
 			}
 			if (left > 0) a.aluRI(Asm.SUB, 8, Asm.RSP, left);
-		} else if (frameSize > 0) a.aluRI(Asm.SUB, 8, Asm.RSP, frameSize);
+		} else if (rest > 0) a.aluRI(Asm.SUB, 8, Asm.RSP, rest);
 		for (k in 0...savedX.length)
 			a.movupsMR(new Mem(Asm.RSP, savedXOff[k]), savedX[k]);
-		if (sizeStats) stat("prologue", text.buf.len - start);
+		// else stores (r11: neither an argument nor saved)
+		if (lay.zeros.length > 0 && pushFrom < 0) {
+			a.aluRR(Asm.XOR, 4, Asm.R11, Asm.R11);
+			for (z in lay.zeros) {
+				var k = 0;
+				while (k < z.bytes) {
+					a.store(8, frameMem(z.off + k), Asm.R11);
+					k += 8;
+				}
+			}
+		}
+		if (sizeStats) {
+			stat("prologue", text.buf.len - start);
+			var z = 0;
+			for (x in lay.zeros)
+				z += x.bytes;
+			stat("root slots (count)", lay.rootBytes >> 3);
+			stat("zeroed root slots (count)", z >> 3);
+			if (record) stat("frame records (count)", 1);
+			if (record && (lay.rootBytes > 0 || f.entrySlot >= 0)) stat("frames with roots (count)", 1);
+		}
 		epiLabel = -1;
 		for (b in f.blocks)
 			b.label = a.newLabel();
@@ -176,20 +221,18 @@ class Emit implements hxmc.Target.Emitter {
 		}
 		a.patchLabelRefs();
 		var sym = obj.define(f.name, text, start, text.buf.len - start, global);
+		// the descriptor (offsets from rbp: below it the saved registers, then the frame)
+		if (record) hxmc.StackMaps.describe(obj, f, lay, text.buf.len - start, -8 * saved.length - frameSize);
 		return sym;
 	}
 
-	// the arguments of hxmc_alloc_slow, then a jump to it (no frame: 20 bytes)
-	public function allocStub(name:String, lo:Int, tySym:Null<String>, tyVal:Int, bytes:Int):Bool {
-		var start = text.buf.len;
-		a.movImm32(win ? 1 : 7, lo); // rcx / rdi
-		if (tySym != null) a.isym = obj.sym(tySym);
-		a.movImm32(win ? 2 : 6, tySym != null ? 0 : tyVal); // rdx / rsi
-		a.movImm32(win ? 8 : 2, bytes); // r8 / rdx
-		a.jmpSym(obj.sym("hxmc_alloc_slow"));
-		obj.define(name, text, start, text.buf.len - start, true);
-		return true;
-	}
+	var hasRecord = false;
+
+	// a frame slot's operand (`off` from the frame's base): from rbp when the
+	// function has a frame record (no SIB byte; the root slots are next to
+	// it), else from rsp
+	function frameMem(off:Int):Mem
+		return hasRecord ? new Mem(Asm.RBP, off - 8 * saved.length - frameSize) : new Mem(Asm.RSP, off);
 
 	function mem(i:LIns):Mem {
 		if (i.secrel != null) {
@@ -205,8 +248,8 @@ class Emit implements hxmc.Target.Emitter {
 			return m;
 		}
 		if (i.sym != null) return Mem.rip(obj.sym(i.sym), i.disp);
-		if (i.base == LIns.FRAME) return new Mem(Asm.RSP, slotOff[i.slot] + i.disp);
-		if (i.base == -3) return new Mem(Asm.RSP, frameSize + 8 * saved.length + 8 + i.disp);
+		if (i.base == LIns.FRAME) return frameMem(slotOff[i.slot] + i.disp);
+		if (i.base == -3) return new Mem(Asm.RSP, frameSize + 8 * saved.length + (hasRecord ? 16 : 8) + i.disp);
 		if (i.base == -4) return new Mem(Asm.RSP, i.disp);
 		return new Mem(i.base, i.disp, i.index, i.scale);
 	}
@@ -231,6 +274,7 @@ class Emit implements hxmc.Target.Emitter {
 		var k = saved.length;
 		while (k-- > 0)
 			a.pop(saved[k]);
+		if (hasRecord) a.pop(Asm.RBP);
 		a.ret();
 		epilogueBytes += text.buf.len - at;
 	}

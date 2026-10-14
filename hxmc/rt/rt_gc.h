@@ -10,6 +10,7 @@
 // them).
 typedef struct rt_mutator {
 	void ***sp_ref, ***hw_ref, ***base_ref;
+	void **last_fp_ref, **last_pc_ref; // stack maps (rt_frames.c)
 	void **exn_ref;
 	char **yptr_ref, **ylim_ref;
 	void ***rem; // remembered set: slots of old objects that may hold young pointers

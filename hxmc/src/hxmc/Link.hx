@@ -78,18 +78,47 @@ class Link {
 				work.push(s);
 			}
 		}
+		// (the frame descriptors keep nothing alive: frameTable drops the
+		// descriptors of the functions left out)
+		var frames:Null<Section> = null;
 		for (o in objs)
 			for (s in o.sections)
-				if ((o != collect && !StringTools.startsWith(s.name, GC_PREFIX)) || s.kind == InitArray || s.kind == FiniArray) mark(s);
+				if (s.name == StackMaps.TABLE) frames = s;
+				else if ((o != collect && !StringTools.startsWith(s.name, GC_PREFIX)) || s.kind == InitArray || s.kind == FiniArray) mark(s);
 		var e = globals.get(entry);
 		if (e != null) mark(e.section);
 		while (work.length > 0) {
 			var s = work.pop();
+			if (s == frames) continue; // (the runtime refers to the table)
 			for (r in s.relocs) {
 				var t = target(r.sym);
 				if (t != null && t.section != null) mark(t.section);
 			}
 		}
+		if (frames != null) {
+			live.set(frames, true);
+			frameTable(frames);
+		}
+	}
+
+	// keeps the descriptors of the live functions (one relocation each, at
+	// its start: StackMaps.descriptor) and moves hxmc_frames_end
+	function frameTable(sec:Section) {
+		var out = new Buf(sec.buf.len);
+		var relocs = [];
+		for (r in sec.relocs) {
+			var t = target(r.sym);
+			if (t == null || t.section == null || !live.exists(t.section)) continue;
+			var at = out.len;
+			for (k in 0...StackMaps.DESC_SIZE >> 2)
+				out.u32(sec.buf.get32(r.offset + 4 * k));
+			relocs.push(new Reloc(at, r.kind, r.sym, r.addend));
+		}
+		sec.buf = out;
+		sec.relocs = relocs;
+		for (o in objs)
+			for (s in o.symbols)
+				if (s.name == StackMaps.END && s.section == sec) s.offset = out.len;
 	}
 
 	inline function isLive(s:Section):Bool

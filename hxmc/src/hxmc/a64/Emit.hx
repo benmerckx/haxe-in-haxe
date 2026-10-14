@@ -36,9 +36,6 @@ class Emit implements hxmc.Target.Emitter {
 	var saved:Array<Int>;
 	var saveOff:Array<Int>;
 
-	public function allocStub(name:String, lo:Int, tySym:Null<String>, tyVal:Int, bytes:Int):Bool
-		return false;
-
 	public function useSection(name:Null<String>) {
 		text = obj.section(name != null ? name : ".text", Text, 16);
 		a.sec = text;
@@ -49,14 +46,11 @@ class Emit implements hxmc.Target.Emitter {
 		text.buf.align(16, 0);
 		var start = text.buf.len;
 		a.reset();
-		var off = f.outArgs;
-		slotOff = [];
-		for (s in f.slots) {
-			var al = s.align < 8 ? 8 : s.align;
-			off = (off + al - 1) & ~(al - 1);
-			slotOff.push(off);
-			off += s.size;
-		}
+		// outgoing arguments, the root slots (together: one range for the
+		// stack maps), the other slots, the saved registers
+		var lay = hxmc.StackMaps.layout(f, f.outArgs);
+		slotOff = lay.slotOff;
+		var off = lay.end;
 		saved = [for (r in Isel.CALLEE_SAVED) if (usedRegs[r]) r];
 		saveOff = [];
 		for (r in saved) {
@@ -70,6 +64,20 @@ class Emit implements hxmc.Target.Emitter {
 		subSp(frameSize);
 		for (k in 0...saved.length)
 			ldst(false, 8, false, saved[k], SP, saveOff[k]);
+		// root slots a GC point may see unassigned start null
+		for (z in lay.zeros) {
+			var k = 0;
+			while (k < z.bytes) {
+				var o = z.off + k;
+				if (k + 16 <= z.bytes && o <= 504) {
+					a.pair(false, ZR, ZR, SP, o, 0); // stp xzr, xzr, [sp, #o]
+					k += 16;
+				} else {
+					ldst(false, 8, false, ZR, SP, o);
+					k += 8;
+				}
+			}
+		}
 		for (b in f.blocks)
 			b.label = a.newLabel();
 		var tables:Array<{label:Int, entries:Array<LBlock>}> = [];
@@ -87,7 +95,10 @@ class Emit implements hxmc.Target.Emitter {
 				text.buf.u32(a.labelPos(e.label) - at);
 		}
 		a.finish();
-		return obj.define(f.name, text, start, text.buf.len - start, global);
+		var sym = obj.define(f.name, text, start, text.buf.len - start, global);
+		// the descriptor (every function has a frame record; the frame is below it)
+		if (f.needsRecord) hxmc.StackMaps.describe(obj, f, lay, text.buf.len - start, -frameSize);
+		return sym;
 	}
 
 	function subSp(n:Int) {

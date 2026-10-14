@@ -14,9 +14,6 @@ interface Emitter {
 	// where the next functions go: their own section (`name`, Link's dead
 	// code removal may drop it), or the object's .text (null)
 	function useSection(name:Null<String>):Void;
-	// an allocation stub (DataGen.allocStubs) written directly: false when
-	// the target has no such writer (the stub is then a compiled function)
-	function allocStub(name:String, lo:Int, tySym:Null<String>, tyVal:Int, bytes:Int):Bool;
 }
 
 class Target {

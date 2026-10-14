@@ -1018,6 +1018,7 @@ void rt_threads_scan(void *(*fwd)(void *)) {
 		void **sp = *t->mut.sp_ref;
 		for (void **s = *t->mut.base_ref; s < sp; s++)
 			if (*s) *s = fwd(*s);
+		rt_frames_scan(*t->mut.last_fp_ref, *t->mut.last_pc_ref, fwd);
 		if (*t->mut.exn_ref) *t->mut.exn_ref = fwd(*t->mut.exn_ref);
 	}
 }

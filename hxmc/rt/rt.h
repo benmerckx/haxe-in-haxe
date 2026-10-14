@@ -155,6 +155,11 @@ extern RT_TLS void **rt_sp; // shadow stack top
 // it is a valid (if dead) reference. Every push goes through rt_push.
 extern RT_TLS void **rt_sp_hw;
 extern RT_TLS void **rt_stack_base; // shadow stack bottom (of the running thread)
+// stack maps (rt_frames.c): the record of the running thread's latest call
+// of C from hxmc's code (its frame pointer, its function's address)
+extern RT_TLS void *rt_last_fp, *rt_last_pc;
+void rt_frames_scan(void *fp, void *pc, void *(*fwd)(void *));
+void rt_frames_register(const void *descs, size_t n);
 extern void **rt_globals;
 void *rt_alloc_slow(uint64_t header, uint32_t bytes);
 void rt_write_barrier(void *obj, void **slot, void *val);
@@ -277,8 +282,10 @@ struct rt_cxx_exn {};
 }
 extern "C" {
 #else
-#define RT_TRY(h) { rt_handler h; h.prev = rt_hcur; h.sp = rt_sp; rt_hcur = &h; if (RT_SETJMP(h.buf) == 0) {
-#define RT_CATCH(h) rt_hcur = h.prev; } else { rt_hcur = h.prev; rt_sp = h.sp;
+// (a handler also restores the stack maps' record: an exception may leave
+// entries of hxmc's code without their restoring it)
+#define RT_TRY(h) { rt_handler h; h.prev = rt_hcur; h.sp = rt_sp; rt_hcur = &h; void *h##_fp = rt_last_fp, *h##_pc = rt_last_pc; if (RT_SETJMP(h.buf) == 0) {
+#define RT_CATCH(h) rt_hcur = h.prev; } else { rt_hcur = h.prev; rt_sp = h.sp; rt_last_fp = h##_fp; rt_last_pc = h##_pc;
 #define RT_END_TRY(h) } }
 #define RT_POP(h) rt_hcur = h.prev;
 __attribute__((noreturn)) void rt_throw(void *v);

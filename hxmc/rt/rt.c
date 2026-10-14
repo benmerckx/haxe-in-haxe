@@ -200,7 +200,8 @@ static void sweep_natives(char *lo, char *hi) {
 static void scan_roots(void *(*fwd)(void *)) {
 	for (void **s = rt_stack_base; s < rt_sp; s++)
 		if (*s) *s = fwd(*s);
-	rt_threads_scan(fwd); // the other threads' shadow stacks, entry closures, Tls values
+	rt_frames_scan(rt_last_fp, rt_last_pc, fwd);
+	rt_threads_scan(fwd); // the other threads' stacks and shadow stacks, entry closures, Tls values
 	for (int i = 0; i < nglobals; i++)
 		if (rt_globals[i]) rt_globals[i] = fwd(rt_globals[i]);
 	if (rt_exn) rt_exn = fwd(rt_exn);
@@ -939,6 +940,8 @@ void rt_mutator_bind(rt_mutator *m) {
 	m->sp_ref = &rt_sp;
 	m->hw_ref = &rt_sp_hw;
 	m->base_ref = &rt_stack_base;
+	m->last_fp_ref = &rt_last_fp;
+	m->last_pc_ref = &rt_last_pc;
 	m->exn_ref = &rt_exn;
 	m->yptr_ref = &rt_young_ptr;
 	m->ylim_ref = &rt_young_limit;

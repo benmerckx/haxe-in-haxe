@@ -10,10 +10,9 @@ import hxmc.Mir;
 //
 // Candidates are decided on hxmc's IR (hxmc.ir) (`candidate`: no try, a small body),
 // so that Fingerprint can put a candidate's body into the key of every
-// module calling it; the final decision is on the callee's Mir: no
-// shadow-stack frame (its references never live across a GC point, so the
-// caller's roots are unchanged), no inline caches (their storage is the
-// callee's), few instructions on its fast path.
+// module calling it; the final decision is on the callee's Mir: few
+// instructions on its fast path (its inline caches and root slots become
+// the caller's).
 class Inline {
 	public static inline var MAX_IR = 40; // IR nodes of a candidate
 	// instructions outside slow paths: of a callee inlined anywhere, at a
@@ -54,7 +53,6 @@ class Inline {
 
 	// the callee's Mir when it can be inlined (built once per caller module)
 	public static function template(mb:MirBuild, mf:MFunc):Null<Template> {
-		// (a callee with a shadow-stack frame keeps it: its copy pushes and pops it)
 		var n = 0;
 		for (b in mf.blocks)
 			if (!b.cold)
@@ -187,6 +185,11 @@ class Inline {
 			ic.count += site.callee.icaches;
 			for (s in g.slots)
 				f.slots.push(s);
+			// (the callee's root slots: the caller's prologue zeroes them too)
+			for (r in g.rootSlots) {
+				f.rootSlots.push(slotBase + r);
+				f.rootZero.push(g.slots[r].size); // (all: the caller may collect before the copy runs)
+			}
 			// values first (operands may refer forward: phis)
 			for (gb in g.blocks)
 				for (i in gb.ins) {
@@ -221,6 +224,8 @@ class Inline {
 					x.mem = i.mem;
 					x.noReturn = i.noReturn;
 					x.returnsTwice = i.returnsTwice;
+					x.keepsFrame = i.keepsFrame && !f.blocksHere;
+					x.walkFree = i.walkFree;
 					x.variadic = i.variadic;
 					x.argTys = i.argTys;
 					x.cases = i.cases;

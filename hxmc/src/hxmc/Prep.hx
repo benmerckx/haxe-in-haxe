@@ -11,10 +11,27 @@ class Prep {
 	public var e:Facts;
 	public var p:Program;
 
+	// the exported runtime functions (@:hxmc.export): C name -> function
+	public var exports = new Map<String, FuncInfo>();
+
 	public function new(p:Program) {
 		this.p = p;
 		e = new Facts(p);
+		for (f in p.funcs)
+			if (f.cSymbol != null) exports.set(f.cSymbol, f);
 	}
+
+	// the symbol the program's code calls runtime function n by (its Haxe
+	// implementation's when exported, not the entry C calls)
+	public inline function hostSym(n:String):String {
+		var f = exports.get(n);
+		return f == null ? n : e.cname(f);
+	}
+
+	// whether sym is one of the program's functions (stack maps: a call of
+	// anything else is a call of C)
+	public inline function isHaxe(sym:String):Bool
+		return e.byCName.exists(sym);
 
 	public inline function id(name:String):Int
 		return e.ids.get(name);

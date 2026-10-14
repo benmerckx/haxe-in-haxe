@@ -760,7 +760,9 @@ class Opt {
 					case c: (1 << c) | (1 << MOther);
 				}
 			case TlsStore: 1 << tlsClass(i.sym);
-			case Call if (i.returnsTwice || i.sym == null || !readOnly.exists(i.sym)): ((1 << NCLS) - 1) & ~(1 << MConst);
+			// (one during which nothing collects leaves the root slots as they are)
+			case Call if (i.returnsTwice || i.sym == null || !readOnly.exists(i.sym)):
+				((1 << NCLS) - 1) & ~(1 << MConst) & (i.keepsFrame && !i.returnsTwice ? ~(1 << MFrame) : -1);
 			case _: 0;
 		};
 	}

@@ -68,8 +68,12 @@ class LFunc {
 	public var isFloat:Array<Bool> = []; // per virtual register (index - NPHYS)
 	public var fprBase:Int; // the first floating-point physical register
 	public var slots:Array<{size:Int, align:Int}> = []; // frame slots (MIR slots, then spills)
+	public var rootSlots:Array<Int> = []; // MFunc.rootSlots (stack maps)
+	public var rootZero:Array<Int> = []; // MFunc.rootZero
+	public var entrySlot = -1; // MFunc.entrySlot
 	public var outArgs = 0; // bytes of outgoing stack arguments
 	public var hasCalls = false;
+	public var needsRecord = false; // a frame record (stack maps): a call that is not walk-free, or an entry
 	var hints:Array<Int> = []; // vreg - NPHYS -> preferred register (physical or virtual), -1
 
 	public inline function hint(r:Int):Int
