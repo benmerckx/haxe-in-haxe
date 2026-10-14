@@ -157,15 +157,20 @@ class StackMaps {
 		return b.toString();
 	}
 
-	// the calls that need the record: through thunks, or (`inlineOnly`, and the
-	// calls of rt_blocking_enter and variadic functions) after storing it
+	// calls that store the record themselves: rt_blocking_enter (the safe
+	// region outlasts the call). (Hot C functions could too: hx_box_int's
+	// would save json 1.3% of its instructions for 0.3% more code in the port.)
+	static var INLINE = ["rt_blocking_enter" => true];
+
+	// the calls that need the record: through thunks, or (`inlineOnly`, the
+	// calls of INLINE and variadic functions) after storing it
 	public static function record(f:MFunc, haxe:String->Bool, inlineOnly:Bool) {
 		for (b in f.blocks) {
 			var k = 0;
 			while (k < b.ins.length) {
 				var i = b.ins[k];
 				if (i.op == Call && !i.dead && i.sym != null && transition(i.sym, haxe)) {
-					if (!inlineOnly && i.variadic < 0 && i.sym != "rt_blocking_enter") {
+					if (!inlineOnly && i.variadic < 0 && !INLINE.exists(i.sym)) {
 						i.sym = thunkName(i);
 						k++;
 						continue;
