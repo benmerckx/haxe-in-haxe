@@ -100,10 +100,9 @@ NATIVE_TOOL := bin/hxc-dev/tool
 RELEASE_BIN := bin/release/$(TARGET)/haxe-in-haxe$(if $(findstring windows,$(TARGET)),.exe)
 
 # $(call wbk,<out>,<args>): C by the JS tool into <out>_hxc/; files.txt marks the run
-# (hxnodejs's stdout flush fails on pipes, hence the log file)
 define wbk
 @mkdir -p $(dir $(1))
-$(NODE) --stack-size=65500 $(WBK) $(1) $(2) $(HXC_ARGS) > $(1).log 2>&1 || { cat $(1).log; exit 1; }
+$(NODE) --stack-size=65500 $(WBK) $(1) $(2) $(HXC_ARGS)
 touch $(1)_hxc/files.txt
 endef
 
@@ -181,7 +180,7 @@ $(NATIVE_TOOL): $(TOOL_SRC) $(RT_SRC) $(STD)
 	if [ -x $@ ]; then \
 		ulimit -s unlimited 2>/dev/null || true; $@ bin/hxc-dev/tool $(TOOL_GEN_ARGS) $(HXC_ARGS) > bin/hxc-dev/gen.log 2>&1 || { cat bin/hxc-dev/gen.log; exit 1; }; \
 	else \
-		$(MAKE) $(WBK) && $(NODE) --stack-size=65500 $(WBK) bin/hxc-dev/tool $(TOOL_GEN_ARGS) $(HXC_ARGS) > bin/hxc-dev/gen.log 2>&1 || { cat bin/hxc-dev/gen.log; exit 1; }; \
+		$(MAKE) $(WBK) && $(NODE) --stack-size=65500 $(WBK) bin/hxc-dev/tool $(TOOL_GEN_ARGS) $(HXC_ARGS); \
 	fi
 	$(call cc,$(TOOL_CC),$(CFLAGS_BASE) $(NO_TLS_UV) -DHXC_CONST_IDS,-lm,bin/hxc-dev/tool_hxc,$@.new)
 	mv $@.new $@

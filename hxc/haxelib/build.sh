@@ -44,7 +44,7 @@ if [ -z "${SKIP_GEN:-}" ]; then
 	${MAKE:-make} HAXE="$HAXE" bin/hxc/wbk.js
 	HAXE_STD_PATH=$PWD/haxe/std node --stack-size=65500 bin/hxc/wbk.js "$B/hxc" \
 		-cp src -cp hxc/src -cp hxc/js -cp bin/hxc/std -main backend.Main -D disable-parallelism \
-		--custom-target hxc > "$B/wbk.log" 2>&1 || { cat "$B/wbk.log"; exit 1; }
+		--custom-target hxc
 fi
 
 # 2. the APE binary. Macros run in the bundled Eval, whose sys.ssl and eval.luv

@@ -20,8 +20,6 @@ if [ ! -f "$RT/done" ]; then
 fi
 # the hxc target's std, as the Makefile makes it
 [ -d "$ROOT/bin/hxc/std" ] || (cd "$ROOT" && python3 hxc/tools/mkstd.py)
-# hxnodejs's stdout flush fails on pipes, hence the file
 HXC_SINGLE=1 HAXE_STD_PATH=${HAXE_STD_PATH:-$ROOT/haxe/std} node --stack-size=65500 "$ROOT/bin/hxc/wbk.js" "$OUT/prog" "$@" \
-	-cp "$ROOT/bin/hxc/std" --custom-target hxc > "$OUT/hxc.log" 2>&1 || { cat "$OUT/hxc.log"; exit 1; }
-cat "$OUT/hxc.log"
+	-cp "$ROOT/bin/hxc/std" --custom-target hxc
 $CC $FLAGS "$OUT/prog.c" "$RT"/rt*.o -lm -lpthread -o "$OUT/prog"
