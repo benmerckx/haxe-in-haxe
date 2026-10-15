@@ -76,7 +76,7 @@ class Playground {
 		exampleSelect = cast document.getElementById("example");
 
 		saved = try window.localStorage.getItem("hih-code") catch (_:Dynamic) null;
-		window.fetch("examples/index.json").then((r) -> r.json()).then((list:Array<Example>) -> {
+		window.fetch(Version.url("examples/index.json")).then((r) -> r.json()).then((list:Array<Example>) -> {
 			examples = list;
 			final groups = new Map<String, Element>();
 			for (i => ex in list) {
@@ -127,7 +127,7 @@ class Playground {
 		hxbButton.onclick = () -> start("hxb");
 
 		// build facts (sizes, date, commit) from build-info.json, written by `make site` (Makefile)
-		window.fetch("build-info.json").then((r) -> r.ok ? r.json() : null).then((info:haxe.DynamicAccess<String>) -> {
+		window.fetch(Version.url("build-info.json")).then((r) -> r.ok ? r.json() : null).then((info:haxe.DynamicAccess<String>) -> {
 			if (info == null) return;
 			for (node in document.querySelectorAll("[data-info]")) {
 				final el:Element = cast node;
@@ -176,7 +176,7 @@ class Playground {
 	}
 
 	static function loadExample(i:Int) {
-		window.fetch("examples/" + examples[i].file).then((r) -> r.text()).then((code) -> {
+		window.fetch(Version.url("examples/" + examples[i].file)).then((r) -> r.text()).then((code) -> {
 			setCode(code);
 			save();
 		});
@@ -237,8 +237,8 @@ class Playground {
 	static var zipUrl:Null<String>;
 
 	static function startWorker(onReply:Reply->Void):js.html.Worker {
-		if (compiledModule == null) compiledModule = js.lib.WebAssembly.compileStreaming(cast window.fetch(MODULE));
-		final w = new js.html.Worker("worker.js");
+		if (compiledModule == null) compiledModule = js.lib.WebAssembly.compileStreaming(cast window.fetch(Version.url(MODULE)));
+		final w = new js.html.Worker(Version.url("worker.js"));
 		w.onmessage = (e) -> onReply(e.data);
 		compiledModule.then((m) -> w.postMessage(({type: "module", module: m} : Request)),
 			(e) -> setBusy(true, "The compiler could not be loaded: " + error(e)));

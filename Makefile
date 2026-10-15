@@ -271,10 +271,13 @@ npm: $(NPM_GEN) $(NPM_NATIVES)
 # subset the playground's compiler reads (hxmc/web/MkBundle.hx), the measured
 # results (hxmc/web/data) and the build facts
 mb = awk '{printf "%.1f MB", $$1 / 1048576}'
+# the site's build in the addresses of the files its pages fetch (Version.hx)
+SITE_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
 site: wasm $(PORT_BIN) $(WEB_SRC)
 	mkdir -p bin/site
 	cp bin/wasm/hih.wasm bin/wasm/hih-legacy.wasm hxmc/web/index.html hxmc/web/story.html hxmc/web/style.css bin/site/
-	$(PORT_BIN) hxmc/web/build.hxml
+	$(PORT_BIN) -D site_version=$(SITE_VERSION) hxmc/web/build.hxml
+	sed -i -e 's/\(src\|href\)="\(playground\.js\|tables\.js\|style\.css\)"/\1="\2?v=$(SITE_VERSION)"/g' bin/site/index.html bin/site/story.html
 	$(RUN) -cp hxmc/web --run MkBundle $(HAXE_STD_PATH) bin/site/std.bundle
 	cp hxmc/web/data/*.json bin/site/
 	rm -rf bin/site/examples && cp -r hxmc/web/examples bin/site/examples

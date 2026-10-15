@@ -122,7 +122,7 @@ class Tables {
 	static function load<T>(url:String, id:String, render:(Element, T) -> Void) {
 		final root = document.getElementById(id);
 		if (root == null) return;
-		window.fetch(url).then((r) -> r.ok ? r.json() : null).then((d) -> if (d != null) render(root, d)).catchError((_) -> {});
+		window.fetch(Version.url(url)).then((r) -> r.ok ? r.json() : null).then((d) -> if (d != null) render(root, d)).catchError((_) -> {});
 	}
 
 	static function secs(s:Null<Float>):String {

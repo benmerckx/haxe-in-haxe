@@ -22,7 +22,7 @@ class Worker {
 
 	static function main() {
 		wasmModule = new Promise((resolve, _) -> moduleReady = resolve);
-		std = scope.fetch("std.bundle").then((r) -> {
+		std = scope.fetch(Version.url("std.bundle")).then((r) -> {
 			if (!r.ok) throw "std.bundle: " + r.status;
 			r.arrayBuffer();
 		}).then((b) -> unbundle(new Uint8Array(b)));

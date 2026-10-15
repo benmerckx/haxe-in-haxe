@@ -84,7 +84,7 @@ async function inPage([code, wasm]) {
 async function pageTest(browser, query, expect) {
 	const page = await browser.newPage();
 	const fetched = [];
-	page.on('request', (r) => { if (r.url().endsWith('.wasm')) fetched.push(path.basename(new URL(r.url()).pathname)); });
+	page.on('request', (r) => { const p = new URL(r.url()).pathname; if (p.endsWith('.wasm')) fetched.push(path.basename(p)); });
 	await page.route(/^https:\/\/cdn\.jsdelivr\.net\//, (r) => r.abort());
 	await page.goto(`http://localhost:${port}/index.html${query}`);
 	await page.evaluate(() => document.getElementById('playground').scrollIntoView());
