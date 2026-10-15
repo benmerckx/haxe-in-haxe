@@ -59,6 +59,8 @@ enum abstract XOp(Int) to Int from Int {
 	var CVTSD2SS; // d (xmm, a float32) <- s1 (xmm)
 	var MOVDXR; // d (xmm) <- s1 (32 bits)
 	var MOVDRX; // d (32 bits) <- s1 (xmm)
+	var VFMADD; // d <- d + s1 * s2, rounded once (vfmadd231sd: FMA3)
+	var HASFMA; // rax <- whether FMA3 is usable (cpuid, xgetbv; clobbers rcx, rdx, r11)
 }
 
 // Mir -> LIR for x86-64 (System V calling convention).
@@ -182,6 +184,16 @@ class Isel implements hxmc.Target.Selector {
 			case CQO:
 				defs.push(RDX);
 				uses.push(RAX);
+			case VFMADD:
+				defs.push(i.d);
+				uses.push(i.d);
+				uses.push(i.s1);
+				uses.push(i.s2);
+			case HASFMA:
+				defs.push(RAX);
+				defs.push(RCX);
+				defs.push(RDX);
+				defs.push(11);
 			case IDIV:
 				defs.push(RAX);
 				defs.push(RDX);
@@ -1189,6 +1201,19 @@ class Isel implements hxmc.Target.Selector {
 				var c = emit(CVTSS2SD);
 				c.d = reg(i.id);
 				c.s1 = t;
+			case "fma":
+				var a = use(i.args[0]), b = use(i.args[1]), c = use(i.args[2]);
+				var d = reg(i.id);
+				var t = f.newReg(true);
+				mov(t, c);
+				var x = emit(VFMADD);
+				x.d = t;
+				x.s1 = a;
+				x.s2 = b;
+				mov(d, t);
+			case "has_fma":
+				emit(HASFMA);
+				mov(reg(i.id), RAX, 4);
 			case "f64_to_f32":
 				var t = f.newReg(true);
 				var c = emit(CVTSD2SS);

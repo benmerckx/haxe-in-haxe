@@ -14,7 +14,9 @@ and follows its licensing.
   so those programs are not bound by the GPL:
     hxmc/c/    the runtime's C part                   (hxmc/c/LICENSE)
     hxmc/std/  the hxmc target's standard library and the runtime's
-               Haxe part                              (hxmc/std/LICENSE)
+               Haxe part                              (hxmc/std/LICENSE); its math
+               library translates Arm's Optimized Routines, CORE-MATH and musl,
+               also MIT                               (hxmc/std/hxmc/rt/LICENSE.libm)
 
 - haxe/src/libs/ reproduces OCaml libraries that upstream Haxe depends on, under
   their own licenses:

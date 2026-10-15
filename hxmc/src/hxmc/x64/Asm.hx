@@ -612,6 +612,39 @@ class Asm {
 	public function pdRM(o:Int, dst:Int, m:Mem)
 		sse(0x66, false, 0x0f00 | o, dst, 0, m);
 
+	// vfmadd231sd dst, a, c: dst <- dst + a * c, rounded once (VEX.LIG.66.0F38.W1 B9 /r)
+	public function vfmadd231sd(dst:Int, a:Int, c:Int) {
+		b.u8(0xc4);
+		b.u8(((dst & 8) == 0 ? 0x80 : 0) | 0x40 | ((c & 8) == 0 ? 0x20 : 0) | 0x02);
+		b.u8(0x80 | ((~a & 15) << 3) | 0x01);
+		b.u8(0xb9);
+		b.u8(0xc0 | ((dst & 7) << 3) | (c & 7));
+	}
+
+	// eax <- 1 when FMA3 is usable, else 0: CPUID.1:ECX has FMA (bit 12)
+	// and OSXSAVE (27), and XCR0 enables the xmm and ymm state; rbx (which
+	// cpuid writes) kept in r11; clobbers rcx, rdx
+	public function hasFma() {
+		for (x in [
+			0x49, 0x89, 0xdb, // mov r11, rbx
+			0xb8, 0x01, 0x00, 0x00, 0x00, // mov eax, 1
+			0x31, 0xc9, // xor ecx, ecx
+			0x0f, 0xa2, // cpuid
+			0x4c, 0x89, 0xdb, // mov rbx, r11
+			0x81, 0xe1, 0x00, 0x10, 0x00, 0x08, // and ecx, 0x08001000
+			0x31, 0xc0, // xor eax, eax
+			0x81, 0xf9, 0x00, 0x10, 0x00, 0x08, // cmp ecx, 0x08001000
+			0x75, 0x11, // jne (the end)
+			0x31, 0xc9, // xor ecx, ecx
+			0x0f, 0x01, 0xd0, // xgetbv
+			0x83, 0xe0, 0x06, // and eax, 6
+			0x83, 0xf8, 0x06, // cmp eax, 6
+			0x0f, 0x94, 0xc0, // sete al
+			0x0f, 0xb6, 0xc0 // movzx eax, al
+		])
+			b.u8(x);
+	}
+
 	public function xorpd(dst:Int, src:Int)
 		sse(0x66, false, 0x0f57, dst, src, null);
 

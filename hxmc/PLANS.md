@@ -122,7 +122,7 @@ the GC. Built on internal intrinsics (raw loads/stores, pointer
 arithmetic, atomics, fences), compiler-checked no-GC functions and C-ABI
 externs. What stays native: startup, stack switching, the thread
 trampoline, exception unwinding (setjmp/longjmp or hxmc's own), the
-Windows exception handler; libc/libm or the system libraries; mbedtls
+Windows exception handler; libc or the system libraries; mbedtls
 and libuv.
 
 Shims that cannot be intrinsics are written per architecture through
@@ -316,7 +316,8 @@ module written from Mir (Ramsey-style structuring, SSA values as locals,
 exception handling for `try`), linked by hxmc, with the whole runtime in
 Haxe: the collector of rt.c single-threaded, malloc over `memory.grow`,
 field names and inline caches, strtod and float formatting identical to
-the C library's, musl's libm. The corpus passes under node 22 and wasmtime
+the C library's, musl's libm (since replaced, for every target, by the math
+library of README "Math"). The corpus passes under node 22 and wasmtime
 (threads and sockets excluded), and the port as a module compiles itself
 to the reference's HXB under both (15-16 s, native 8.4 s). Left:
 

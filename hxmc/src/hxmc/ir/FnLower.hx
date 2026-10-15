@@ -264,7 +264,7 @@ class FnLower {
 	// the intrinsics of hxmc.unsafe (MirBuild.intrinsic): no GC point but the
 	// allocations; these are pure (they read no memory)
 	public static var PURE_INTRINSICS = [
-		for (n in ["addr", "obj", "sym", "abi", "os", "arm", "target", "ult", "stack"])
+		for (n in ["addr", "obj", "sym", "abi", "os", "arm", "target", "ult", "stack", "fma"])
 			"hxmc_unsafe_Mem_" + n => true
 	];
 

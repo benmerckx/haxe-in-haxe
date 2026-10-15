@@ -12,7 +12,8 @@ using StringTools;
 //          corpus under node: after every edit
 //   check  quick + linux-arm64 (qemu) and windows-x86_64 (wine), x64 with a
 //          16 KB nursery, the wasm corpus with legacy exception handling
-//          (-D hxmc.wasm-eh=legacy) under node, ThreadNatives x30, the tool as
+//          (-D hxmc.wasm-eh=legacy) under node, ThreadNatives x30, the math
+//          library against glibc's on four targets (Libm.hx), the tool as
 //          a module building three cases for x64, arm64 and wasm32-wasi
 //          byte-identical to the native tool; --port adds the native port's
 //          self-compile: before commits
@@ -23,7 +24,8 @@ using StringTools;
 //          port's self-compile natively (64 KB, 256 KB, 256 KB with
 //          RT_VERIFY=1) and as a module (node, node with 256 KB, wasmtime, node
 //          with legacy exception handling); the tool as a module building
-//          every case for every target and itself; the fixpoint: before pushing
+//          every case for every target and itself; the math library (Libm.hx);
+//          the fixpoint: before pushing
 // Cases named restrict the corpus lanes to them; the port, ThreadNatives and
 // fixpoint lanes ignore them. Lanes run one after another (they share the
 // cases' output directories); the reference (bin/reference/haxe) is needed
@@ -110,6 +112,13 @@ class Tiers {
 		{ok: r.code == 0, detail: lastLine(r.out) + (bad.length == 0 ? "" : "  " + bad.slice(0, 8).join(", "))};
 	}
 
+	// the math library against glibc's on every target (Libm.hx)
+	static function libm() {
+		var r = exec(SCRIPT.concat(["Libm", "--n", "50000"]), {merge: true});
+		var lines = [for (l in r.out.split("\n")) if (l.contains(": ok") || l.contains(": FAIL") || l.contains(": skipped")) l.substr(0, l.indexOf(":") + (l.contains(": ok") ? 4 : 6))];
+		return {ok: r.code == 0, detail: r.code == 0 || lines.length > 0 ? lines.join(", ") : tail(r.out, 300)};
+	}
+
 	static function fixpoint() {
 		var r = exec(["make", "--no-print-directory", "fixpoint"], {merge: true});
 		var said = [for (l in r.out.split("\n")) if (l.startsWith("fixpoint:")) l];
@@ -133,6 +142,7 @@ class Tiers {
 			lane("windows (wine)", corpus("windows-x86_64", null, cases));
 			lane("wasm node legacy EH", corpus("wasm32-wasi", null, cases, LEGACY));
 			lane("ThreadNatives x30", threads(30, 16));
+			lane("libm", libm);
 			lane("cross-host", crosshost(["--targets", "linux-x86_64,linux-arm64,wasm32-wasi"].concat(cases.length > 0 ? cases : ["Unsafe", "SwitchIndex", "Regress"])));
 			if (port) lane("port self-compile", portNative);
 		}
@@ -161,6 +171,7 @@ class Tiers {
 				"--env", "PWD=" + root, wp]));
 			lane("wasm port build legacy EH", wasmPortBuild(true));
 			lane("wasm port node legacy EH", selfCompile(["node", "--no-warnings", "--stack-size=8000", FileSystem.fullPath("hxmc/bootstrap/wasi.mjs"), FileSystem.fullPath("bin/hxmc-t/wport") + "/haxe-legacy.wasm"], ["HXMC_WASM_EXNREF" => "0"]));
+			lane("libm", libm);
 			lane("cross-host", crosshost(["--tool"].concat(cases)));
 			lane("fixpoint", fixpoint);
 		}

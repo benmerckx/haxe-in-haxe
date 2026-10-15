@@ -111,6 +111,7 @@ class EncTestA64 {
 				emit('fadd d$d, d$n, d7', a -> a.fop2(2, 32 + d, 32 + n, 39));
 				emit('fsub d$d, d$n, d7', a -> a.fop2(3, 32 + d, 32 + n, 39));
 				emit('fmul d$d, d$n, d7', a -> a.fop2(0, 32 + d, 32 + n, 39));
+				emit('fmadd d$d, d$n, d7, d${(d + 3) & 31}', a -> a.fmadd(32 + d, 32 + n, 39, 32 + ((d + 3) & 31)));
 				emit('fdiv d$d, d$n, d7', a -> a.fop2(1, 32 + d, 32 + n, 39));
 				emit('fmov d$d, d$n', a -> a.fop1(0, 32 + d, 32 + n));
 				emit('fabs d$d, d$n', a -> a.fop1(1, 32 + d, 32 + n));

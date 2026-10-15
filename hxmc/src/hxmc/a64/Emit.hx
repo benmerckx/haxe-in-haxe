@@ -250,6 +250,8 @@ class Emit implements hxmc.Target.Emitter {
 				a.fop2(i.cond, i.d, i.s1, i.s2);
 			case FOP1:
 				a.fop1(i.cond, i.d, i.s1);
+			case FMADD:
+				a.fmadd(i.d, i.s1, i.s2, i.s3);
 			case SCVTF:
 				a.scvtf(x, i.d, i.s1);
 			case FCVTZS:

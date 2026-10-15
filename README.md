@@ -196,7 +196,10 @@ fuzzer programs, compiled by the tool, run with a 64 KB nursery (a missing
 root shows) and compared with their golden files, which are frozen (the
 outputs of hxc, the C target hxmc came from): a new case gets one with
 `--bless` (checked by hand), a changed output is an edit of its golden file
-with the reason in the commit. `Crosshost`: the tool as a WebAssembly module
+with the reason in the commit. `Libm`: the math library against glibc's on
+four targets, bit for bit where glibc rounds as LibM does, with `--core-math
+<checkout>` against CORE-MATH's C code and its hard cases (9.5 million
+inputs). `Crosshost`: the tool as a WebAssembly module
 writes the same bytes as the native tool, for every target, itself included.
 `RT_VERIFY=1` fills the free nursery with a pattern, so uninitialized
 allocations and missed roots show at once.
@@ -298,6 +301,19 @@ threads and the stop-the-world handshake, TLS over mbedtls, libuv, the field
 names and inline-cache tables, float formatting. A change of the runtime's
 interface or of the IR's conventions needs a tool that knows it: build once
 against the previous runtime first, or bootstrap again.
+
+Math (`hxmc/std/hxmc/rt/LibM.hx`, `LibMTrig.hx`, `LibMArc.hx`): `Math`'s
+functions in Haxe for every target, with glibc's results (the reference
+compiler's C library): `exp`, `log` and `pow` are Arm's Optimized Routines as
+glibc runs them on processors with FMA, bit for bit; `sin`, `cos`, `tan`,
+`asin`, `acos`, `atan` and `atan2` are the CORE-MATH project's correctly
+rounded functions (glibc's differ from them by an ulp in about one case in a
+thousand). They use the processor's fused multiply-add (`Mem.fma`: x86-64
+with FMA3, checked once at run time, and ARM64) or an exact one in software
+(WebAssembly, older x86-64), with the same results. The C library still
+computes the exact functions (`%`, `floor`, `ceil`). `Mem.fma` is behind `-D
+hxmc.fma`, which the tool adds to its builds (`hxmc.Main.CAPS`), so that an
+older tool (the stage0) still builds the std.
 
 Targets: Linux (static ELF with musl's members), Windows (PE over the UCRT,
 imports written from the import libraries), macOS (Mach-O against

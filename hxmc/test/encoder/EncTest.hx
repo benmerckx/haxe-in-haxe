@@ -136,6 +136,8 @@ class EncTest {
 				emit('movd ${r(d, 4)}, ${r(s + 16, 8)}', a -> a.movdRX(d, s + 16));
 				emit('cvtss2sd ${r(d + 16, 8)}, ${r(s + 16, 8)}', a -> a.cvtss2sd(d + 16, s + 16));
 				emit('cvtsd2ss ${r(d + 16, 8)}, ${r(s + 16, 8)}', a -> a.cvtsd2ss(d + 16, s + 16));
+				var c = (d + s + 7) & 15;
+				emit('vfmadd231sd ${r(d + 16, 8)}, ${r(s + 16, 8)}, ${r(c + 16, 8)}', a -> a.vfmadd231sd(d + 16, s + 16, c + 16));
 			}
 			for (size in sizes) {
 				emit('neg ${r(d, size)}', a -> a.neg(size, d));

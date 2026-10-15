@@ -2070,6 +2070,10 @@ class MirBuild {
 			case "target": iconst(targetCode(abi));
 			case "stack": stackAddr(f.slot(intLiteral(args[0], "Mem.stack"), 16));
 			case "ult": cmp(CULt, ex(args[0]), ex(args[1]));
+			case "fma":
+				if (abi.wasm) throw new Unsupported("Mem.fma on WebAssembly (test Mem.hasFma)");
+				special("fma", [ex(args[0]), ex(args[1]), ex(args[2])], F64);
+			case "hasFma": abi.arm ? iconst(1) : abi.wasm ? iconst(0) : special("has_fma", [], I32);
 			case "getI8": ld(I32, 1, true);
 			case "getU8": ld(I32, 1, false);
 			case "getI16": ld(I32, 2, true);

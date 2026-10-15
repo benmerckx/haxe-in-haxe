@@ -78,7 +78,7 @@ class Main {
 				failed = Std.string(e) + "\n" + haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 			}
 		}
-		var code = haxe.Main.run(args.concat(["--no-output"]));
+		var code = haxe.Main.run(args.concat(["--no-output"]).concat(CAPS));
 		if (failed != null) {
 			Sys.stderr().writeString("hxmc: " + failed + "\n");
 			Sys.exit(1);
@@ -86,6 +86,11 @@ class Main {
 		if (code == 0) UpToDate.record(key, out);
 		Sys.exit(code);
 	}
+
+	// what this hxmc compiles beyond its predecessors, for the std's code
+	// that an older tool (the committed stage0) must still build: -D
+	// hxmc.fma: Mem.fma and Mem.hasFma
+	public static var CAPS = ["-D", "hxmc.fma"];
 
 	static function generate(com:context.Common.CommonContext, out:String) {
 		var path = com.main.mainPath;

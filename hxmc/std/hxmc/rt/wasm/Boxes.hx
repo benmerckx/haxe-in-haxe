@@ -2,6 +2,7 @@ package hxmc.rt.wasm;
 
 import hxmc.I64;
 import hxmc.rt.Types.*;
+import hxmc.rt.LibM;
 import hxmc.unsafe.Mem;
 import hxmc.unsafe.Ptr;
 

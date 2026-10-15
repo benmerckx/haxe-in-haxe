@@ -366,6 +366,10 @@ class Emit implements hxmc.Target.Emitter {
 				a.movdXR(i.d, i.s1);
 			case MOVDRX:
 				a.movdRX(i.d, i.s1);
+			case VFMADD:
+				a.vfmadd231sd(i.d, i.s1, i.s2);
+			case HASFMA:
+				a.hasFma();
 		}
 	}
 }

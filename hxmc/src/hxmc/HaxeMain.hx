@@ -42,6 +42,7 @@ class HaxeMain {
 		// hxmc's std, given last (a custom target gets no std of its own)
 		var hxmcStd = Sys.getEnv("HXMC_STD");
 		if (hxmcStd != null && selectsHxmc(args, 0)) args = args.concat(["-cp", hxmcStd]);
+		if (selectsHxmc(args, 0)) args = args.concat(Main.CAPS);
 		var host = hostTarget();
 		// (the port calls the hook with --no-output too: e.g. writing HXB only)
 		var noOutput = args.contains("--no-output");

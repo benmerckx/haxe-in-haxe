@@ -31,6 +31,12 @@ extern class Mem {
 	static function stack(bytes:Int):Ptr;
 	// unsigned comparison
 	static function ult(a:I64, b:I64):Bool;
+	// a * b + c rounded once, by the processor's fused multiply-add (x86-64:
+	// vfmadd231sd, only where hasFma(); arm64: fmadd; not on WebAssembly)
+	static function fma(a:Float, b:Float, c:Float):Float;
+	// whether the processor and the OS support fma (x86-64: CPUID's FMA and
+	// OSXSAVE, XGETBV's xmm and ymm state; arm64: always; WebAssembly: never)
+	static function hasFma():Bool;
 	// calls code at fn with the C ABI (GC points: the callee may collect):
 	// fn(a) and fn(a, b) returning a reference
 	static function callRef1(fn:Ptr, a:Dynamic):Dynamic;

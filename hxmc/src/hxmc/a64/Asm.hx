@@ -422,6 +422,10 @@ class Asm {
 	public function fop2(op:Int, d:Int, n:Int, m:Int)
 		w([0x1E600800, 0x1E601800, 0x1E602800, 0x1E603800][op] | ((m & 31) << 16) | ((n & 31) << 5) | (d & 31));
 
+	// fmadd d, n, m, a: d <- a + n * m, rounded once
+	public function fmadd(d:Int, n:Int, m:Int, a:Int)
+		w(0x1F400000 | ((m & 31) << 16) | ((a & 31) << 10) | ((n & 31) << 5) | (d & 31));
+
 	// 0 fmov, 1 fabs, 2 fneg, 3 fsqrt, 4 frintm (floor), 5 frintp (ceil)
 	public function fop1(op:Int, d:Int, n:Int)
 		w([0x1E604000, 0x1E60C000, 0x1E614000, 0x1E61C000, 0x1E654000, 0x1E64C000][op] | ((n & 31) << 5) | (d & 31));
