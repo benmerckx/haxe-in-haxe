@@ -1,0 +1,363 @@
+{
+ "schema": 1,
+ "source": "imported",
+ "stat": "min",
+ "date": "2026-10-11T17:50:21Z",
+ "commit": "ecb1af244093db901241d1c28ad88a3cfec22e66",
+ "short": "ecb1af2",
+ "ref": "history",
+ "run_url": null,
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": 4,
+  "memory_gb": 15.7,
+  "os": "Linux 6.18 (shared development VM)",
+  "runner": null
+ },
+ "versions": {
+  "node": "v22.22.0",
+  "java": "OpenJDK 21",
+  "hashlink": "master 2.0.0 (3b7bd74)",
+  "hxcpp": "4.3.0 (git)",
+  "gcc": "13.3.0"
+ },
+ "runs": 3,
+ "method": "best (minimum) wall time of 3 runs, on a development VM, not the CI runner; imported from the repository's history",
+ "note": "Imported from site/bench (commit ecb1af2): built by the reference compiler, HashLink master (2.0.0) with gcc -O2 for HL/C, hxcpp 4.3.0 from git; best of 3 on a development VM.",
+ "targets": [
+  "cpp",
+  "jvm",
+  "js",
+  "hlc",
+  "hl"
+ ],
+ "cases": [
+  "alloc",
+  "bcrypt",
+  "binarytrees",
+  "json",
+  "mandelbrot",
+  "mandelbrot_anon",
+  "nbody",
+  "sha256",
+  "sha512",
+  "formatter_noio"
+ ],
+ "results": {
+  "alloc": {
+   "cpp": {
+    "median": 1.713,
+    "min": 1.713,
+    "max": null,
+    "build_s": 33.18
+   },
+   "hl": {
+    "median": 2.523,
+    "min": 2.523,
+    "max": null,
+    "build_s": 0.25
+   },
+   "hlc": {
+    "median": 2.476,
+    "min": 2.476,
+    "max": null,
+    "build_s": 2.85
+   },
+   "js": {
+    "median": 12.078,
+    "min": 12.078,
+    "max": null,
+    "build_s": 0.39
+   },
+   "jvm": {
+    "median": 2.033,
+    "min": 2.033,
+    "max": null,
+    "build_s": 0.47
+   }
+  },
+  "bcrypt": {
+   "cpp": {
+    "median": 2.407,
+    "min": 2.407,
+    "max": null,
+    "build_s": 36.5
+   },
+   "hl": {
+    "median": 5.007,
+    "min": 5.007,
+    "max": null,
+    "build_s": 0.26
+   },
+   "hlc": {
+    "median": 3.557,
+    "min": 3.557,
+    "max": null,
+    "build_s": 3.79
+   },
+   "js": {
+    "median": 2.967,
+    "min": 2.967,
+    "max": null,
+    "build_s": 0.41
+   },
+   "jvm": {
+    "median": 2.546,
+    "min": 2.546,
+    "max": null,
+    "build_s": 0.51
+   }
+  },
+  "binarytrees": {
+   "cpp": {
+    "median": 0.805,
+    "min": 0.805,
+    "max": null,
+    "build_s": 31.61
+   },
+   "hl": {
+    "median": 4.359,
+    "min": 4.359,
+    "max": null,
+    "build_s": 0.28
+   },
+   "hlc": {
+    "median": 4.151,
+    "min": 4.151,
+    "max": null,
+    "build_s": 2.83
+   },
+   "js": {
+    "median": 1.304,
+    "min": 1.304,
+    "max": null,
+    "build_s": 0.4
+   },
+   "jvm": {
+    "median": 0.671,
+    "min": 0.671,
+    "max": null,
+    "build_s": 0.57
+   }
+  },
+  "formatter_noio": {
+   "hl": {
+    "median": 17.184,
+    "min": 17.184,
+    "max": null,
+    "build_s": 1.07
+   },
+   "hlc": {
+    "median": 16.525,
+    "min": 16.525,
+    "max": null,
+    "build_s": 14.84
+   },
+   "js": {
+    "median": 17.351,
+    "min": 17.351,
+    "max": null,
+    "build_s": 0.91
+   },
+   "jvm": {
+    "median": 5.185,
+    "min": 5.185,
+    "max": null,
+    "build_s": 1.28
+   }
+  },
+  "json": {
+   "cpp": {
+    "median": 0.579,
+    "min": 0.579,
+    "max": null,
+    "build_s": 37.66
+   },
+   "hl": {
+    "median": 1.525,
+    "min": 1.525,
+    "max": null,
+    "build_s": 0.27
+   },
+   "hlc": {
+    "median": 1.368,
+    "min": 1.368,
+    "max": null,
+    "build_s": 3.11
+   },
+   "js": {
+    "median": 0.304,
+    "min": 0.304,
+    "max": null,
+    "build_s": 0.38
+   },
+   "jvm": {
+    "median": 0.538,
+    "min": 0.538,
+    "max": null,
+    "build_s": 0.5
+   }
+  },
+  "mandelbrot": {
+   "cpp": {
+    "median": 1.363,
+    "min": 1.363,
+    "max": null,
+    "build_s": 31.28
+   },
+   "hl": {
+    "median": 23.681,
+    "min": 23.681,
+    "max": null,
+    "build_s": 0.24
+   },
+   "hlc": {
+    "median": 22.784,
+    "min": 22.784,
+    "max": null,
+    "build_s": 2.81
+   },
+   "js": {
+    "median": 0.899,
+    "min": 0.899,
+    "max": null,
+    "build_s": 0.37
+   },
+   "jvm": {
+    "median": 1.076,
+    "min": 1.076,
+    "max": null,
+    "build_s": 0.49
+   }
+  },
+  "mandelbrot_anon": {
+   "cpp": {
+    "median": 8.079,
+    "min": 8.079,
+    "max": null,
+    "build_s": 31.75
+   },
+   "hl": {
+    "median": 34.21,
+    "min": 34.21,
+    "max": null,
+    "build_s": 0.28
+   },
+   "hlc": {
+    "median": 32.791,
+    "min": 32.791,
+    "max": null,
+    "build_s": 2.82
+   },
+   "js": {
+    "median": 0.888,
+    "min": 0.888,
+    "max": null,
+    "build_s": 0.38
+   },
+   "jvm": {
+    "median": 1.124,
+    "min": 1.124,
+    "max": null,
+    "build_s": 0.48
+   }
+  },
+  "nbody": {
+   "cpp": {
+    "median": 0.723,
+    "min": 0.723,
+    "max": null,
+    "build_s": 31.32
+   },
+   "hl": {
+    "median": 1.579,
+    "min": 1.579,
+    "max": null,
+    "build_s": 0.3
+   },
+   "hlc": {
+    "median": 1.136,
+    "min": 1.136,
+    "max": null,
+    "build_s": 2.96
+   },
+   "js": {
+    "median": 0.923,
+    "min": 0.923,
+    "max": null,
+    "build_s": 0.36
+   },
+   "jvm": {
+    "median": 0.809,
+    "min": 0.809,
+    "max": null,
+    "build_s": 0.46
+   }
+  },
+  "sha256": {
+   "cpp": {
+    "median": 0.23,
+    "min": 0.23,
+    "max": null,
+    "build_s": 35.05
+   },
+   "hl": {
+    "median": 0.645,
+    "min": 0.645,
+    "max": null,
+    "build_s": 0.27
+   },
+   "hlc": {
+    "median": 0.338,
+    "min": 0.338,
+    "max": null,
+    "build_s": 3.07
+   },
+   "js": {
+    "median": 0.257,
+    "min": 0.257,
+    "max": null,
+    "build_s": 0.39
+   },
+   "jvm": {
+    "median": 0.16,
+    "min": 0.16,
+    "max": null,
+    "build_s": 0.53
+   }
+  },
+  "sha512": {
+   "cpp": {
+    "median": 0.025,
+    "min": 0.025,
+    "max": null,
+    "build_s": 37.37
+   },
+   "hl": {
+    "median": 0.081,
+    "min": 0.081,
+    "max": null,
+    "build_s": 0.27
+   },
+   "hlc": {
+    "median": 0.048,
+    "min": 0.048,
+    "max": null,
+    "build_s": 3.17
+   },
+   "js": {
+    "median": 0.318,
+    "min": 0.318,
+    "max": null,
+    "build_s": 0.4
+   },
+   "jvm": {
+    "median": 0.126,
+    "min": 0.126,
+    "max": null,
+    "build_s": 0.47
+   }
+  }
+ },
+ "checks": {}
+}

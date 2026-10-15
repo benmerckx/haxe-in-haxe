@@ -1,0 +1,222 @@
+{
+ "schema": 1,
+ "source": "imported",
+ "stat": "min",
+ "date": "2026-10-15T10:15:00Z",
+ "commit": "143ce04690639ebb76bdcc77e8e7a431de476db9",
+ "short": "143ce04",
+ "ref": "history",
+ "run_url": null,
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": 4,
+  "memory_gb": 15.7,
+  "os": "Linux 6.18 (shared development VM)",
+  "runner": null
+ },
+ "versions": {
+  "node": "v22.22.0"
+ },
+ "runs": 3,
+ "method": "best (minimum) wall time of 3 runs, on a development VM, not the CI runner; imported from the repository's history",
+ "note": "Imported from hxmc/web/data/programs.json (commit cbb986a): hxmc native and wasm (node) at 143ce04; best of 3 on a development VM.",
+ "targets": [
+  "hxmc",
+  "hxmc-wasm"
+ ],
+ "cases": [
+  "alloc",
+  "bcrypt",
+  "binarytrees",
+  "json",
+  "mandelbrot",
+  "mandelbrot_anon",
+  "nbody",
+  "sha256",
+  "sha512",
+  "formatter_noio"
+ ],
+ "results": {
+  "alloc": {
+   "hxmc": {
+    "median": 1.593,
+    "min": 1.593,
+    "max": null,
+    "build_s": 0.3,
+    "size": 102740,
+    "gzip": 51102
+   },
+   "hxmc-wasm": {
+    "median": 2.087,
+    "min": 2.087,
+    "max": null,
+    "build_s": 0.42,
+    "size": 81192,
+    "gzip": 28134
+   }
+  },
+  "bcrypt": {
+   "hxmc": {
+    "median": 3.014,
+    "min": 3.014,
+    "max": null,
+    "build_s": 0.34,
+    "size": 347792,
+    "gzip": 166354
+   },
+   "hxmc-wasm": {
+    "median": 3.352,
+    "min": 3.352,
+    "max": null,
+    "build_s": 0.44,
+    "size": 324494,
+    "gzip": 139780
+   }
+  },
+  "binarytrees": {
+   "hxmc": {
+    "median": 0.722,
+    "min": 0.722,
+    "max": null,
+    "build_s": 0.32,
+    "size": 98100,
+    "gzip": 50254
+   },
+   "hxmc-wasm": {
+    "median": 1.263,
+    "min": 1.263,
+    "max": null,
+    "build_s": 0.43,
+    "size": 76604,
+    "gzip": 26656
+   }
+  },
+  "formatter_noio": {
+   "hxmc": {
+    "median": 6.48,
+    "min": 6.48,
+    "max": null,
+    "build_s": 1.43,
+    "size": 1379588,
+    "gzip": 403524
+   },
+   "hxmc-wasm": {
+    "median": 8.104,
+    "min": 8.104,
+    "max": null,
+    "build_s": 1.37,
+    "size": 1148325,
+    "gzip": 210917
+   }
+  },
+  "json": {
+   "hxmc": {
+    "median": 0.53,
+    "min": 0.53,
+    "max": null,
+    "build_s": 0.39,
+    "size": 173432,
+    "gzip": 80935
+   },
+   "hxmc-wasm": {
+    "median": 0.781,
+    "min": 0.781,
+    "max": null,
+    "build_s": 0.45,
+    "size": 152478,
+    "gzip": 46353
+   }
+  },
+  "mandelbrot": {
+   "hxmc": {
+    "median": 0.777,
+    "min": 0.777,
+    "max": null,
+    "build_s": 0.29,
+    "size": 102964,
+    "gzip": 51324
+   },
+   "hxmc-wasm": {
+    "median": 1.017,
+    "min": 1.017,
+    "max": null,
+    "build_s": 0.46,
+    "size": 81622,
+    "gzip": 28353
+   }
+  },
+  "mandelbrot_anon": {
+   "hxmc": {
+    "median": 1.285,
+    "min": 1.285,
+    "max": null,
+    "build_s": 0.3,
+    "size": 115284,
+    "gzip": 53588
+   },
+   "hxmc-wasm": {
+    "median": 2.503,
+    "min": 2.503,
+    "max": null,
+    "build_s": 0.44,
+    "size": 85076,
+    "gzip": 28916
+   }
+  },
+  "nbody": {
+   "hxmc": {
+    "median": 0.81,
+    "min": 0.81,
+    "max": null,
+    "build_s": 0.42,
+    "size": 102644,
+    "gzip": 51869
+   },
+   "hxmc-wasm": {
+    "median": 1.204,
+    "min": 1.204,
+    "max": null,
+    "build_s": 0.43,
+    "size": 80561,
+    "gzip": 27909
+   }
+  },
+  "sha256": {
+   "hxmc": {
+    "median": 0.177,
+    "min": 0.177,
+    "max": null,
+    "build_s": 0.36,
+    "size": 321508,
+    "gzip": 152097
+   },
+   "hxmc-wasm": {
+    "median": 0.355,
+    "min": 0.355,
+    "max": null,
+    "build_s": 0.4,
+    "size": 293629,
+    "gzip": 126887
+   }
+  },
+  "sha512": {
+   "hxmc": {
+    "median": 0.027,
+    "min": 0.027,
+    "max": null,
+    "build_s": 0.41,
+    "size": 334228,
+    "gzip": 156337
+   },
+   "hxmc-wasm": {
+    "median": 0.146,
+    "min": 0.146,
+    "max": null,
+    "build_s": 0.49,
+    "size": 301846,
+    "gzip": 129674
+   }
+  }
+ },
+ "checks": {}
+}

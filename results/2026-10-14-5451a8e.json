@@ -1,0 +1,549 @@
+{
+ "schema": 1,
+ "source": "imported",
+ "stat": "min",
+ "date": "2026-10-14T22:06:48Z",
+ "commit": "5451a8e27e98c6230760f1a6491c2660e86cfd52",
+ "short": "5451a8e",
+ "ref": "history",
+ "run_url": null,
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": 4,
+  "memory_gb": 15.7,
+  "os": "Linux 6.18 (shared development VM)",
+  "runner": null
+ },
+ "versions": {
+  "node": "v22.22.0",
+  "java": "OpenJDK 21.0.12.1",
+  "hashlink": "master 2.0.0",
+  "gcc": "13.3.0"
+ },
+ "runs": 5,
+ "method": "best (minimum) wall time of 5 runs, on a development VM, not the CI runner; imported from the repository's history",
+ "note": "Imported from site/bench/hxmc-haxebench.json (commit 7738d9c): hxmc at 5451a8e (sha512 re-measured at 4b9aa7d); HL/HL/C on HashLink master (2.0.0) with gcc -O2, built by the reference compiler; best of 5 on a development VM.",
+ "targets": [
+  "hxmc",
+  "hxmc-wasm",
+  "jvm",
+  "js",
+  "hlc",
+  "hl"
+ ],
+ "cases": [
+  "alloc",
+  "bcrypt",
+  "binarytrees",
+  "json",
+  "mandelbrot",
+  "mandelbrot_anon",
+  "nbody",
+  "sha256",
+  "sha512",
+  "formatter_noio"
+ ],
+ "results": {
+  "alloc": {
+   "hxmc": {
+    "median": 1.46,
+    "min": 1.46,
+    "max": null,
+    "build_s": 0.33,
+    "size": 98640,
+    "gzip": 50371
+   },
+   "hxmc-wasm": {
+    "median": 1.688,
+    "min": 1.688,
+    "max": null,
+    "build_s": 0.37,
+    "size": 86869,
+    "gzip": 28198
+   },
+   "hl": {
+    "median": 2.629,
+    "min": 2.629,
+    "max": null,
+    "build_s": 0.23,
+    "size": 57800,
+    "gzip": 24184
+   },
+   "hlc": {
+    "median": 2.649,
+    "min": 2.649,
+    "max": null,
+    "build_s": 3.07,
+    "size": 435352,
+    "gzip": 75207
+   },
+   "js": {
+    "median": 12.266,
+    "min": 12.266,
+    "max": null,
+    "build_s": 0.33,
+    "size": 12861,
+    "gzip": 3469
+   },
+   "jvm": {
+    "median": 1.745,
+    "min": 1.745,
+    "max": null,
+    "build_s": 0.48,
+    "size": 67681,
+    "gzip": 61749
+   }
+  },
+  "bcrypt": {
+   "hxmc": {
+    "median": 2.865,
+    "min": 2.865,
+    "max": null,
+    "build_s": 0.34,
+    "size": 347784,
+    "gzip": 165595
+   },
+   "hxmc-wasm": {
+    "median": 3.295,
+    "min": 3.295,
+    "max": null,
+    "build_s": 0.53,
+    "size": 332680,
+    "gzip": 139966
+   },
+   "hl": {
+    "median": 5.002,
+    "min": 5.002,
+    "max": null,
+    "build_s": 0.26,
+    "size": 192647,
+    "gzip": 114994
+   },
+   "hlc": {
+    "median": 3.421,
+    "min": 3.421,
+    "max": null,
+    "build_s": 3.82,
+    "size": 704160,
+    "gzip": 188718
+   },
+   "js": {
+    "median": 2.932,
+    "min": 2.932,
+    "max": null,
+    "build_s": 0.41,
+    "size": 136553,
+    "gzip": 88396
+   },
+   "jvm": {
+    "median": 2.461,
+    "min": 2.461,
+    "max": null,
+    "build_s": 0.45,
+    "size": 166518,
+    "gzip": 159219
+   }
+  },
+  "binarytrees": {
+   "hxmc": {
+    "median": 0.713,
+    "min": 0.713,
+    "max": null,
+    "build_s": 0.3,
+    "size": 98096,
+    "gzip": 49601
+   },
+   "hxmc-wasm": {
+    "median": 1.008,
+    "min": 1.008,
+    "max": null,
+    "build_s": 0.39,
+    "size": 81649,
+    "gzip": 26731
+   },
+   "hl": {
+    "median": 4.664,
+    "min": 4.664,
+    "max": null,
+    "build_s": 0.23,
+    "size": 57750,
+    "gzip": 24295
+   },
+   "hlc": {
+    "median": 4.133,
+    "min": 4.133,
+    "max": null,
+    "build_s": 3,
+    "size": 439344,
+    "gzip": 75511
+   },
+   "js": {
+    "median": 1.309,
+    "min": 1.309,
+    "max": null,
+    "build_s": 0.34,
+    "size": 10218,
+    "gzip": 2877
+   },
+   "jvm": {
+    "median": 0.661,
+    "min": 0.661,
+    "max": null,
+    "build_s": 0.43,
+    "size": 64307,
+    "gzip": 58858
+   }
+  },
+  "json": {
+   "hxmc": {
+    "median": 0.455,
+    "min": 0.455,
+    "max": null,
+    "build_s": 0.35,
+    "size": 173424,
+    "gzip": 80286
+   },
+   "hxmc-wasm": {
+    "median": 0.769,
+    "min": 0.769,
+    "max": null,
+    "build_s": 0.46,
+    "size": 166664,
+    "gzip": 47603
+   },
+   "hl": {
+    "median": 1.412,
+    "min": 1.412,
+    "max": null,
+    "build_s": 0.22,
+    "size": 67239,
+    "gzip": 29601
+   },
+   "hlc": {
+    "median": 1.399,
+    "min": 1.399,
+    "max": null,
+    "build_s": 2.84,
+    "size": 491624,
+    "gzip": 86519
+   },
+   "js": {
+    "median": 0.292,
+    "min": 0.292,
+    "max": null,
+    "build_s": 0.32,
+    "size": 12568,
+    "gzip": 3100
+   },
+   "jvm": {
+    "median": 0.53,
+    "min": 0.53,
+    "max": null,
+    "build_s": 0.46,
+    "size": 99859,
+    "gzip": 91801
+   }
+  },
+  "mandelbrot": {
+   "hxmc": {
+    "median": 0.57,
+    "min": 0.57,
+    "max": null,
+    "build_s": 0.33,
+    "size": 102960,
+    "gzip": 50679
+   },
+   "hxmc-wasm": {
+    "median": 0.765,
+    "min": 0.765,
+    "max": null,
+    "build_s": 0.38,
+    "size": 87412,
+    "gzip": 28311
+   },
+   "hl": {
+    "median": 24.327,
+    "min": 24.327,
+    "max": null,
+    "build_s": 0.23,
+    "size": 58570,
+    "gzip": 24746
+   },
+   "hlc": {
+    "median": 22.877,
+    "min": 22.877,
+    "max": null,
+    "build_s": 2.9,
+    "size": 445792,
+    "gzip": 76619
+   },
+   "js": {
+    "median": 0.867,
+    "min": 0.867,
+    "max": null,
+    "build_s": 0.35,
+    "size": 10675,
+    "gzip": 3078
+   },
+   "jvm": {
+    "median": 1.078,
+    "min": 1.078,
+    "max": null,
+    "build_s": 0.48,
+    "size": 66117,
+    "gzip": 60583
+   }
+  },
+  "mandelbrot_anon": {
+   "hxmc": {
+    "median": 0.946,
+    "min": 0.946,
+    "max": null,
+    "build_s": 0.3,
+    "size": 115280,
+    "gzip": 52939
+   },
+   "hxmc-wasm": {
+    "median": 2.034,
+    "min": 2.034,
+    "max": null,
+    "build_s": 0.44,
+    "size": 92059,
+    "gzip": 29114
+   },
+   "hl": {
+    "median": 33.508,
+    "min": 33.508,
+    "max": null,
+    "build_s": 0.21,
+    "size": 58443,
+    "gzip": 24687
+   },
+   "hlc": {
+    "median": 32.55,
+    "min": 32.55,
+    "max": null,
+    "build_s": 2.92,
+    "size": 444672,
+    "gzip": 76873
+   },
+   "js": {
+    "median": 0.847,
+    "min": 0.847,
+    "max": null,
+    "build_s": 0.32,
+    "size": 10495,
+    "gzip": 3034
+   },
+   "jvm": {
+    "median": 1.053,
+    "min": 1.053,
+    "max": null,
+    "build_s": 0.49,
+    "size": 66465,
+    "gzip": 60935
+   }
+  },
+  "nbody": {
+   "hxmc": {
+    "median": 0.727,
+    "min": 0.727,
+    "max": null,
+    "build_s": 0.33,
+    "size": 102640,
+    "gzip": 51061
+   },
+   "hxmc-wasm": {
+    "median": 0.944,
+    "min": 0.944,
+    "max": null,
+    "build_s": 0.42,
+    "size": 85934,
+    "gzip": 28123
+   },
+   "hl": {
+    "median": 1.46,
+    "min": 1.46,
+    "max": null,
+    "build_s": 0.28,
+    "size": 60058,
+    "gzip": 25491
+   },
+   "hlc": {
+    "median": 1.077,
+    "min": 1.077,
+    "max": null,
+    "build_s": 2.9,
+    "size": 449072,
+    "gzip": 77659
+   },
+   "js": {
+    "median": 0.867,
+    "min": 0.867,
+    "max": null,
+    "build_s": 0.32,
+    "size": 13791,
+    "gzip": 3772
+   },
+   "jvm": {
+    "median": 0.765,
+    "min": 0.765,
+    "max": null,
+    "build_s": 0.48,
+    "size": 66761,
+    "gzip": 61331
+   }
+  },
+  "sha256": {
+   "hxmc": {
+    "median": 0.161,
+    "min": 0.161,
+    "max": null,
+    "build_s": 0.35,
+    "size": 317408,
+    "gzip": 151449
+   },
+   "hxmc-wasm": {
+    "median": 0.289,
+    "min": 0.289,
+    "max": null,
+    "build_s": 0.41,
+    "size": 299852,
+    "gzip": 126823
+   },
+   "hl": {
+    "median": 0.612,
+    "min": 0.612,
+    "max": null,
+    "build_s": 0.22,
+    "size": 165699,
+    "gzip": 104401
+   },
+   "hlc": {
+    "median": 0.283,
+    "min": 0.283,
+    "max": null,
+    "build_s": 3.12,
+    "size": 670480,
+    "gzip": 176097
+   },
+   "js": {
+    "median": 0.268,
+    "min": 0.268,
+    "max": null,
+    "build_s": 0.34,
+    "size": 115949,
+    "gzip": 80975
+   },
+   "jvm": {
+    "median": 0.154,
+    "min": 0.154,
+    "max": null,
+    "build_s": 0.52,
+    "size": 142922,
+    "gzip": 137578
+   }
+  },
+  "sha512": {
+   "hxmc": {
+    "median": 0.026,
+    "min": 0.026,
+    "max": null,
+    "build_s": 0.36,
+    "size": 330128,
+    "gzip": 155776
+   },
+   "hxmc-wasm": {
+    "median": 0.139,
+    "min": 0.139,
+    "max": null,
+    "build_s": 0.43,
+    "size": 310128,
+    "gzip": 129825
+   },
+   "hl": {
+    "median": 0.079,
+    "min": 0.079,
+    "max": null,
+    "build_s": 0.24,
+    "size": 173157,
+    "gzip": 106807
+   },
+   "hlc": {
+    "median": 0.046,
+    "min": 0.046,
+    "max": null,
+    "build_s": 3.4,
+    "size": 682880,
+    "gzip": 179165
+   },
+   "js": {
+    "median": 0.311,
+    "min": 0.311,
+    "max": null,
+    "build_s": 0.39,
+    "size": 129988,
+    "gzip": 83652
+   },
+   "jvm": {
+    "median": 0.13,
+    "min": 0.13,
+    "max": null,
+    "build_s": 0.49,
+    "size": 152848,
+    "gzip": 146709
+   }
+  },
+  "formatter_noio": {
+   "hxmc": {
+    "median": 5.467,
+    "min": 5.467,
+    "max": null,
+    "build_s": 1.15,
+    "size": 1395984,
+    "gzip": 404023
+   },
+   "hxmc-wasm": {
+    "median": 7.639,
+    "min": 7.639,
+    "max": null,
+    "build_s": 1.28,
+    "size": 1376654,
+    "gzip": 229131
+   },
+   "hl": {
+    "median": 17.75,
+    "min": 17.75,
+    "max": null,
+    "build_s": 0.87,
+    "size": 352996,
+    "gzip": 156370
+   },
+   "hlc": {
+    "median": 17.833,
+    "min": 17.833,
+    "max": null,
+    "build_s": 15.25,
+    "size": 1915504,
+    "gzip": 416782
+   },
+   "js": {
+    "median": 18.549,
+    "min": 18.549,
+    "max": null,
+    "build_s": 0.87,
+    "size": 622887,
+    "gzip": 84593
+   },
+   "jvm": {
+    "median": 5.286,
+    "min": 5.286,
+    "max": null,
+    "build_s": 1.22,
+    "size": 923150,
+    "gzip": 828285
+   }
+  }
+ },
+ "checks": {}
+}
