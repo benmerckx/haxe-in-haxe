@@ -2012,6 +2012,22 @@ class MirBuild {
 		return {base: base, disp: disp, index: op1(SExt, I64, ex(i))};
 	}
 
+	// the high half of the 128-bit product of a and b from 32-bit halves
+	// (WebAssembly has no such instruction); signed: minus a if b < 0 and
+	// b if a < 0, from the unsigned one
+	function mulhiHalves(a:Int, b:Int, signed:Bool):Int {
+		var m32 = lconst(-1, 0);
+		var al = op2(And, I64, a, m32), ah = op2(Shr, I64, a, lconst32(32));
+		var bl = op2(And, I64, b, m32), bh = op2(Shr, I64, b, lconst32(32));
+		var t = op2(Mul, I64, al, bl);
+		var m1 = op2(Add, I64, op2(Mul, I64, ah, bl), op2(Shr, I64, t, lconst32(32)));
+		var m2 = op2(Add, I64, op2(Mul, I64, al, bh), op2(And, I64, m1, m32));
+		var hi = op2(Add, I64, op2(Add, I64, op2(Mul, I64, ah, bh), op2(Shr, I64, m1, lconst32(32))), op2(Shr, I64, m2, lconst32(32)));
+		if (!signed) return hi;
+		var sa = op2(Sar, I64, a, lconst32(63)), sb = op2(Sar, I64, b, lconst32(63));
+		return op2(Sub, I64, op2(Sub, I64, hi, op2(And, I64, sa, b)), op2(And, I64, sb, a));
+	}
+
 	// an inline expansion the instruction selection does (Call to hxmc$...)
 	function special(name:String, args:Array<Int>, ret:MTy):Int
 		return call(SPECIAL + name, args, ret);
@@ -2074,6 +2090,11 @@ class MirBuild {
 				if (abi.wasm) throw new Unsupported("Mem.fma on WebAssembly (test Mem.hasFma)");
 				special("fma", [ex(args[0]), ex(args[1]), ex(args[2])], F64);
 			case "hasFma": abi.arm ? iconst(1) : abi.wasm ? iconst(0) : special("has_fma", [], I32);
+			case "umulhi" | "mulhi":
+				var a = ex(args[0]), b = ex(args[1]);
+				abi.wasm ? mulhiHalves(a, b, short == "mulhi") : special(short == "mulhi" ? "smulhi" : "umulhi", [a, b], I64);
+			case "f64Bits": op1(FToBits, I64, ex(args[0]));
+			case "bitsF64": op1(BitsToF, F64, ex(args[0]));
 			case "getI8": ld(I32, 1, true);
 			case "getU8": ld(I32, 1, false);
 			case "getI16": ld(I32, 2, true);

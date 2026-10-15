@@ -24,15 +24,11 @@ import hxmc.unsafe.Ptr;
 @:keep @:allow(hxmc.rt)
 class LibMTrig {
 	static inline function bits(x:Float):I64 {
-		var t = Mem.stack(8);
-		Mem.setF64(t, 0, x);
-		return Mem.getI64(t, 0);
+		return Mem.f64Bits(x);
 	}
 
 	static inline function ofBits(u:I64):Float {
-		var t = Mem.stack(8);
-		Mem.setI64(t, 0, u);
-		return Mem.getF64(t, 0);
+		return Mem.bitsF64(u);
 	}
 
 	static inline function nz(x:I64):Bool

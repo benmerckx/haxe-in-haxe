@@ -473,6 +473,10 @@ class Asm {
 	public function idiv(size:Int, r:Int)
 		unary(7, size, r);
 
+	// mul / imul r (64 bits, one operand): rdx:rax <- rax * r
+	public function mulhi(signed:Bool, r:Int)
+		unary(signed ? 5 : 4, 8, r);
+
 	// cdq / cqo
 	public function signExtendAx(size:Int) {
 		if (size == 8) b.u8(0x48);

@@ -37,6 +37,14 @@ extern class Mem {
 	// whether the processor and the OS support fma (x86-64: CPUID's FMA and
 	// OSXSAVE, XGETBV's xmm and ymm state; arm64: always; WebAssembly: never)
 	static function hasFma():Bool;
+	// the high 64 bits of the 128-bit product of a and b, unsigned and
+	// signed (x86-64: mul, imul; arm64: umulh, smulh; WebAssembly: 32-bit
+	// halves)
+	static function umulhi(a:I64, b:I64):I64;
+	static function mulhi(a:I64, b:I64):I64;
+	// the bits of a double, and the double of bits (movq, fmov; no memory)
+	static function f64Bits(v:Float):I64;
+	static function bitsF64(b:I64):Float;
 	// calls code at fn with the C ABI (GC points: the callee may collect):
 	// fn(a) and fn(a, b) returning a reference
 	static function callRef1(fn:Ptr, a:Dynamic):Dynamic;

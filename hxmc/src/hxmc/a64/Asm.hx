@@ -240,6 +240,10 @@ class Asm {
 	public function mul(x:Bool, d:Int, n:Int, m:Int)
 		madd(x, d, n, m, ZR);
 
+	// umulh / smulh d, n, m: the high 64 bits of the 128-bit product
+	public function mulh(signed:Bool, d:Int, n:Int, m:Int)
+		w((signed ? 0x9B407C00 : 0x9BC07C00) | ((m & 31) << 16) | ((n & 31) << 5) | (d & 31));
+
 	// bitfield moves: sbfm (signed) / ubfm
 	public function bfm(signed:Bool, x:Bool, d:Int, n:Int, immr:Int, imms:Int)
 		w(sf(x) | (signed ? 0x13000000 : 0x53000000) | (x ? 1 << 22 : 0) | (immr << 16) | (imms << 10) | (n << 5) | d);

@@ -32,6 +32,10 @@ class EncTestA64 {
 						emit('orr ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.logicR(1, x, d, n, m));
 						emit('eor ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.logicR(2, x, d, n, m));
 						emit('mul ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.mul(x, d, n, m));
+						if (x) {
+							emit('umulh ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.mulh(false, d, n, m));
+							emit('smulh ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.mulh(true, d, n, m));
+						}
 						emit('sdiv ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.dp2(1, x, d, n, m));
 						emit('lsl ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.dp2(2, x, d, n, m));
 						emit('lsr ${r(d, x)}, ${r(n, x)}, ${r(m, x)}', a -> a.dp2(3, x, d, n, m));

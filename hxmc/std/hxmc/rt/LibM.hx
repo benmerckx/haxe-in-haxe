@@ -33,15 +33,11 @@ class LibM {
 	// ---- bits
 
 	static inline function bits(x:Float):I64 {
-		var t = Mem.stack(8);
-		Mem.setF64(t, 0, x);
-		return Mem.getI64(t, 0);
+		return Mem.f64Bits(x);
 	}
 
 	static inline function ofBits(u:I64):Float {
-		var t = Mem.stack(8);
-		Mem.setI64(t, 0, u);
-		return Mem.getF64(t, 0);
+		return Mem.bitsF64(u);
 	}
 
 	// a 64-bit constant from its two halves
@@ -94,12 +90,7 @@ class LibM {
 	// the high 64 bits of the 128-bit product of unsigned a and b (the low
 	// ones are a * b)
 	@:hxmc.noGc static inline function mulhi(a:I64, b:I64):I64 {
-		var al = (a << 32) >>> 32, ah = a >>> 32;
-		var bl = (b << 32) >>> 32, bh = b >>> 32;
-		var t = al * bl;
-		var m1 = ah * bl + (t >>> 32);
-		var m2 = al * bh + ((m1 << 32) >>> 32);
-		return ah * bh + (m1 >>> 32) + (m2 >>> 32);
+		return Mem.umulhi(a, b);
 	}
 
 	// ---- tables: hexadecimal words (`width` digits each) into memory, once
@@ -170,65 +161,45 @@ class LibM {
 	// 1 yes, 2 no), else fmaSoft
 	static var fmaHw = 0;
 
-	// (-D hxmc.fma: a tool that has Mem.fma, see hxmc.Main.CAPS; the results
-	// are the same without it)
 	@:hxmc.noGc public static inline function fma(a:Float, b:Float, c:Float):Float {
-		#if (hxmc.fma)
 		if (Mem.target() == 6) return fmaSoft(a, b, c);
 		if (Mem.arm()) return Mem.fma(a, b, c);
 		if (fmaHw == 1) return Mem.fma(a, b, c);
 		return fmaFirst(a, b, c);
-		#else
-		return fmaSoft(a, b, c);
-		#end
 	}
 
-	#if (hxmc.fma)
 	@:hxmc.noGc static function fmaFirst(a:Float, b:Float, c:Float):Float {
 		if (fmaHw == 0) fmaHw = Mem.hasFma() ? 1 : 2;
 		return fmaHw == 1 ? Mem.fma(a, b, c) : fmaSoft(a, b, c);
 	}
-	#end
 
 	// for the code specialized for the processor's fma (hw) and without it
 	// (one copy each, chosen once per call by useHw: a call of fmaSoft that
 	// the code may reach keeps its values in memory)
 	@:hxmc.noGc static inline function useHw():Bool {
-		#if (hxmc.fma)
 		if (Mem.target() == 6) return false;
 		if (Mem.arm()) return true;
 		if (fmaHw == 0) fmaHw = Mem.hasFma() ? 1 : 2;
 		return fmaHw == 1;
-		#else
-		return false;
-		#end
 	}
 
 	static inline function fm(hw:Bool, a:Float, b:Float, c:Float):Float {
-		#if (hxmc.fma)
 		var r:Float;
 		if (Mem.target() != 6) {
 			if (hw) r = Mem.fma(a, b, c); else r = fmaSoft(a, b, c);
 		} else
 			r = fmaSoft(a, b, c);
 		return r;
-		#else
-		return fmaSoft(a, b, c);
-		#end
 	}
 
 	// a * b - p exactly, for p = a * b rounded
 	static inline function me(hw:Bool, a:Float, b:Float, p:Float):Float {
-		#if (hxmc.fma)
 		var r:Float;
 		if (Mem.target() != 6) {
 			if (hw) r = Mem.fma(a, b, -p); else r = mulErr(a, b, p);
 		} else
 			r = mulErr(a, b, p);
 		return r;
-		#else
-		return mulErr(a, b, p);
-		#end
 	}
 
 	@:hxmc.noGc public static function fmaSoft(a:Float, b:Float, c:Float):Float {
@@ -782,7 +753,6 @@ class LibM {
 		return ofBits(uxi);
 	}
 
-	// WebAssembly has instructions for these (wasm.LinkWasm)
 	#end
 
 	// ---- the tables (ARM's exp_data.c, log_data.c, pow_log_data.c)

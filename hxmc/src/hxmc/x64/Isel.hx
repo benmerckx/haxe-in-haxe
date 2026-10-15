@@ -60,6 +60,7 @@ enum abstract XOp(Int) to Int from Int {
 	var MOVDXR; // d (xmm) <- s1 (32 bits)
 	var MOVDRX; // d (32 bits) <- s1 (xmm)
 	var VFMADD; // d <- d + s1 * s2, rounded once (vfmadd231sd: FMA3)
+	var MULHI; // rdx <- the high half of rax * s1 (cond: 4 mul, 5 imul), rax clobbered
 	var HASFMA; // rax <- whether FMA3 is usable (cpuid, xgetbv; clobbers rcx, rdx, r11)
 }
 
@@ -189,6 +190,11 @@ class Isel implements hxmc.Target.Selector {
 				uses.push(i.d);
 				uses.push(i.s1);
 				uses.push(i.s2);
+			case MULHI:
+				defs.push(RAX);
+				defs.push(RDX);
+				uses.push(RAX);
+				uses.push(i.s1);
 			case HASFMA:
 				defs.push(RAX);
 				defs.push(RCX);
@@ -1211,6 +1217,13 @@ class Isel implements hxmc.Target.Selector {
 				x.s1 = a;
 				x.s2 = b;
 				mov(d, t);
+			case "umulhi" | "smulhi":
+				var b = use(i.args[1]);
+				mov(RAX, use(i.args[0]), 8);
+				var x = emit(MULHI);
+				x.s1 = b;
+				x.cond = name == "umulhi" ? 4 : 5;
+				mov(reg(i.id), RDX, 8);
 			case "has_fma":
 				emit(HASFMA);
 				mov(reg(i.id), RAX, 4);

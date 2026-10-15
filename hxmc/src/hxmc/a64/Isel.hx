@@ -31,6 +31,7 @@ enum abstract AOp(Int) to Int from Int {
 	var FOP2; // d <- s1 (cond: 0 fmul, 1 fdiv, 2 fadd, 3 fsub) s2
 	var FOP1; // d <- (cond: 1 fabs, 2 fneg, 3 fsqrt) s1
 	var FMADD; // d <- s3 + s1 * s2, rounded once
+	var MULH; // d <- the high half of s1 * s2 (cond: 0 umulh, 1 smulh)
 	var SCVTF; // d (fpr) <- s1 (size)
 	var FCVTZS; // d <- s1 (fpr), truncating (size)
 	var FMOVTOG; // d <- bits of s1 (fpr)
@@ -130,7 +131,7 @@ class Isel implements hxmc.Target.Selector {
 			case STORE:
 				u(i.s1);
 				mem();
-			case ALU | ADDSH | MUL | SDIV | SHIFT | FOP2 | CSEL:
+			case ALU | ADDSH | MUL | SDIV | SHIFT | FOP2 | CSEL | MULH:
 				defs.push(i.d);
 				u(i.s1);
 				u(i.s2);
@@ -947,6 +948,12 @@ class Isel implements hxmc.Target.Selector {
 				var c = emit(FCVTSD);
 				c.d = reg(i.id);
 				c.s1 = t;
+			case "umulhi" | "smulhi":
+				var x = emit(MULH);
+				x.d = reg(i.id);
+				x.s1 = use(i.args[0]);
+				x.s2 = use(i.args[1]);
+				x.cond = name == "umulhi" ? 0 : 1;
 			case "fma":
 				var x = emit(FMADD);
 				x.d = reg(i.id);

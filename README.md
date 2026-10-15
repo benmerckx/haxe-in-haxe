@@ -311,9 +311,7 @@ rounded functions (glibc's differ from them by an ulp in about one case in a
 thousand). They use the processor's fused multiply-add (`Mem.fma`: x86-64
 with FMA3, checked once at run time, and ARM64) or an exact one in software
 (WebAssembly, older x86-64), with the same results. The C library still
-computes the exact functions (`%`, `floor`, `ceil`). `Mem.fma` is behind `-D
-hxmc.fma`, which the tool adds to its builds (`hxmc.Main.CAPS`), so that an
-older tool (the stage0) still builds the std.
+computes the exact functions (`%`, `floor`, `ceil`).
 
 Targets: Linux (static ELF with musl's members), Windows (PE over the UCRT,
 imports written from the import libraries), macOS (Mach-O against

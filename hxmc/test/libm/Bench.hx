@@ -1,10 +1,15 @@
 // The math functions' speed (hxmc/test/Libm.hx --bench): each over the
-// same inputs, the time per call in nanoseconds.
+// same inputs, the time per call in nanoseconds (the best of five runs).
 class Bench {
+	// the best of five runs
 	static function time(name:String, n:Int, f:Void->Float) {
-		var t0 = haxe.Timer.stamp();
-		var s = f();
-		var dt = haxe.Timer.stamp() - t0;
+		var dt = 1e9, s = 0.0;
+		for (k in 0...5) {
+			var t0 = haxe.Timer.stamp();
+			s = f();
+			var d = haxe.Timer.stamp() - t0;
+			if (d < dt) dt = d;
+		}
 		Sys.println('${StringTools.rpad(name, " ", 6)} ${StringTools.lpad(Std.string(Math.round(dt / n * 1e10) / 10), " ", 7)} ns  (checksum $s)');
 	}
 
