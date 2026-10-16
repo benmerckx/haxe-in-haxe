@@ -1,0 +1,41 @@
+name: expr
+on: push
+jobs:
+  a:
+    if: false
+    runs-on: ubuntu-24.04
+    steps: [{run: echo a}]
+  b:
+    needs: a
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps: [{run: echo b}]
+  m:
+    needs: b
+    if: ${{ !cancelled() && needs.b.result == 'success' }}
+    strategy: {matrix: {x: [1, 2]}}
+    runs-on: ubuntu-24.04
+    steps: [{run: echo m}]
+  dump:
+    needs: [b, m]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "$N"
+        env: {N: '${{ toJSON(needs) }}'}
+      - run: echo "${{ contains(needs.*.result, 'skipped') }} ${{ contains(needs.*.result, 'failure') }} ${{ join(needs.*.result, ',') }}"
+  c1:
+    needs: [b, m]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
+    runs-on: ubuntu-24.04
+    steps: [{run: echo c1}]
+  c2:
+    needs: [b, m]
+    if: ${{ !cancelled() && needs.b.result == 'success' && needs.m.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps: [{run: echo c2}]
+  c3:
+    needs: [b, m]
+    if: ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
+    runs-on: ubuntu-24.04
+    steps: [{run: echo c3}]
