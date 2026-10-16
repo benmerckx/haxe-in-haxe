@@ -12,17 +12,16 @@ jobs:
         timeout-minutes: 15
         run: |
           $cdb = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers" -Recurse -Filter cdb.exe -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "arm64" } | Select-Object -First 1).FullName
-          "cdb: $cdb"
-          foreach ($v in @("0", "1", "1", "1")) {
+          foreach ($exe in @("P1", "P2")) {
+          foreach ($v in @("0", "1")) {
             if ($v -eq "1") { $env:RT_VERIFY = "1" } else { Remove-Item Env:RT_VERIFY -ErrorAction SilentlyContinue }
             $env:RT_MINOR_KB = "64"
-            $p = Start-Process -FilePath "dbgbin\tn.exe" -PassThru -NoNewWindow -RedirectStandardOutput o.txt -RedirectStandardError e.txt
-            $done = $p.WaitForExit(15000)
-            "RT_VERIFY=$v exited=$done"
+            $p = Start-Process -FilePath "dbgbin\$exe.exe" -PassThru -NoNewWindow -RedirectStandardOutput o.txt -RedirectStandardError e.txt
+            $done = $p.WaitForExit(8000)
+            "== $exe RT_VERIFY=$v exited=$done"
             if (-not $done) {
-              if ($cdb) { & $cdb -pv -p $p.Id -c ".echo DUMP; lm; ~* r pc,lr,sp,fp; ~*k 50; qd" | Select-Object -Last 400 }
+              & $cdb -pv -p $p.Id -c ".echo DUMP; ~0 r; ~0 k 20; ~0 dps @sp L40; qd" | Select-String -Pattern "^(x|pc|lr|sp|fp|[0-9a-f]{8}`|[0-9a-f]{8} |  [0-9]|DUMP)" | Select-Object -Last 120
               $p.Kill()
             } else { "code $($p.ExitCode)" }
-            Get-Content o.txt | Select-Object -Last 15
-            Get-Content e.txt | Select-Object -Last 15
-          }
+            Get-Content o.txt; Get-Content e.txt
+          }}
