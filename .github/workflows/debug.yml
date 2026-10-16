@@ -1,0 +1,26 @@
+name: debug-wa64
+on: {push: {branches: [lowlevel-debug]}}
+permissions: {actions: read, contents: read}
+jobs:
+  wa64:
+    runs-on: windows-11-arm
+    defaults: {run: {shell: bash}}
+    steps:
+      - uses: actions/download-artifact@v8
+        with: {name: hxmc-haxe-windows-aarch64, path: dl, run-id: 38828231864, github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@v8
+        with: {name: corpus-windows-arm64, path: dl, run-id: 38828231864, github-token: '${{ github.token }}'}
+      - name: run
+        timeout-minutes: 25
+        run: |
+          mkdir -p t corpus
+          unzip -q dl/hxmc-haxe-windows-aarch64.zip -d t
+          tar xzf dl/corpus-windows-arm64.tar.gz -C corpus
+          B=$PWD/t/hxmc-haxe-windows-aarch64/haxe.exe
+          echo "== haxe -version, RT_VERIFY"; RT_VERIFY=1 RT_STATS=1 timeout 30 "$B" -version; echo "rc=$?"
+          ls corpus | head; ls corpus/* | head
+          for d in corpus/*/*/ corpus/*/; do [ -f "$d/m.exe" ] || continue
+            (cd "$d"; RT_VERIFY=1 RT_MINOR_KB=64 timeout 15 ./m.exe > out.txt 2> err.txt; echo "$d rc=$? $(head -c 300 err.txt | tr '\n' ' ')")
+          done
+          echo "== without RT_VERIFY, first few"
+          for d in corpus/*/; do [ -f "$d/m.exe" ] || continue; (cd "$d"; RT_MINOR_KB=64 timeout 15 ./m.exe > /dev/null 2>&1; echo "$d rc=$?"); done | head -20
