@@ -12,7 +12,7 @@ jobs:
         timeout-minutes: 15
         run: |
           $cdb = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Debuggers" -Recurse -Filter cdb.exe -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "arm64" } | Select-Object -First 1).FullName
-          foreach ($exe in @("P1", "P2")) {
+          foreach ($exe in @("P1", "P2", "tn")) {
           foreach ($v in @("0", "1")) {
             if ($v -eq "1") { $env:RT_VERIFY = "1" } else { Remove-Item Env:RT_VERIFY -ErrorAction SilentlyContinue }
             $env:RT_MINOR_KB = "64"
