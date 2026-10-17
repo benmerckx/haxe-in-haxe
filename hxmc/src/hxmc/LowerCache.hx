@@ -116,7 +116,7 @@ enum LCall {
 	CStaticClos(f:FuncInfo, r:LambdaInfo);
 	CHostClos(name:String, sig:SigInfo, self:Null<Ty>, r:LambdaInfo);
 	CCtorClos(ci:CtorInfo, sig:SigInfo, r:LambdaInfo);
-	CBoundClos(f:FuncInfo, dispatch:Null<{sel:Int, sig:SigInfo, ?cls:TClass}>, owner:FuncInfo, r:LambdaInfo);
+	CBoundClos(f:FuncInfo, dispatch:Null<{sel:Int, sig:SigInfo, args:Array<Ty>, ?cls:TClass}>, owner:FuncInfo, r:LambdaInfo);
 	CAdapter(from:SigInfo, to:SigInfo, r:LambdaInfo);
 	CLambda(sig:SigInfo, captures:Array<Local>, name:String, module:String, r:LambdaInfo);
 	CSelector(name:String, sig:SigInfo, r:Int);
@@ -389,7 +389,7 @@ class CachedLower extends Lower {
 		return r;
 	}
 
-	override public function boundClosure(f:FuncInfo, dispatch:Null<{sel:Int, sig:SigInfo, ?cls:TClass}>, owner:FuncInfo):LambdaInfo {
+	override public function boundClosure(f:FuncInfo, dispatch:Null<{sel:Int, sig:SigInfo, args:Array<Ty>, ?cls:TClass}>, owner:FuncInfo):LambdaInfo {
 		depth++;
 		var r = super.boundClosure(f, dispatch, owner);
 		depth--;
@@ -507,7 +507,7 @@ class CachedLower extends Lower {
 			case CCtorClos(ci, s, r):
 				bindLambda(r, ctorClosure(obj(ci), obj(s)));
 			case CBoundClos(f, d, owner, r):
-				bindLambda(r, boundClosure(obj(f), d == null ? null : {sel: sel(d.sel), sig: obj(d.sig), cls: d.cls}, obj(owner)));
+				bindLambda(r, boundClosure(obj(f), d == null ? null : {sel: sel(d.sel), sig: obj(d.sig), args: [for (t in d.args) mapTy(t)], cls: d.cls}, obj(owner)));
 			case CAdapter(from, to, r):
 				bindLambda(r, adapter(obj(from), obj(to)));
 			case CLambda(s, caps, name, module, r):

@@ -963,7 +963,7 @@ class Lower {
 	// a closure over `this` calling a method (obj.method used as a value)
 	var boundClosures = new Map<FuncInfo, LambdaInfo>();
 
-	public function boundClosure(f:Null<FuncInfo>, dispatch:Null<{sel:Int, sig:SigInfo, ?cls:TClass}>, owner:FuncInfo):LambdaInfo {
+	public function boundClosure(f:Null<FuncInfo>, dispatch:Null<{sel:Int, sig:SigInfo, args:Array<Ty>, ?cls:TClass}>, owner:FuncInfo):LambdaInfo {
 		if (f == null) {
 			// (an interface's method, or an abstract one no class of the chain
 			// implements: dispatched, the selector's signature without the

@@ -157,7 +157,7 @@ class FnLower {
 	}
 
 	// closure body forwarding to a function (static or bound method)
-	public function forward(f:Null<FuncInfo>, dispatch:Null<{sel:Int, sig:SigInfo, ?cls:TClass}>) {
+	public function forward(f:Null<FuncInfo>, dispatch:Null<{sel:Int, sig:SigInfo, args:Array<Ty>, ?cls:TClass}>) {
 		boxed = new Map();
 		var args = [];
 		var self = lambda.captures.length > 0 ? 1 : 0; // (the callee's arguments start with the receiver)
@@ -172,7 +172,7 @@ class FnLower {
 		for (k in 1...fi.args.length) {
 			var a = fi.args[k];
 			var j = k - 1 + self;
-			var target = k >= last ? a.ty : f != null ? f.args[j].ty : dispatch.sig.args[j];
+			var target = k >= last ? a.ty : f != null ? f.args[j].ty : dispatch.args[j];
 			switch a.ty {
 				// (signatures keep references as Dynamic: a nullable number is a box)
 				case TRef(_) if (target == TI32 || target == TF64 || target == TBool):
@@ -190,6 +190,10 @@ class FnLower {
 					});
 					out.push(SIf(EBin(RefEq, ELocal(a), ENull(a.ty)), dflt, [SSet(v, coerce(ELocal(a), a.ty, t))]));
 					args.push(ELocal(v));
+				// (the function takes a closure as the type it declares, which
+				// the one passed here may not have: signatures keep it Dynamic)
+				case _ if (closureConversion(a.ty, target)):
+					args.push(coerce(ELocal(a), a.ty, target));
 				case _:
 					args.push(ELocal(a));
 			}
@@ -1303,10 +1307,10 @@ class FnLower {
 		}
 		var li:LambdaInfo;
 		if (l.needsDispatch(c, cf.cfName)) {
-			var d = dispatchSig(c, cf);
+			var d = dispatchType(c, cf);
 			var impl = l.lookupMethod(c, cf.cfName);
 			var f = impl != null ? l.method(impl.cls, impl.field) : null;
-			li = l.boundClosure(f, {sel: l.selector(cf.cfName, d), sig: d, cls: c}, fi);
+			li = l.boundClosure(f, {sel: l.selector(cf.cfName, d.sig), sig: d.sig, args: d.args, cls: c}, fi);
 		} else {
 			var impl = l.lookupMethod(c, cf.cfName);
 			if (impl == null) fail("no implementation of " + cf.cfName, e);
@@ -1365,20 +1369,25 @@ class FnLower {
 		}
 	}
 
-	// the selector signature of a method: its root declaration's
-	function dispatchSig(c:TClass, cf:TClassField):SigInfo {
+	// the selector signature of a method (its root declaration's), and the
+	// types of its arguments and result there: the signature keeps references
+	// as Dynamic, but an implementation takes a closure argument as a closure
+	// of the declared type (Lower.method), so a call converts to these
+	function dispatchType(c:TClass, cf:TClassField):{sig:SigInfo, args:Array<Ty>, ret:Ty} {
 		var decl = l.rootDecl(c, cf.cfName);
 		var impl = l.lookupMethod(c, cf.cfName);
+		var args:Array<Ty>, ret:Ty;
 		if (impl != null) {
 			var f = l.method(impl.cls, impl.field);
-			return l.getProgram().sig([for (a in f.args) a.ty], f.ret);
-		}
-		return switch Lower.followFun((decl != null ? decl : cf).cfType) {
+			args = [for (a in f.args) a.ty];
+			ret = f.ret;
+		} else switch Lower.followFun((decl != null ? decl : cf).cfType) {
 			case TFun(s):
-				var rt = ty(s.ret);
-				l.getProgram().sig([TRef(RObj(l.rootClass()))].concat([for (a in s.args) ty(a.type)]).concat(rt.match(TStruct(_)) ? [TI64] : []), rt);
-			case _: fail("method type");
+				ret = ty(s.ret);
+				args = [TRef(RObj(l.rootClass()))].concat([for (a in s.args) ty(a.type)]).concat(ret.match(TStruct(_)) ? [TI64] : []);
+			case _: return fail("method type");
 		}
+		return {sig: l.getProgram().sig(args, ret), args: args, ret: ret};
 	}
 
 	// ---- operators
@@ -1794,14 +1803,15 @@ class FnLower {
 					case Method(_):
 				}
 				if (l.needsDispatch(c, cf.cfName)) {
-					var sig = dispatchSig(c, cf);
+					var d = dispatchType(c, cf);
+					var sig = d.sig;
 					var decl = l.rootDecl(c, cf.cfName);
 					var impl = l.lookupMethod(c, cf.cfName);
 					var ds = impl != null ? l.defaults.get(l.method(impl.cls, impl.field)) : null;
 					var rootTy = TRef(RObj(l.rootClass()));
 					var o = coerce(value(obj), tyOf(obj), rootTy);
 					var before = out.length;
-					var to = sig.ret.match(TStruct(_)) ? sig.args.slice(0, sig.args.length - 1) : sig.args;
+					var to = sig.ret.match(TStruct(_)) ? d.args.slice(0, d.args.length - 1) : d.args;
 					var xs = args(cargs, to, ds, 1);
 					o = spillBefore(o, rootTy, before);
 					if (cargs.length + 1 < to.length && !o.match(ELocal(_))) o = ELocal(asLocal(o, rootTy)); // (the defaults may test it)
@@ -1812,7 +1822,7 @@ class FnLower {
 						out.push(SExpr(ECallDispatch(l.selector(cf.cfName, sig), sig, [o].concat(xs).concat([ELocal(s)]))));
 						return coerce(ELocal(s), sig.ret, rt);
 					}
-					return coerceRhs(ECallDispatch(l.selector(cf.cfName, sig), sig, [o].concat(xs)), sig.ret, rt);
+					return coerceRhs(ECallDispatch(l.selector(cf.cfName, sig), sig, [o].concat(xs)), d.ret, rt);
 				}
 				var impl = l.lookupMethod(c, cf.cfName);
 				if (impl == null) fail("no implementation of " + cf.cfName, e);
